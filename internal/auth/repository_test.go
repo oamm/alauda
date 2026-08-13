@@ -162,6 +162,85 @@ func TestRepositoryBootstrapAdminCreatesTokenOnce(t *testing.T) {
 	}
 }
 
+func TestRepositoryListUsersAndRejectsInvalidRole(t *testing.T) {
+	ctx := context.Background()
+	db := newAuthTestDB(t, ctx)
+	repo := NewRepository(db)
+
+	if _, err := repo.CreateUser(ctx, CreateUserInput{
+		Username:    "bad",
+		Email:       "bad@example.test",
+		DisplayName: "Bad",
+		Password:    "password",
+		Role:        Role("Root"),
+	}); err == nil {
+		t.Fatalf("expected invalid role error")
+	}
+	for _, input := range []CreateUserInput{
+		{Username: "viewer", Email: "viewer@example.test", DisplayName: "Viewer", Password: "password", Role: RoleViewer, Tags: map[string]string{"team": "docs"}},
+		{Username: "ops", Email: "ops@example.test", DisplayName: "Ops", Password: "password", Role: RoleOperator},
+	} {
+		if _, err := repo.CreateUser(ctx, input); err != nil {
+			t.Fatalf("create user %s: %v", input.Username, err)
+		}
+	}
+	users, err := repo.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("list users: %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("users = %d, want 2", len(users))
+	}
+	if users[0].Username != "ops" || users[1].Username != "viewer" {
+		t.Fatalf("users order = %s, %s, want display-name order", users[0].Username, users[1].Username)
+	}
+	if users[1].Tags["team"] != "docs" {
+		t.Fatalf("user tags = %#v, want team docs", users[1].Tags)
+	}
+}
+
+func TestServiceLoginRejectsDisabledUserAndBadPassword(t *testing.T) {
+	ctx := context.Background()
+	db := newAuthTestDB(t, ctx)
+	repo := NewRepository(db)
+	service := NewService(repo, time.Hour)
+	user, err := repo.CreateUser(ctx, CreateUserInput{
+		Username:    "viewer",
+		Email:       "viewer@example.test",
+		DisplayName: "Viewer",
+		Password:    "password",
+		Role:        RoleViewer,
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if _, _, err := service.Login(ctx, user.Username, "wrong"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("bad password error = %v, want ErrInvalidCredentials", err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE users SET enabled = 0 WHERE id = ?`, user.ID); err != nil {
+		t.Fatalf("disable user: %v", err)
+	}
+	if _, _, err := service.Login(ctx, user.Username, "password"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("disabled user error = %v, want ErrInvalidCredentials", err)
+	}
+}
+
+func TestRepositoryTokenInputValidationAndAuthenticationErrors(t *testing.T) {
+	ctx := context.Background()
+	db := newAuthTestDB(t, ctx)
+	repo := NewRepository(db)
+	service := NewService(repo, time.Hour)
+	if _, err := repo.CreateToken(ctx, CreateTokenInput{UserID: "missing", Name: "bad", Scopes: []Scope{ScopeRead}}); err == nil {
+		t.Fatalf("expected foreign key error for missing user")
+	}
+	if _, err := service.AuthenticateToken(ctx, ""); err == nil {
+		t.Fatalf("expected empty token authentication error")
+	}
+	if _, err := service.AuthenticateToken(ctx, "sr_missing"); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("missing token error = %v, want sql.ErrNoRows", err)
+	}
+}
+
 func TestServiceCreateTokenRequiresAdminScopeAndDefaultsRead(t *testing.T) {
 	ctx := context.Background()
 	db := newAuthTestDB(t, ctx)

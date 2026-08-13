@@ -40,7 +40,7 @@ jobs:
 
       - name: Generate scoped Go coverage report
         shell: pwsh
-        run: ./scripts/coverage.ps1 -Threshold 0
+        run: ./scripts/coverage.ps1
 
       - name: Run frontend tests
         run: npm test -- --run

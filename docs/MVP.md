@@ -747,7 +747,7 @@ curl http://localhost:9700/api/v1/alerts/test/<channel-id>
 
 **Testing**:
 
-- [ ] Unit tests (>80% scoped maintained-package coverage; current scoped coverage: 65.7% on 2026-08-13 via `scripts/coverage.ps1`; previous all-package baseline was 25.6% including generated/entrypoint packages)
+- [x] Unit tests (>80% scoped maintained-package coverage; current scoped coverage: 80.4% on 2026-08-13 via `scripts/coverage.ps1`; previous all-package baseline was 25.6% including generated/entrypoint packages)
 - [x] Integration tests
 - [x] RBAC tests
 - [x] Audit log tests
