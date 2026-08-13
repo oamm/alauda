@@ -1,0 +1,159 @@
+syntax = "proto3";
+
+package registry.v1;
+
+option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
+
+import "api/registry/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message HealthCheck {
+  string id = 1;
+  string instance_id = 2;
+  string endpoint_id = 3;
+  string name = 4;
+  HealthCheckType type = 5;
+  bool enabled = 6;
+  int32 interval_seconds = 7;
+  int32 timeout_seconds = 8;
+  int32 failures_before_unhealthy = 9;
+  int32 successes_before_healthy = 10;
+  string description = 11;
+  map<string, string> tags = 12;
+  map<string, string> metadata = 13;
+}
+
+message HealthResult {
+  string id = 1;
+  string health_check_id = 2;
+  string instance_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  bool success = 5;
+  int32 latency_ms = 6;
+  int32 status_code = 7;
+  string error_type = 8;
+  string error_message = 9;
+  map<string, string> metadata = 10;
+}
+
+message HealthStateView {
+  string instance_id = 1;
+  HealthState current_state = 2;
+  int32 consecutive_successes = 3;
+  int32 consecutive_failures = 4;
+  google.protobuf.Timestamp last_transition_time = 5;
+  google.protobuf.Timestamp last_check_time = 6;
+}
+
+message CreateHealthCheckRequest {
+  string instance_id = 1;
+  string endpoint_id = 2;
+  string name = 3;
+  HealthCheckType type = 4;
+  bool enabled = 5;
+  int32 interval_seconds = 6;
+  int32 timeout_seconds = 7;
+  int32 failures_before_unhealthy = 8;
+  int32 successes_before_healthy = 9;
+  string description = 10;
+  map<string, string> tags = 11;
+  map<string, string> metadata = 12;
+}
+message CreateHealthCheckResponse { HealthCheck health_check = 1; }
+message GetHealthCheckRequest { string id = 1; }
+message GetHealthCheckResponse { HealthCheck health_check = 1; }
+message ListHealthChecksRequest {
+  PaginationRequest pagination = 1;
+  string instance_id = 2;
+  bool include_disabled = 3;
+}
+message ListHealthChecksResponse {
+  repeated HealthCheck health_checks = 1;
+  PaginationResponse pagination = 2;
+}
+message UpdateHealthCheckRequest {
+  string id = 1;
+  bool enabled = 2;
+  int32 interval_seconds = 3;
+  int32 timeout_seconds = 4;
+  int32 failures_before_unhealthy = 5;
+  int32 successes_before_healthy = 6;
+  string description = 7;
+}
+message UpdateHealthCheckResponse { HealthCheck health_check = 1; }
+message DeleteHealthCheckRequest { string id = 1; }
+message DeleteHealthCheckResponse {}
+message RunHealthCheckRequest { string id = 1; }
+message RunHealthCheckResponse {
+  HealthResult result = 1;
+  HealthStateView state = 2;
+}
+
+message GetInstanceHealthStateRequest { string instance_id = 1; }
+message GetInstanceHealthStateResponse { HealthStateView state = 1; }
+
+message ListHealthResultsRequest {
+  string health_check_id = 1;
+  string instance_id = 2;
+  PaginationRequest pagination = 3;
+}
+message ListHealthResultsResponse {
+  repeated HealthResult results = 1;
+  PaginationResponse pagination = 2;
+}
+
+message AvailabilitySummary {
+  string environment_id = 1;
+  string service_id = 2;
+  string deployment_id = 3;
+  string instance_id = 4;
+  int32 window_hours = 5;
+  google.protobuf.Timestamp window_start = 6;
+  google.protobuf.Timestamp window_end = 7;
+  double availability_percent = 8;
+  int64 downtime_seconds = 9;
+  int32 incident_count = 10;
+}
+
+message GetAvailabilityRequest {
+  string environment_id = 1;
+  string service_id = 2;
+  string deployment_id = 3;
+  string instance_id = 4;
+}
+
+message GetAvailabilityResponse {
+  AvailabilitySummary availability_24h = 1;
+  AvailabilitySummary availability_7d = 2;
+  AvailabilitySummary availability_30d = 3;
+}
+
+message WatchHealthEventsRequest {
+  string environment_id = 1;
+  string service_id = 2;
+  string deployment_id = 3;
+  string instance_id = 4;
+}
+
+message HealthEvent {
+  string instance_id = 1;
+  string health_check_id = 2;
+  HealthState previous_state = 3;
+  HealthState current_state = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  string reason = 6;
+}
+
+service HealthService {
+  rpc CreateHealthCheck(CreateHealthCheckRequest) returns (CreateHealthCheckResponse);
+  rpc GetHealthCheck(GetHealthCheckRequest) returns (GetHealthCheckResponse);
+  rpc ListHealthChecks(ListHealthChecksRequest) returns (ListHealthChecksResponse);
+  rpc UpdateHealthCheck(UpdateHealthCheckRequest) returns (UpdateHealthCheckResponse);
+  rpc DeleteHealthCheck(DeleteHealthCheckRequest) returns (DeleteHealthCheckResponse);
+  rpc RunHealthCheck(RunHealthCheckRequest) returns (RunHealthCheckResponse);
+
+  rpc GetInstanceHealthState(GetInstanceHealthStateRequest) returns (GetInstanceHealthStateResponse);
+  rpc ListHealthResults(ListHealthResultsRequest) returns (ListHealthResultsResponse);
+  rpc GetAvailability(GetAvailabilityRequest) returns (GetAvailabilityResponse);
+  rpc WatchHealthEvents(WatchHealthEventsRequest) returns (stream HealthEvent);
+}

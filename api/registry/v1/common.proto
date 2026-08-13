@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package registry.v1;
+
+option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Health state enumeration
+enum HealthState {
+  HEALTH_STATE_UNSPECIFIED = 0;
+  HEALTH_STATE_UNKNOWN = 1;
+  HEALTH_STATE_HEALTHY = 2;
+  HEALTH_STATE_DEGRADED = 3;
+  HEALTH_STATE_UNHEALTHY = 4;
+  HEALTH_STATE_DISABLED = 5;
+}
+
+// Health check type enumeration
+enum HealthCheckType {
+  HEALTH_CHECK_TYPE_UNSPECIFIED = 0;
+  HEALTH_CHECK_TYPE_HTTP = 1;
+  HEALTH_CHECK_TYPE_HTTPS = 2;
+  HEALTH_CHECK_TYPE_GRPC = 3;
+  HEALTH_CHECK_TYPE_TCP = 4;
+  HEALTH_CHECK_TYPE_UDP = 5;
+  HEALTH_CHECK_TYPE_HEARTBEAT = 6;
+}
+
+// Protocol enumeration
+enum Protocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_HTTP = 1;
+  PROTOCOL_HTTPS = 2;
+  PROTOCOL_GRPC = 3;
+  PROTOCOL_TCP = 4;
+  PROTOCOL_UDP = 5;
+}
+
+// Incident state enumeration
+enum IncidentState {
+  INCIDENT_STATE_UNSPECIFIED = 0;
+  INCIDENT_STATE_OPEN = 1;
+  INCIDENT_STATE_RESOLVED = 2;
+}
+
+// User role enumeration
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER_ROLE_ADMINISTRATOR = 1;
+  USER_ROLE_OPERATOR = 2;
+  USER_ROLE_VIEWER = 3;
+  USER_ROLE_AUTOMATION = 4;
+}
+
+// Standard error response
+message Error {
+  string code = 1;
+  string message = 2;
+  map<string, string> details = 3;
+}
+
+// Pagination request
+message PaginationRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// Pagination response
+message PaginationResponse {
+  string next_page_token = 1;
+  int32 total_size = 2;
+}
+
+// Tag key-value pair
+message Tag {
+  string key = 1;
+  string value = 2;
+}
+
+// Server health/version response
+message HealthCheckResponse {
+  bool alive = 1;
+  string version = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}

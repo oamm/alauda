@@ -1,0 +1,222 @@
+syntax = "proto3";
+
+package registry.v1;
+
+option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
+
+import "api/registry/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message Service {
+  string id = 1;
+  string name = 2;
+  string display_name = 3;
+  string description = 4;
+  map<string, string> tags = 5;
+  map<string, string> metadata = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message ServiceDeployment {
+  string id = 1;
+  string service_id = 2;
+  string environment_id = 3;
+  bool health_enabled = 4;
+  bool alerts_enabled = 5;
+  int32 alert_cooldown_minutes = 6;
+  map<string, string> tags = 7;
+  map<string, string> metadata = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message ServiceInstance {
+  string id = 1;
+  string deployment_id = 2;
+  string name = 3;
+  string address = 4;
+  int32 port = 5;
+  string description = 6;
+  bool enabled = 7;
+  map<string, string> tags = 8;
+  map<string, string> metadata = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  google.protobuf.Timestamp last_seen_at = 12;
+}
+
+message Endpoint {
+  string id = 1;
+  string instance_id = 2;
+  string name = 3;
+  Protocol protocol = 4;
+  int32 port = 5;
+  string path = 6;
+  bool enabled = 7;
+  map<string, string> tags = 8;
+  map<string, string> metadata = 9;
+}
+
+message CreateServiceRequest {
+  string name = 1;
+  string display_name = 2;
+  string description = 3;
+  map<string, string> tags = 4;
+  map<string, string> metadata = 5;
+}
+message CreateServiceResponse { Service service = 1; }
+message GetServiceRequest { string id = 1; }
+message GetServiceResponse { Service service = 1; }
+message ListServicesRequest {
+  PaginationRequest pagination = 1;
+  string environment_id = 2;
+}
+message ListServicesResponse {
+  repeated Service services = 1;
+  PaginationResponse pagination = 2;
+}
+message UpdateServiceRequest {
+  string id = 1;
+  string display_name = 2;
+  string description = 3;
+  map<string, string> tags = 4;
+  map<string, string> metadata = 5;
+}
+message UpdateServiceResponse { Service service = 1; }
+message DeleteServiceRequest { string id = 1; }
+message DeleteServiceResponse {}
+
+message CreateDeploymentRequest {
+  string service_id = 1;
+  string environment_id = 2;
+  bool health_enabled = 3;
+  bool alerts_enabled = 4;
+  int32 alert_cooldown_minutes = 5;
+  map<string, string> tags = 6;
+  map<string, string> metadata = 7;
+}
+message CreateDeploymentResponse { ServiceDeployment deployment = 1; }
+message GetDeploymentRequest { string id = 1; }
+message GetDeploymentResponse { ServiceDeployment deployment = 1; }
+message ListDeploymentsRequest {
+  PaginationRequest pagination = 1;
+  string service_id = 2;
+  string environment_id = 3;
+}
+message ListDeploymentsResponse {
+  repeated ServiceDeployment deployments = 1;
+  PaginationResponse pagination = 2;
+}
+message UpdateDeploymentRequest {
+  string id = 1;
+  bool health_enabled = 2;
+  bool alerts_enabled = 3;
+  int32 alert_cooldown_minutes = 4;
+  map<string, string> tags = 5;
+  map<string, string> metadata = 6;
+}
+message UpdateDeploymentResponse { ServiceDeployment deployment = 1; }
+message DeleteDeploymentRequest { string id = 1; }
+message DeleteDeploymentResponse {}
+
+message CreateInstanceRequest {
+  string deployment_id = 1;
+  string name = 2;
+  string address = 3;
+  int32 port = 4;
+  string description = 5;
+  bool enabled = 6;
+  map<string, string> tags = 7;
+  map<string, string> metadata = 8;
+}
+message CreateInstanceResponse { ServiceInstance instance = 1; }
+message GetInstanceRequest { string id = 1; }
+message GetInstanceResponse { ServiceInstance instance = 1; }
+message ListInstancesRequest {
+  PaginationRequest pagination = 1;
+  string deployment_id = 2;
+}
+message ListInstancesResponse {
+  repeated ServiceInstance instances = 1;
+  PaginationResponse pagination = 2;
+}
+message UpdateInstanceRequest {
+  string id = 1;
+  string address = 2;
+  int32 port = 3;
+  string description = 4;
+  bool enabled = 5;
+  map<string, string> tags = 6;
+  map<string, string> metadata = 7;
+}
+message UpdateInstanceResponse { ServiceInstance instance = 1; }
+message DeleteInstanceRequest { string id = 1; }
+message DeleteInstanceResponse {}
+
+message CreateEndpointRequest {
+  string instance_id = 1;
+  string name = 2;
+  Protocol protocol = 3;
+  int32 port = 4;
+  string path = 5;
+  bool enabled = 6;
+  map<string, string> tags = 7;
+  map<string, string> metadata = 8;
+}
+message CreateEndpointResponse { Endpoint endpoint = 1; }
+message GetEndpointRequest { string id = 1; }
+message GetEndpointResponse { Endpoint endpoint = 1; }
+message ListEndpointsRequest {
+  PaginationRequest pagination = 1;
+  string instance_id = 2;
+}
+message ListEndpointsResponse {
+  repeated Endpoint endpoints = 1;
+  PaginationResponse pagination = 2;
+}
+message UpdateEndpointRequest {
+  string id = 1;
+  string name = 2;
+  Protocol protocol = 3;
+  int32 port = 4;
+  string path = 5;
+  bool enabled = 6;
+  map<string, string> tags = 7;
+  map<string, string> metadata = 8;
+}
+message UpdateEndpointResponse { Endpoint endpoint = 1; }
+message DeleteEndpointRequest { string id = 1; }
+message DeleteEndpointResponse {}
+
+service CatalogService {
+  rpc CreateService(CreateServiceRequest) returns (CreateServiceResponse);
+  rpc GetService(GetServiceRequest) returns (GetServiceResponse);
+  rpc ListServices(ListServicesRequest) returns (ListServicesResponse);
+  rpc UpdateService(UpdateServiceRequest) returns (UpdateServiceResponse);
+  rpc DeleteService(DeleteServiceRequest) returns (DeleteServiceResponse);
+}
+
+service EndpointService {
+  rpc CreateEndpoint(CreateEndpointRequest) returns (CreateEndpointResponse);
+  rpc GetEndpoint(GetEndpointRequest) returns (GetEndpointResponse);
+  rpc ListEndpoints(ListEndpointsRequest) returns (ListEndpointsResponse);
+  rpc UpdateEndpoint(UpdateEndpointRequest) returns (UpdateEndpointResponse);
+  rpc DeleteEndpoint(DeleteEndpointRequest) returns (DeleteEndpointResponse);
+}
+
+service DeploymentService {
+  rpc CreateDeployment(CreateDeploymentRequest) returns (CreateDeploymentResponse);
+  rpc GetDeployment(GetDeploymentRequest) returns (GetDeploymentResponse);
+  rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse);
+  rpc UpdateDeployment(UpdateDeploymentRequest) returns (UpdateDeploymentResponse);
+  rpc DeleteDeployment(DeleteDeploymentRequest) returns (DeleteDeploymentResponse);
+}
+
+service InstanceService {
+  rpc CreateInstance(CreateInstanceRequest) returns (CreateInstanceResponse);
+  rpc GetInstance(GetInstanceRequest) returns (GetInstanceResponse);
+  rpc ListInstances(ListInstancesRequest) returns (ListInstancesResponse);
+  rpc UpdateInstance(UpdateInstanceRequest) returns (UpdateInstanceResponse);
+  rpc DeleteInstance(DeleteInstanceRequest) returns (DeleteInstanceResponse);
+}

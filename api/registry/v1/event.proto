@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package registry.v1;
+
+option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
+
+import "api/registry/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message Event {
+  string id = 1;
+  string type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string resource_type = 4;
+  string resource_id = 5;
+  string environment_id = 6;
+  string service_id = 7;
+  string deployment_id = 8;
+  string instance_id = 9;
+  string actor = 10;
+  string actor_id = 11;
+  string message = 12;
+  string changes = 13;
+  map<string, string> metadata = 14;
+}
+
+message ListEventsRequest {
+  PaginationRequest pagination = 1;
+  string environment_id = 2;
+  string service_id = 3;
+  string deployment_id = 4;
+  string instance_id = 5;
+  string type = 6;
+}
+
+message ListEventsResponse {
+  repeated Event events = 1;
+  PaginationResponse pagination = 2;
+}
+
+message WatchEventsRequest {
+  string environment_id = 1;
+  string service_id = 2;
+  string deployment_id = 3;
+  string instance_id = 4;
+}
+
+service EventService {
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse);
+  rpc WatchEvents(WatchEventsRequest) returns (stream Event);
+}

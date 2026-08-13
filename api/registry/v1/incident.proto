@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package registry.v1;
+
+option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
+
+import "api/registry/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message Incident {
+  string id = 1;
+  string instance_id = 2;
+  string deployment_id = 3;
+  string environment_id = 4;
+  string service_id = 5;
+  IncidentState state = 6;
+  google.protobuf.Timestamp opened_at = 7;
+  google.protobuf.Timestamp resolved_at = 8;
+  int64 duration_seconds = 9;
+  string reason = 10;
+  string impact_summary = 11;
+  map<string, string> tags = 12;
+  map<string, string> metadata = 13;
+}
+
+message GetIncidentRequest { string id = 1; }
+message GetIncidentResponse { Incident incident = 1; }
+
+message ListIncidentsRequest {
+  PaginationRequest pagination = 1;
+  string environment_id = 2;
+  string service_id = 3;
+  string deployment_id = 4;
+  string instance_id = 5;
+  IncidentState state = 6;
+}
+
+message ListIncidentsResponse {
+  repeated Incident incidents = 1;
+  PaginationResponse pagination = 2;
+}
+
+message ResolveIncidentRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message ResolveIncidentResponse { Incident incident = 1; }
+
+message WatchIncidentsRequest {
+  string environment_id = 1;
+  string service_id = 2;
+}
+
+service IncidentService {
+  rpc GetIncident(GetIncidentRequest) returns (GetIncidentResponse);
+  rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse);
+  rpc ResolveIncident(ResolveIncidentRequest) returns (ResolveIncidentResponse);
+  rpc WatchIncidents(WatchIncidentsRequest) returns (stream Incident);
+}

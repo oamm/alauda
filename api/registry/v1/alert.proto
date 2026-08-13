@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package registry.v1;
+
+option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
+
+import "api/registry/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message NotificationChannel {
+  string id = 1;
+  string type = 2;
+  string name = 3;
+  bool enabled = 4;
+  string description = 5;
+  map<string, string> configuration = 6;
+  map<string, string> retry_policy = 7;
+  map<string, string> tags = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message AlertPolicy {
+  string id = 1;
+  string deployment_id = 2;
+  string environment_id = 3;
+  bool enabled = 4;
+  repeated string notify_on = 5;
+  int32 cooldown_minutes = 6;
+  bool send_recovery_notification = 7;
+  map<string, string> filters = 8;
+  repeated string channel_ids = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message CreateNotificationChannelRequest {
+  string type = 1;
+  string name = 2;
+  bool enabled = 3;
+  string description = 4;
+  map<string, string> configuration = 5;
+  map<string, string> retry_policy = 6;
+  map<string, string> tags = 7;
+}
+message CreateNotificationChannelResponse { NotificationChannel channel = 1; }
+message GetNotificationChannelRequest { string id = 1; }
+message GetNotificationChannelResponse { NotificationChannel channel = 1; }
+message ListNotificationChannelsRequest { PaginationRequest pagination = 1; }
+message ListNotificationChannelsResponse {
+  repeated NotificationChannel channels = 1;
+  PaginationResponse pagination = 2;
+}
+message UpdateNotificationChannelRequest {
+  string id = 1;
+  string name = 2;
+  bool enabled = 3;
+  string description = 4;
+  map<string, string> configuration = 5;
+  map<string, string> retry_policy = 6;
+  map<string, string> tags = 7;
+}
+message UpdateNotificationChannelResponse { NotificationChannel channel = 1; }
+message DeleteNotificationChannelRequest { string id = 1; }
+message DeleteNotificationChannelResponse {}
+
+message CreateAlertPolicyRequest {
+  string deployment_id = 1;
+  string environment_id = 2;
+  bool enabled = 3;
+  repeated string notify_on = 4;
+  int32 cooldown_minutes = 5;
+  bool send_recovery_notification = 6;
+  map<string, string> filters = 7;
+  repeated string channel_ids = 8;
+}
+message CreateAlertPolicyResponse { AlertPolicy policy = 1; }
+message GetAlertPolicyRequest { string id = 1; }
+message GetAlertPolicyResponse { AlertPolicy policy = 1; }
+message ListAlertPoliciesRequest {
+  PaginationRequest pagination = 1;
+  string deployment_id = 2;
+  string environment_id = 3;
+}
+message ListAlertPoliciesResponse {
+  repeated AlertPolicy policies = 1;
+  PaginationResponse pagination = 2;
+}
+message UpdateAlertPolicyRequest {
+  string id = 1;
+  bool enabled = 2;
+  repeated string notify_on = 3;
+  int32 cooldown_minutes = 4;
+  bool send_recovery_notification = 5;
+  map<string, string> filters = 6;
+  repeated string channel_ids = 7;
+}
+message UpdateAlertPolicyResponse { AlertPolicy policy = 1; }
+message DeleteAlertPolicyRequest { string id = 1; }
+message DeleteAlertPolicyResponse {}
+
+service AlertService {
+  rpc CreateNotificationChannel(CreateNotificationChannelRequest) returns (CreateNotificationChannelResponse);
+  rpc GetNotificationChannel(GetNotificationChannelRequest) returns (GetNotificationChannelResponse);
+  rpc ListNotificationChannels(ListNotificationChannelsRequest) returns (ListNotificationChannelsResponse);
+  rpc UpdateNotificationChannel(UpdateNotificationChannelRequest) returns (UpdateNotificationChannelResponse);
+  rpc DeleteNotificationChannel(DeleteNotificationChannelRequest) returns (DeleteNotificationChannelResponse);
+
+  rpc CreateAlertPolicy(CreateAlertPolicyRequest) returns (CreateAlertPolicyResponse);
+  rpc GetAlertPolicy(GetAlertPolicyRequest) returns (GetAlertPolicyResponse);
+  rpc ListAlertPolicies(ListAlertPoliciesRequest) returns (ListAlertPoliciesResponse);
+  rpc UpdateAlertPolicy(UpdateAlertPolicyRequest) returns (UpdateAlertPolicyResponse);
+  rpc DeleteAlertPolicy(DeleteAlertPolicyRequest) returns (DeleteAlertPolicyResponse);
+}

@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package registry.v1;
+
+option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
+
+import "api/registry/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message Environment {
+  string id = 1;
+  string key = 2;
+  string name = 3;
+  string description = 4;
+  bool enabled = 5;
+  string tier = 6;
+  map<string, string> tags = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message CreateEnvironmentRequest {
+  string key = 1;
+  string name = 2;
+  string description = 3;
+  string tier = 4;
+  map<string, string> tags = 5;
+}
+
+message CreateEnvironmentResponse {
+  Environment environment = 1;
+}
+
+message GetEnvironmentRequest {
+  string id = 1;
+}
+
+message GetEnvironmentResponse {
+  Environment environment = 1;
+}
+
+message ListEnvironmentsRequest {
+  PaginationRequest pagination = 1;
+  bool include_disabled = 2;
+}
+
+message ListEnvironmentsResponse {
+  repeated Environment environments = 1;
+  PaginationResponse pagination = 2;
+}
+
+message UpdateEnvironmentRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  bool enabled = 4;
+  string tier = 5;
+  map<string, string> tags = 6;
+}
+
+message UpdateEnvironmentResponse {
+  Environment environment = 1;
+}
+
+message DeleteEnvironmentRequest {
+  string id = 1;
+}
+
+message DeleteEnvironmentResponse {}
+
+service EnvironmentService {
+  rpc CreateEnvironment(CreateEnvironmentRequest) returns (CreateEnvironmentResponse);
+  rpc GetEnvironment(GetEnvironmentRequest) returns (GetEnvironmentResponse);
+  rpc ListEnvironments(ListEnvironmentsRequest) returns (ListEnvironmentsResponse);
+  rpc UpdateEnvironment(UpdateEnvironmentRequest) returns (UpdateEnvironmentResponse);
+  rpc DeleteEnvironment(DeleteEnvironmentRequest) returns (DeleteEnvironmentResponse);
+}
