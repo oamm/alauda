@@ -798,6 +798,102 @@ func (*DeleteNotificationChannelResponse) Descriptor() ([]byte, []int) {
 	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{11}
 }
 
+type TestNotificationChannelRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChannelId     string                 `protobuf:"bytes,1,opt,name=channel_id,json=channelId,proto3" json:"channel_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestNotificationChannelRequest) Reset() {
+	*x = TestNotificationChannelRequest{}
+	mi := &file_api_registry_v1_alert_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestNotificationChannelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestNotificationChannelRequest) ProtoMessage() {}
+
+func (x *TestNotificationChannelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_alert_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestNotificationChannelRequest.ProtoReflect.Descriptor instead.
+func (*TestNotificationChannelRequest) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *TestNotificationChannelRequest) GetChannelId() string {
+	if x != nil {
+		return x.ChannelId
+	}
+	return ""
+}
+
+type TestNotificationChannelResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestNotificationChannelResponse) Reset() {
+	*x = TestNotificationChannelResponse{}
+	mi := &file_api_registry_v1_alert_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestNotificationChannelResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestNotificationChannelResponse) ProtoMessage() {}
+
+func (x *TestNotificationChannelResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_alert_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestNotificationChannelResponse.ProtoReflect.Descriptor instead.
+func (*TestNotificationChannelResponse) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *TestNotificationChannelResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *TestNotificationChannelResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type CreateAlertPolicyRequest struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	DeploymentId             string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
@@ -814,7 +910,7 @@ type CreateAlertPolicyRequest struct {
 
 func (x *CreateAlertPolicyRequest) Reset() {
 	*x = CreateAlertPolicyRequest{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[12]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -826,7 +922,7 @@ func (x *CreateAlertPolicyRequest) String() string {
 func (*CreateAlertPolicyRequest) ProtoMessage() {}
 
 func (x *CreateAlertPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[12]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -839,7 +935,7 @@ func (x *CreateAlertPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAlertPolicyRequest.ProtoReflect.Descriptor instead.
 func (*CreateAlertPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{12}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CreateAlertPolicyRequest) GetDeploymentId() string {
@@ -907,7 +1003,7 @@ type CreateAlertPolicyResponse struct {
 
 func (x *CreateAlertPolicyResponse) Reset() {
 	*x = CreateAlertPolicyResponse{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[13]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -919,7 +1015,7 @@ func (x *CreateAlertPolicyResponse) String() string {
 func (*CreateAlertPolicyResponse) ProtoMessage() {}
 
 func (x *CreateAlertPolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[13]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -932,7 +1028,7 @@ func (x *CreateAlertPolicyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAlertPolicyResponse.ProtoReflect.Descriptor instead.
 func (*CreateAlertPolicyResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{13}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CreateAlertPolicyResponse) GetPolicy() *AlertPolicy {
@@ -951,7 +1047,7 @@ type GetAlertPolicyRequest struct {
 
 func (x *GetAlertPolicyRequest) Reset() {
 	*x = GetAlertPolicyRequest{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[14]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -963,7 +1059,7 @@ func (x *GetAlertPolicyRequest) String() string {
 func (*GetAlertPolicyRequest) ProtoMessage() {}
 
 func (x *GetAlertPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[14]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -976,7 +1072,7 @@ func (x *GetAlertPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAlertPolicyRequest.ProtoReflect.Descriptor instead.
 func (*GetAlertPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{14}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetAlertPolicyRequest) GetId() string {
@@ -995,7 +1091,7 @@ type GetAlertPolicyResponse struct {
 
 func (x *GetAlertPolicyResponse) Reset() {
 	*x = GetAlertPolicyResponse{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[15]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1007,7 +1103,7 @@ func (x *GetAlertPolicyResponse) String() string {
 func (*GetAlertPolicyResponse) ProtoMessage() {}
 
 func (x *GetAlertPolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[15]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1020,7 +1116,7 @@ func (x *GetAlertPolicyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAlertPolicyResponse.ProtoReflect.Descriptor instead.
 func (*GetAlertPolicyResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{15}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetAlertPolicyResponse) GetPolicy() *AlertPolicy {
@@ -1041,7 +1137,7 @@ type ListAlertPoliciesRequest struct {
 
 func (x *ListAlertPoliciesRequest) Reset() {
 	*x = ListAlertPoliciesRequest{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[16]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1149,7 @@ func (x *ListAlertPoliciesRequest) String() string {
 func (*ListAlertPoliciesRequest) ProtoMessage() {}
 
 func (x *ListAlertPoliciesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[16]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1162,7 @@ func (x *ListAlertPoliciesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAlertPoliciesRequest.ProtoReflect.Descriptor instead.
 func (*ListAlertPoliciesRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{16}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListAlertPoliciesRequest) GetPagination() *PaginationRequest {
@@ -1100,7 +1196,7 @@ type ListAlertPoliciesResponse struct {
 
 func (x *ListAlertPoliciesResponse) Reset() {
 	*x = ListAlertPoliciesResponse{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[17]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1112,7 +1208,7 @@ func (x *ListAlertPoliciesResponse) String() string {
 func (*ListAlertPoliciesResponse) ProtoMessage() {}
 
 func (x *ListAlertPoliciesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[17]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1125,7 +1221,7 @@ func (x *ListAlertPoliciesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAlertPoliciesResponse.ProtoReflect.Descriptor instead.
 func (*ListAlertPoliciesResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{17}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListAlertPoliciesResponse) GetPolicies() []*AlertPolicy {
@@ -1157,7 +1253,7 @@ type UpdateAlertPolicyRequest struct {
 
 func (x *UpdateAlertPolicyRequest) Reset() {
 	*x = UpdateAlertPolicyRequest{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[18]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1169,7 +1265,7 @@ func (x *UpdateAlertPolicyRequest) String() string {
 func (*UpdateAlertPolicyRequest) ProtoMessage() {}
 
 func (x *UpdateAlertPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[18]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1182,7 +1278,7 @@ func (x *UpdateAlertPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAlertPolicyRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAlertPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{18}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UpdateAlertPolicyRequest) GetId() string {
@@ -1243,7 +1339,7 @@ type UpdateAlertPolicyResponse struct {
 
 func (x *UpdateAlertPolicyResponse) Reset() {
 	*x = UpdateAlertPolicyResponse{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[19]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1255,7 +1351,7 @@ func (x *UpdateAlertPolicyResponse) String() string {
 func (*UpdateAlertPolicyResponse) ProtoMessage() {}
 
 func (x *UpdateAlertPolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[19]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1268,7 +1364,7 @@ func (x *UpdateAlertPolicyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAlertPolicyResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAlertPolicyResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{19}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *UpdateAlertPolicyResponse) GetPolicy() *AlertPolicy {
@@ -1287,7 +1383,7 @@ type DeleteAlertPolicyRequest struct {
 
 func (x *DeleteAlertPolicyRequest) Reset() {
 	*x = DeleteAlertPolicyRequest{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[20]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1299,7 +1395,7 @@ func (x *DeleteAlertPolicyRequest) String() string {
 func (*DeleteAlertPolicyRequest) ProtoMessage() {}
 
 func (x *DeleteAlertPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[20]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1312,7 +1408,7 @@ func (x *DeleteAlertPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAlertPolicyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAlertPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{20}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DeleteAlertPolicyRequest) GetId() string {
@@ -1330,7 +1426,7 @@ type DeleteAlertPolicyResponse struct {
 
 func (x *DeleteAlertPolicyResponse) Reset() {
 	*x = DeleteAlertPolicyResponse{}
-	mi := &file_api_registry_v1_alert_proto_msgTypes[21]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1342,7 +1438,7 @@ func (x *DeleteAlertPolicyResponse) String() string {
 func (*DeleteAlertPolicyResponse) ProtoMessage() {}
 
 func (x *DeleteAlertPolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_alert_proto_msgTypes[21]
+	mi := &file_api_registry_v1_alert_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1355,7 +1451,7 @@ func (x *DeleteAlertPolicyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAlertPolicyResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAlertPolicyResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{21}
+	return file_api_registry_v1_alert_proto_rawDescGZIP(), []int{23}
 }
 
 var File_api_registry_v1_alert_proto protoreflect.FileDescriptor
@@ -1458,7 +1554,13 @@ const file_api_registry_v1_alert_proto_rawDesc = "" +
 	"\achannel\x18\x01 \x01(\v2 .registry.v1.NotificationChannelR\achannel\"2\n" +
 	" DeleteNotificationChannelRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"#\n" +
-	"!DeleteNotificationChannelResponse\"\xb1\x03\n" +
+	"!DeleteNotificationChannelResponse\"?\n" +
+	"\x1eTestNotificationChannelRequest\x12\x1d\n" +
+	"\n" +
+	"channel_id\x18\x01 \x01(\tR\tchannelId\"U\n" +
+	"\x1fTestNotificationChannelResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xb1\x03\n" +
 	"\x18CreateAlertPolicyRequest\x12#\n" +
 	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\x12%\n" +
 	"\x0eenvironment_id\x18\x02 \x01(\tR\renvironmentId\x12\x18\n" +
@@ -1505,13 +1607,14 @@ const file_api_registry_v1_alert_proto_rawDesc = "" +
 	"\x06policy\x18\x01 \x01(\v2\x18.registry.v1.AlertPolicyR\x06policy\"*\n" +
 	"\x18DeleteAlertPolicyRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x1b\n" +
-	"\x19DeleteAlertPolicyResponse2\xd9\b\n" +
+	"\x19DeleteAlertPolicyResponse2\xcf\t\n" +
 	"\fAlertService\x12z\n" +
 	"\x19CreateNotificationChannel\x12-.registry.v1.CreateNotificationChannelRequest\x1a..registry.v1.CreateNotificationChannelResponse\x12q\n" +
 	"\x16GetNotificationChannel\x12*.registry.v1.GetNotificationChannelRequest\x1a+.registry.v1.GetNotificationChannelResponse\x12w\n" +
 	"\x18ListNotificationChannels\x12,.registry.v1.ListNotificationChannelsRequest\x1a-.registry.v1.ListNotificationChannelsResponse\x12z\n" +
 	"\x19UpdateNotificationChannel\x12-.registry.v1.UpdateNotificationChannelRequest\x1a..registry.v1.UpdateNotificationChannelResponse\x12z\n" +
-	"\x19DeleteNotificationChannel\x12-.registry.v1.DeleteNotificationChannelRequest\x1a..registry.v1.DeleteNotificationChannelResponse\x12b\n" +
+	"\x19DeleteNotificationChannel\x12-.registry.v1.DeleteNotificationChannelRequest\x1a..registry.v1.DeleteNotificationChannelResponse\x12t\n" +
+	"\x17TestNotificationChannel\x12+.registry.v1.TestNotificationChannelRequest\x1a,.registry.v1.TestNotificationChannelResponse\x12b\n" +
 	"\x11CreateAlertPolicy\x12%.registry.v1.CreateAlertPolicyRequest\x1a&.registry.v1.CreateAlertPolicyResponse\x12Y\n" +
 	"\x0eGetAlertPolicy\x12\".registry.v1.GetAlertPolicyRequest\x1a#.registry.v1.GetAlertPolicyResponse\x12b\n" +
 	"\x11ListAlertPolicies\x12%.registry.v1.ListAlertPoliciesRequest\x1a&.registry.v1.ListAlertPoliciesResponse\x12b\n" +
@@ -1532,7 +1635,7 @@ func file_api_registry_v1_alert_proto_rawDescGZIP() []byte {
 	return file_api_registry_v1_alert_proto_rawDescData
 }
 
-var file_api_registry_v1_alert_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_api_registry_v1_alert_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_api_registry_v1_alert_proto_goTypes = []any{
 	(*NotificationChannel)(nil),               // 0: registry.v1.NotificationChannel
 	(*AlertPolicy)(nil),                       // 1: registry.v1.AlertPolicy
@@ -1546,83 +1649,87 @@ var file_api_registry_v1_alert_proto_goTypes = []any{
 	(*UpdateNotificationChannelResponse)(nil), // 9: registry.v1.UpdateNotificationChannelResponse
 	(*DeleteNotificationChannelRequest)(nil),  // 10: registry.v1.DeleteNotificationChannelRequest
 	(*DeleteNotificationChannelResponse)(nil), // 11: registry.v1.DeleteNotificationChannelResponse
-	(*CreateAlertPolicyRequest)(nil),          // 12: registry.v1.CreateAlertPolicyRequest
-	(*CreateAlertPolicyResponse)(nil),         // 13: registry.v1.CreateAlertPolicyResponse
-	(*GetAlertPolicyRequest)(nil),             // 14: registry.v1.GetAlertPolicyRequest
-	(*GetAlertPolicyResponse)(nil),            // 15: registry.v1.GetAlertPolicyResponse
-	(*ListAlertPoliciesRequest)(nil),          // 16: registry.v1.ListAlertPoliciesRequest
-	(*ListAlertPoliciesResponse)(nil),         // 17: registry.v1.ListAlertPoliciesResponse
-	(*UpdateAlertPolicyRequest)(nil),          // 18: registry.v1.UpdateAlertPolicyRequest
-	(*UpdateAlertPolicyResponse)(nil),         // 19: registry.v1.UpdateAlertPolicyResponse
-	(*DeleteAlertPolicyRequest)(nil),          // 20: registry.v1.DeleteAlertPolicyRequest
-	(*DeleteAlertPolicyResponse)(nil),         // 21: registry.v1.DeleteAlertPolicyResponse
-	nil,                                       // 22: registry.v1.NotificationChannel.ConfigurationEntry
-	nil,                                       // 23: registry.v1.NotificationChannel.RetryPolicyEntry
-	nil,                                       // 24: registry.v1.NotificationChannel.TagsEntry
-	nil,                                       // 25: registry.v1.AlertPolicy.FiltersEntry
-	nil,                                       // 26: registry.v1.CreateNotificationChannelRequest.ConfigurationEntry
-	nil,                                       // 27: registry.v1.CreateNotificationChannelRequest.RetryPolicyEntry
-	nil,                                       // 28: registry.v1.CreateNotificationChannelRequest.TagsEntry
-	nil,                                       // 29: registry.v1.UpdateNotificationChannelRequest.ConfigurationEntry
-	nil,                                       // 30: registry.v1.UpdateNotificationChannelRequest.RetryPolicyEntry
-	nil,                                       // 31: registry.v1.UpdateNotificationChannelRequest.TagsEntry
-	nil,                                       // 32: registry.v1.CreateAlertPolicyRequest.FiltersEntry
-	nil,                                       // 33: registry.v1.UpdateAlertPolicyRequest.FiltersEntry
-	(*timestamppb.Timestamp)(nil),             // 34: google.protobuf.Timestamp
-	(*PaginationRequest)(nil),                 // 35: registry.v1.PaginationRequest
-	(*PaginationResponse)(nil),                // 36: registry.v1.PaginationResponse
+	(*TestNotificationChannelRequest)(nil),    // 12: registry.v1.TestNotificationChannelRequest
+	(*TestNotificationChannelResponse)(nil),   // 13: registry.v1.TestNotificationChannelResponse
+	(*CreateAlertPolicyRequest)(nil),          // 14: registry.v1.CreateAlertPolicyRequest
+	(*CreateAlertPolicyResponse)(nil),         // 15: registry.v1.CreateAlertPolicyResponse
+	(*GetAlertPolicyRequest)(nil),             // 16: registry.v1.GetAlertPolicyRequest
+	(*GetAlertPolicyResponse)(nil),            // 17: registry.v1.GetAlertPolicyResponse
+	(*ListAlertPoliciesRequest)(nil),          // 18: registry.v1.ListAlertPoliciesRequest
+	(*ListAlertPoliciesResponse)(nil),         // 19: registry.v1.ListAlertPoliciesResponse
+	(*UpdateAlertPolicyRequest)(nil),          // 20: registry.v1.UpdateAlertPolicyRequest
+	(*UpdateAlertPolicyResponse)(nil),         // 21: registry.v1.UpdateAlertPolicyResponse
+	(*DeleteAlertPolicyRequest)(nil),          // 22: registry.v1.DeleteAlertPolicyRequest
+	(*DeleteAlertPolicyResponse)(nil),         // 23: registry.v1.DeleteAlertPolicyResponse
+	nil,                                       // 24: registry.v1.NotificationChannel.ConfigurationEntry
+	nil,                                       // 25: registry.v1.NotificationChannel.RetryPolicyEntry
+	nil,                                       // 26: registry.v1.NotificationChannel.TagsEntry
+	nil,                                       // 27: registry.v1.AlertPolicy.FiltersEntry
+	nil,                                       // 28: registry.v1.CreateNotificationChannelRequest.ConfigurationEntry
+	nil,                                       // 29: registry.v1.CreateNotificationChannelRequest.RetryPolicyEntry
+	nil,                                       // 30: registry.v1.CreateNotificationChannelRequest.TagsEntry
+	nil,                                       // 31: registry.v1.UpdateNotificationChannelRequest.ConfigurationEntry
+	nil,                                       // 32: registry.v1.UpdateNotificationChannelRequest.RetryPolicyEntry
+	nil,                                       // 33: registry.v1.UpdateNotificationChannelRequest.TagsEntry
+	nil,                                       // 34: registry.v1.CreateAlertPolicyRequest.FiltersEntry
+	nil,                                       // 35: registry.v1.UpdateAlertPolicyRequest.FiltersEntry
+	(*timestamppb.Timestamp)(nil),             // 36: google.protobuf.Timestamp
+	(*PaginationRequest)(nil),                 // 37: registry.v1.PaginationRequest
+	(*PaginationResponse)(nil),                // 38: registry.v1.PaginationResponse
 }
 var file_api_registry_v1_alert_proto_depIdxs = []int32{
-	22, // 0: registry.v1.NotificationChannel.configuration:type_name -> registry.v1.NotificationChannel.ConfigurationEntry
-	23, // 1: registry.v1.NotificationChannel.retry_policy:type_name -> registry.v1.NotificationChannel.RetryPolicyEntry
-	24, // 2: registry.v1.NotificationChannel.tags:type_name -> registry.v1.NotificationChannel.TagsEntry
-	34, // 3: registry.v1.NotificationChannel.created_at:type_name -> google.protobuf.Timestamp
-	34, // 4: registry.v1.NotificationChannel.updated_at:type_name -> google.protobuf.Timestamp
-	25, // 5: registry.v1.AlertPolicy.filters:type_name -> registry.v1.AlertPolicy.FiltersEntry
-	34, // 6: registry.v1.AlertPolicy.created_at:type_name -> google.protobuf.Timestamp
-	34, // 7: registry.v1.AlertPolicy.updated_at:type_name -> google.protobuf.Timestamp
-	26, // 8: registry.v1.CreateNotificationChannelRequest.configuration:type_name -> registry.v1.CreateNotificationChannelRequest.ConfigurationEntry
-	27, // 9: registry.v1.CreateNotificationChannelRequest.retry_policy:type_name -> registry.v1.CreateNotificationChannelRequest.RetryPolicyEntry
-	28, // 10: registry.v1.CreateNotificationChannelRequest.tags:type_name -> registry.v1.CreateNotificationChannelRequest.TagsEntry
+	24, // 0: registry.v1.NotificationChannel.configuration:type_name -> registry.v1.NotificationChannel.ConfigurationEntry
+	25, // 1: registry.v1.NotificationChannel.retry_policy:type_name -> registry.v1.NotificationChannel.RetryPolicyEntry
+	26, // 2: registry.v1.NotificationChannel.tags:type_name -> registry.v1.NotificationChannel.TagsEntry
+	36, // 3: registry.v1.NotificationChannel.created_at:type_name -> google.protobuf.Timestamp
+	36, // 4: registry.v1.NotificationChannel.updated_at:type_name -> google.protobuf.Timestamp
+	27, // 5: registry.v1.AlertPolicy.filters:type_name -> registry.v1.AlertPolicy.FiltersEntry
+	36, // 6: registry.v1.AlertPolicy.created_at:type_name -> google.protobuf.Timestamp
+	36, // 7: registry.v1.AlertPolicy.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 8: registry.v1.CreateNotificationChannelRequest.configuration:type_name -> registry.v1.CreateNotificationChannelRequest.ConfigurationEntry
+	29, // 9: registry.v1.CreateNotificationChannelRequest.retry_policy:type_name -> registry.v1.CreateNotificationChannelRequest.RetryPolicyEntry
+	30, // 10: registry.v1.CreateNotificationChannelRequest.tags:type_name -> registry.v1.CreateNotificationChannelRequest.TagsEntry
 	0,  // 11: registry.v1.CreateNotificationChannelResponse.channel:type_name -> registry.v1.NotificationChannel
 	0,  // 12: registry.v1.GetNotificationChannelResponse.channel:type_name -> registry.v1.NotificationChannel
-	35, // 13: registry.v1.ListNotificationChannelsRequest.pagination:type_name -> registry.v1.PaginationRequest
+	37, // 13: registry.v1.ListNotificationChannelsRequest.pagination:type_name -> registry.v1.PaginationRequest
 	0,  // 14: registry.v1.ListNotificationChannelsResponse.channels:type_name -> registry.v1.NotificationChannel
-	36, // 15: registry.v1.ListNotificationChannelsResponse.pagination:type_name -> registry.v1.PaginationResponse
-	29, // 16: registry.v1.UpdateNotificationChannelRequest.configuration:type_name -> registry.v1.UpdateNotificationChannelRequest.ConfigurationEntry
-	30, // 17: registry.v1.UpdateNotificationChannelRequest.retry_policy:type_name -> registry.v1.UpdateNotificationChannelRequest.RetryPolicyEntry
-	31, // 18: registry.v1.UpdateNotificationChannelRequest.tags:type_name -> registry.v1.UpdateNotificationChannelRequest.TagsEntry
+	38, // 15: registry.v1.ListNotificationChannelsResponse.pagination:type_name -> registry.v1.PaginationResponse
+	31, // 16: registry.v1.UpdateNotificationChannelRequest.configuration:type_name -> registry.v1.UpdateNotificationChannelRequest.ConfigurationEntry
+	32, // 17: registry.v1.UpdateNotificationChannelRequest.retry_policy:type_name -> registry.v1.UpdateNotificationChannelRequest.RetryPolicyEntry
+	33, // 18: registry.v1.UpdateNotificationChannelRequest.tags:type_name -> registry.v1.UpdateNotificationChannelRequest.TagsEntry
 	0,  // 19: registry.v1.UpdateNotificationChannelResponse.channel:type_name -> registry.v1.NotificationChannel
-	32, // 20: registry.v1.CreateAlertPolicyRequest.filters:type_name -> registry.v1.CreateAlertPolicyRequest.FiltersEntry
+	34, // 20: registry.v1.CreateAlertPolicyRequest.filters:type_name -> registry.v1.CreateAlertPolicyRequest.FiltersEntry
 	1,  // 21: registry.v1.CreateAlertPolicyResponse.policy:type_name -> registry.v1.AlertPolicy
 	1,  // 22: registry.v1.GetAlertPolicyResponse.policy:type_name -> registry.v1.AlertPolicy
-	35, // 23: registry.v1.ListAlertPoliciesRequest.pagination:type_name -> registry.v1.PaginationRequest
+	37, // 23: registry.v1.ListAlertPoliciesRequest.pagination:type_name -> registry.v1.PaginationRequest
 	1,  // 24: registry.v1.ListAlertPoliciesResponse.policies:type_name -> registry.v1.AlertPolicy
-	36, // 25: registry.v1.ListAlertPoliciesResponse.pagination:type_name -> registry.v1.PaginationResponse
-	33, // 26: registry.v1.UpdateAlertPolicyRequest.filters:type_name -> registry.v1.UpdateAlertPolicyRequest.FiltersEntry
+	38, // 25: registry.v1.ListAlertPoliciesResponse.pagination:type_name -> registry.v1.PaginationResponse
+	35, // 26: registry.v1.UpdateAlertPolicyRequest.filters:type_name -> registry.v1.UpdateAlertPolicyRequest.FiltersEntry
 	1,  // 27: registry.v1.UpdateAlertPolicyResponse.policy:type_name -> registry.v1.AlertPolicy
 	2,  // 28: registry.v1.AlertService.CreateNotificationChannel:input_type -> registry.v1.CreateNotificationChannelRequest
 	4,  // 29: registry.v1.AlertService.GetNotificationChannel:input_type -> registry.v1.GetNotificationChannelRequest
 	6,  // 30: registry.v1.AlertService.ListNotificationChannels:input_type -> registry.v1.ListNotificationChannelsRequest
 	8,  // 31: registry.v1.AlertService.UpdateNotificationChannel:input_type -> registry.v1.UpdateNotificationChannelRequest
 	10, // 32: registry.v1.AlertService.DeleteNotificationChannel:input_type -> registry.v1.DeleteNotificationChannelRequest
-	12, // 33: registry.v1.AlertService.CreateAlertPolicy:input_type -> registry.v1.CreateAlertPolicyRequest
-	14, // 34: registry.v1.AlertService.GetAlertPolicy:input_type -> registry.v1.GetAlertPolicyRequest
-	16, // 35: registry.v1.AlertService.ListAlertPolicies:input_type -> registry.v1.ListAlertPoliciesRequest
-	18, // 36: registry.v1.AlertService.UpdateAlertPolicy:input_type -> registry.v1.UpdateAlertPolicyRequest
-	20, // 37: registry.v1.AlertService.DeleteAlertPolicy:input_type -> registry.v1.DeleteAlertPolicyRequest
-	3,  // 38: registry.v1.AlertService.CreateNotificationChannel:output_type -> registry.v1.CreateNotificationChannelResponse
-	5,  // 39: registry.v1.AlertService.GetNotificationChannel:output_type -> registry.v1.GetNotificationChannelResponse
-	7,  // 40: registry.v1.AlertService.ListNotificationChannels:output_type -> registry.v1.ListNotificationChannelsResponse
-	9,  // 41: registry.v1.AlertService.UpdateNotificationChannel:output_type -> registry.v1.UpdateNotificationChannelResponse
-	11, // 42: registry.v1.AlertService.DeleteNotificationChannel:output_type -> registry.v1.DeleteNotificationChannelResponse
-	13, // 43: registry.v1.AlertService.CreateAlertPolicy:output_type -> registry.v1.CreateAlertPolicyResponse
-	15, // 44: registry.v1.AlertService.GetAlertPolicy:output_type -> registry.v1.GetAlertPolicyResponse
-	17, // 45: registry.v1.AlertService.ListAlertPolicies:output_type -> registry.v1.ListAlertPoliciesResponse
-	19, // 46: registry.v1.AlertService.UpdateAlertPolicy:output_type -> registry.v1.UpdateAlertPolicyResponse
-	21, // 47: registry.v1.AlertService.DeleteAlertPolicy:output_type -> registry.v1.DeleteAlertPolicyResponse
-	38, // [38:48] is the sub-list for method output_type
-	28, // [28:38] is the sub-list for method input_type
+	12, // 33: registry.v1.AlertService.TestNotificationChannel:input_type -> registry.v1.TestNotificationChannelRequest
+	14, // 34: registry.v1.AlertService.CreateAlertPolicy:input_type -> registry.v1.CreateAlertPolicyRequest
+	16, // 35: registry.v1.AlertService.GetAlertPolicy:input_type -> registry.v1.GetAlertPolicyRequest
+	18, // 36: registry.v1.AlertService.ListAlertPolicies:input_type -> registry.v1.ListAlertPoliciesRequest
+	20, // 37: registry.v1.AlertService.UpdateAlertPolicy:input_type -> registry.v1.UpdateAlertPolicyRequest
+	22, // 38: registry.v1.AlertService.DeleteAlertPolicy:input_type -> registry.v1.DeleteAlertPolicyRequest
+	3,  // 39: registry.v1.AlertService.CreateNotificationChannel:output_type -> registry.v1.CreateNotificationChannelResponse
+	5,  // 40: registry.v1.AlertService.GetNotificationChannel:output_type -> registry.v1.GetNotificationChannelResponse
+	7,  // 41: registry.v1.AlertService.ListNotificationChannels:output_type -> registry.v1.ListNotificationChannelsResponse
+	9,  // 42: registry.v1.AlertService.UpdateNotificationChannel:output_type -> registry.v1.UpdateNotificationChannelResponse
+	11, // 43: registry.v1.AlertService.DeleteNotificationChannel:output_type -> registry.v1.DeleteNotificationChannelResponse
+	13, // 44: registry.v1.AlertService.TestNotificationChannel:output_type -> registry.v1.TestNotificationChannelResponse
+	15, // 45: registry.v1.AlertService.CreateAlertPolicy:output_type -> registry.v1.CreateAlertPolicyResponse
+	17, // 46: registry.v1.AlertService.GetAlertPolicy:output_type -> registry.v1.GetAlertPolicyResponse
+	19, // 47: registry.v1.AlertService.ListAlertPolicies:output_type -> registry.v1.ListAlertPoliciesResponse
+	21, // 48: registry.v1.AlertService.UpdateAlertPolicy:output_type -> registry.v1.UpdateAlertPolicyResponse
+	23, // 49: registry.v1.AlertService.DeleteAlertPolicy:output_type -> registry.v1.DeleteAlertPolicyResponse
+	39, // [39:50] is the sub-list for method output_type
+	28, // [28:39] is the sub-list for method input_type
 	28, // [28:28] is the sub-list for extension type_name
 	28, // [28:28] is the sub-list for extension extendee
 	0,  // [0:28] is the sub-list for field type_name
@@ -1640,7 +1747,7 @@ func file_api_registry_v1_alert_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_registry_v1_alert_proto_rawDesc), len(file_api_registry_v1_alert_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   34,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

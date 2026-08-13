@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
+	"github.com/company/service-registry/internal/alerts"
 )
 
 func (h *alertHandler) CreateNotificationChannel(ctx context.Context, req *connect.Request[registryv1.CreateNotificationChannelRequest]) (*connect.Response[registryv1.CreateNotificationChannelResponse], error) {
@@ -71,6 +72,30 @@ func (h *alertHandler) DeleteNotificationChannel(ctx context.Context, req *conne
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteNotificationChannelResponse{}), nil
+}
+
+func (h *alertHandler) TestNotificationChannel(ctx context.Context, req *connect.Request[registryv1.TestNotificationChannelRequest]) (*connect.Response[registryv1.TestNotificationChannelResponse], error) {
+	if req.Msg.GetChannelId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("channel_id is required"))
+	}
+	channel, err := h.repo.GetNotificationChannel(ctx, req.Msg.GetChannelId())
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	engine := h.engine
+	if engine == nil {
+		engine = alerts.NewEngine(h.repo, nil)
+	}
+	if err := engine.TestChannel(ctx, channel); err != nil {
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+	return connect.NewResponse(&registryv1.TestNotificationChannelResponse{
+		Success: true,
+		Message: "sent",
+	}), nil
 }
 
 func (h *alertHandler) CreateAlertPolicy(ctx context.Context, req *connect.Request[registryv1.CreateAlertPolicyRequest]) (*connect.Response[registryv1.CreateAlertPolicyResponse], error) {

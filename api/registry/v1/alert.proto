@@ -63,6 +63,11 @@ message UpdateNotificationChannelRequest {
 message UpdateNotificationChannelResponse { NotificationChannel channel = 1; }
 message DeleteNotificationChannelRequest { string id = 1; }
 message DeleteNotificationChannelResponse {}
+message TestNotificationChannelRequest { string channel_id = 1; }
+message TestNotificationChannelResponse {
+  bool success = 1;
+  string message = 2;
+}
 
 message CreateAlertPolicyRequest {
   string deployment_id = 1;
@@ -105,6 +110,7 @@ service AlertService {
   rpc ListNotificationChannels(ListNotificationChannelsRequest) returns (ListNotificationChannelsResponse);
   rpc UpdateNotificationChannel(UpdateNotificationChannelRequest) returns (UpdateNotificationChannelResponse);
   rpc DeleteNotificationChannel(DeleteNotificationChannelRequest) returns (DeleteNotificationChannelResponse);
+  rpc TestNotificationChannel(TestNotificationChannelRequest) returns (TestNotificationChannelResponse);
 
   rpc CreateAlertPolicy(CreateAlertPolicyRequest) returns (CreateAlertPolicyResponse);
   rpc GetAlertPolicy(GetAlertPolicyRequest) returns (GetAlertPolicyResponse);

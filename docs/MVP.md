@@ -544,7 +544,7 @@ curl http://localhost:9700/api/v1/events/watch (SSE)
 - [x] `CreateNotificationChannel` RPC & handler
 - [x] `UpdateNotificationChannel` RPC & handler
 - [x] `ListNotificationChannels` RPC & handler
-- [ ] `TestNotificationChannel` RPC & handler (blocked until proto/codegen updates are available; REST test notification endpoint exists)
+- [x] `TestNotificationChannel` RPC & handler
 
 **Webhook Channel**:
 

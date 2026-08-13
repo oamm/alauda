@@ -46,7 +46,7 @@ func RegisterConnectHandlersWithMiddleware(mux *http.ServeMux, db *storage.Datab
 	path, handler = registryv1connect.NewIncidentServiceHandler(&incidentHandler{repo: storage.NewIncidentRepositoryWithAlerts(db, alertEngine)})
 	mux.Handle(path, wrap(handler))
 
-	path, handler = registryv1connect.NewAlertServiceHandler(&alertHandler{repo: alertRepo})
+	path, handler = registryv1connect.NewAlertServiceHandler(&alertHandler{repo: alertRepo, engine: alertEngine})
 	mux.Handle(path, wrap(handler))
 
 	path, handler = registryv1connect.NewEventServiceHandler(&eventHandler{repo: storage.NewEventRepository(db)})
@@ -95,7 +95,8 @@ type incidentHandler struct {
 
 type alertHandler struct {
 	registryv1connect.UnimplementedAlertServiceHandler
-	repo *storage.AlertRepository
+	repo   *storage.AlertRepository
+	engine *alerts.Engine
 }
 
 type eventHandler struct {

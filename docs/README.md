@@ -328,10 +328,10 @@ Service Registry
 
 ### Phase 6: Security & Hardening (Week 7)
 
-**Status**: Mostly complete; coverage hardening remains
+**Status**: Mostly complete; environment-level permissions remain future scope
 **Goal**: Production ready
 
-Remaining MVP hardening work is tracked in `MVP.md`. The current open items are the scoped `>80%` Go coverage gate, the blocked ConnectRPC `TestNotificationChannel` proto/handler, and environment-level permissions as future scope.
+Remaining MVP hardening work is tracked in `MVP.md`. The scoped `>80%` Go coverage gate and ConnectRPC `TestNotificationChannel` proto/handler are complete; environment-level permissions remain future scope.
 
 - Authentication and authorization
 - Audit logging

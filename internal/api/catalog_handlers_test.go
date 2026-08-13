@@ -2,6 +2,9 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -230,6 +233,87 @@ func TestAlertHandlersLifecycle(t *testing.T) {
 	}
 	if _, err := handler.DeleteNotificationChannel(ctx, connect.NewRequest(&registryv1.DeleteNotificationChannelRequest{Id: channelID})); err != nil {
 		t.Fatalf("delete notification channel: %v", err)
+	}
+}
+
+func TestAlertHandlerTestNotificationChannel(t *testing.T) {
+	ctx := context.Background()
+	db := newAPITestDB(t, ctx)
+	handler := &alertHandler{repo: storage.NewAlertRepository(db)}
+	var payload struct {
+		Type      string `json:"type"`
+		Test      bool   `json:"test"`
+		ChannelID string `json:"channel_id"`
+	}
+	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s, want POST", r.Method)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode webhook payload: %v", err)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(webhook.Close)
+
+	channelResp, err := handler.CreateNotificationChannel(ctx, connect.NewRequest(&registryv1.CreateNotificationChannelRequest{
+		Type:          "webhook",
+		Name:          "Primary",
+		Enabled:       true,
+		Configuration: map[string]string{"url": webhook.URL},
+	}))
+	if err != nil {
+		t.Fatalf("create notification channel: %v", err)
+	}
+
+	resp, err := handler.TestNotificationChannel(ctx, connect.NewRequest(&registryv1.TestNotificationChannelRequest{
+		ChannelId: channelResp.Msg.GetChannel().GetId(),
+	}))
+	if err != nil {
+		t.Fatalf("test notification channel: %v", err)
+	}
+	if !resp.Msg.GetSuccess() || resp.Msg.GetMessage() != "sent" {
+		t.Fatalf("response = %+v, want sent success", resp.Msg)
+	}
+	if payload.Type != "test" || !payload.Test || payload.ChannelID != channelResp.Msg.GetChannel().GetId() {
+		t.Fatalf("payload = %+v, want test payload for channel", payload)
+	}
+}
+
+func TestAlertHandlerTestNotificationChannelErrors(t *testing.T) {
+	ctx := context.Background()
+	db := newAPITestDB(t, ctx)
+	handler := &alertHandler{repo: storage.NewAlertRepository(db)}
+	failingWebhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "down", http.StatusInternalServerError)
+	}))
+	t.Cleanup(failingWebhook.Close)
+	channelResp, err := handler.CreateNotificationChannel(ctx, connect.NewRequest(&registryv1.CreateNotificationChannelRequest{
+		Type:          "webhook",
+		Name:          "Primary",
+		Enabled:       true,
+		Configuration: map[string]string{"url": failingWebhook.URL},
+	}))
+	if err != nil {
+		t.Fatalf("create notification channel: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		req  *registryv1.TestNotificationChannelRequest
+		code connect.Code
+	}{
+		{name: "missing id", req: &registryv1.TestNotificationChannelRequest{}, code: connect.CodeInvalidArgument},
+		{name: "not found", req: &registryv1.TestNotificationChannelRequest{ChannelId: "missing"}, code: connect.CodeNotFound},
+		{name: "send failed", req: &registryv1.TestNotificationChannelRequest{ChannelId: channelResp.Msg.GetChannel().GetId()}, code: connect.CodeUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := handler.TestNotificationChannel(ctx, connect.NewRequest(tt.req))
+			if connect.CodeOf(err) != tt.code {
+				t.Fatalf("code = %s, want %s: %v", connect.CodeOf(err), tt.code, err)
+			}
+		})
 	}
 }
 

@@ -48,6 +48,9 @@ const (
 	// AlertServiceDeleteNotificationChannelProcedure is the fully-qualified name of the AlertService's
 	// DeleteNotificationChannel RPC.
 	AlertServiceDeleteNotificationChannelProcedure = "/registry.v1.AlertService/DeleteNotificationChannel"
+	// AlertServiceTestNotificationChannelProcedure is the fully-qualified name of the AlertService's
+	// TestNotificationChannel RPC.
+	AlertServiceTestNotificationChannelProcedure = "/registry.v1.AlertService/TestNotificationChannel"
 	// AlertServiceCreateAlertPolicyProcedure is the fully-qualified name of the AlertService's
 	// CreateAlertPolicy RPC.
 	AlertServiceCreateAlertPolicyProcedure = "/registry.v1.AlertService/CreateAlertPolicy"
@@ -72,6 +75,7 @@ type AlertServiceClient interface {
 	ListNotificationChannels(context.Context, *connect.Request[v1.ListNotificationChannelsRequest]) (*connect.Response[v1.ListNotificationChannelsResponse], error)
 	UpdateNotificationChannel(context.Context, *connect.Request[v1.UpdateNotificationChannelRequest]) (*connect.Response[v1.UpdateNotificationChannelResponse], error)
 	DeleteNotificationChannel(context.Context, *connect.Request[v1.DeleteNotificationChannelRequest]) (*connect.Response[v1.DeleteNotificationChannelResponse], error)
+	TestNotificationChannel(context.Context, *connect.Request[v1.TestNotificationChannelRequest]) (*connect.Response[v1.TestNotificationChannelResponse], error)
 	CreateAlertPolicy(context.Context, *connect.Request[v1.CreateAlertPolicyRequest]) (*connect.Response[v1.CreateAlertPolicyResponse], error)
 	GetAlertPolicy(context.Context, *connect.Request[v1.GetAlertPolicyRequest]) (*connect.Response[v1.GetAlertPolicyResponse], error)
 	ListAlertPolicies(context.Context, *connect.Request[v1.ListAlertPoliciesRequest]) (*connect.Response[v1.ListAlertPoliciesResponse], error)
@@ -120,6 +124,12 @@ func NewAlertServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(alertServiceMethods.ByName("DeleteNotificationChannel")),
 			connect.WithClientOptions(opts...),
 		),
+		testNotificationChannel: connect.NewClient[v1.TestNotificationChannelRequest, v1.TestNotificationChannelResponse](
+			httpClient,
+			baseURL+AlertServiceTestNotificationChannelProcedure,
+			connect.WithSchema(alertServiceMethods.ByName("TestNotificationChannel")),
+			connect.WithClientOptions(opts...),
+		),
 		createAlertPolicy: connect.NewClient[v1.CreateAlertPolicyRequest, v1.CreateAlertPolicyResponse](
 			httpClient,
 			baseURL+AlertServiceCreateAlertPolicyProcedure,
@@ -160,6 +170,7 @@ type alertServiceClient struct {
 	listNotificationChannels  *connect.Client[v1.ListNotificationChannelsRequest, v1.ListNotificationChannelsResponse]
 	updateNotificationChannel *connect.Client[v1.UpdateNotificationChannelRequest, v1.UpdateNotificationChannelResponse]
 	deleteNotificationChannel *connect.Client[v1.DeleteNotificationChannelRequest, v1.DeleteNotificationChannelResponse]
+	testNotificationChannel   *connect.Client[v1.TestNotificationChannelRequest, v1.TestNotificationChannelResponse]
 	createAlertPolicy         *connect.Client[v1.CreateAlertPolicyRequest, v1.CreateAlertPolicyResponse]
 	getAlertPolicy            *connect.Client[v1.GetAlertPolicyRequest, v1.GetAlertPolicyResponse]
 	listAlertPolicies         *connect.Client[v1.ListAlertPoliciesRequest, v1.ListAlertPoliciesResponse]
@@ -190,6 +201,11 @@ func (c *alertServiceClient) UpdateNotificationChannel(ctx context.Context, req 
 // DeleteNotificationChannel calls registry.v1.AlertService.DeleteNotificationChannel.
 func (c *alertServiceClient) DeleteNotificationChannel(ctx context.Context, req *connect.Request[v1.DeleteNotificationChannelRequest]) (*connect.Response[v1.DeleteNotificationChannelResponse], error) {
 	return c.deleteNotificationChannel.CallUnary(ctx, req)
+}
+
+// TestNotificationChannel calls registry.v1.AlertService.TestNotificationChannel.
+func (c *alertServiceClient) TestNotificationChannel(ctx context.Context, req *connect.Request[v1.TestNotificationChannelRequest]) (*connect.Response[v1.TestNotificationChannelResponse], error) {
+	return c.testNotificationChannel.CallUnary(ctx, req)
 }
 
 // CreateAlertPolicy calls registry.v1.AlertService.CreateAlertPolicy.
@@ -224,6 +240,7 @@ type AlertServiceHandler interface {
 	ListNotificationChannels(context.Context, *connect.Request[v1.ListNotificationChannelsRequest]) (*connect.Response[v1.ListNotificationChannelsResponse], error)
 	UpdateNotificationChannel(context.Context, *connect.Request[v1.UpdateNotificationChannelRequest]) (*connect.Response[v1.UpdateNotificationChannelResponse], error)
 	DeleteNotificationChannel(context.Context, *connect.Request[v1.DeleteNotificationChannelRequest]) (*connect.Response[v1.DeleteNotificationChannelResponse], error)
+	TestNotificationChannel(context.Context, *connect.Request[v1.TestNotificationChannelRequest]) (*connect.Response[v1.TestNotificationChannelResponse], error)
 	CreateAlertPolicy(context.Context, *connect.Request[v1.CreateAlertPolicyRequest]) (*connect.Response[v1.CreateAlertPolicyResponse], error)
 	GetAlertPolicy(context.Context, *connect.Request[v1.GetAlertPolicyRequest]) (*connect.Response[v1.GetAlertPolicyResponse], error)
 	ListAlertPolicies(context.Context, *connect.Request[v1.ListAlertPoliciesRequest]) (*connect.Response[v1.ListAlertPoliciesResponse], error)
@@ -268,6 +285,12 @@ func NewAlertServiceHandler(svc AlertServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(alertServiceMethods.ByName("DeleteNotificationChannel")),
 		connect.WithHandlerOptions(opts...),
 	)
+	alertServiceTestNotificationChannelHandler := connect.NewUnaryHandler(
+		AlertServiceTestNotificationChannelProcedure,
+		svc.TestNotificationChannel,
+		connect.WithSchema(alertServiceMethods.ByName("TestNotificationChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
 	alertServiceCreateAlertPolicyHandler := connect.NewUnaryHandler(
 		AlertServiceCreateAlertPolicyProcedure,
 		svc.CreateAlertPolicy,
@@ -310,6 +333,8 @@ func NewAlertServiceHandler(svc AlertServiceHandler, opts ...connect.HandlerOpti
 			alertServiceUpdateNotificationChannelHandler.ServeHTTP(w, r)
 		case AlertServiceDeleteNotificationChannelProcedure:
 			alertServiceDeleteNotificationChannelHandler.ServeHTTP(w, r)
+		case AlertServiceTestNotificationChannelProcedure:
+			alertServiceTestNotificationChannelHandler.ServeHTTP(w, r)
 		case AlertServiceCreateAlertPolicyProcedure:
 			alertServiceCreateAlertPolicyHandler.ServeHTTP(w, r)
 		case AlertServiceGetAlertPolicyProcedure:
@@ -347,6 +372,10 @@ func (UnimplementedAlertServiceHandler) UpdateNotificationChannel(context.Contex
 
 func (UnimplementedAlertServiceHandler) DeleteNotificationChannel(context.Context, *connect.Request[v1.DeleteNotificationChannelRequest]) (*connect.Response[v1.DeleteNotificationChannelResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AlertService.DeleteNotificationChannel is not implemented"))
+}
+
+func (UnimplementedAlertServiceHandler) TestNotificationChannel(context.Context, *connect.Request[v1.TestNotificationChannelRequest]) (*connect.Response[v1.TestNotificationChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.AlertService.TestNotificationChannel is not implemented"))
 }
 
 func (UnimplementedAlertServiceHandler) CreateAlertPolicy(context.Context, *connect.Request[v1.CreateAlertPolicyRequest]) (*connect.Response[v1.CreateAlertPolicyResponse], error) {
