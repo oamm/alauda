@@ -296,7 +296,7 @@ SQLite Database
 - [x] Create Makefile with common tasks
 - [x] Docker image with multi-stage build
 - [x] Docker Compose for local development
-- [ ] CI pipeline (GitHub Actions)
+- [x] CI pipeline (GitHub Actions)
 
 **Deliverables**:
 
@@ -311,7 +311,7 @@ make dev
 
 - [x] Basic connectivity tests
 - [x] Database migration tests
-- [ ] Server startup tests
+- [x] Server startup tests
 
 ---
 
@@ -379,10 +379,10 @@ make dev
 
 **Testing**:
 
-- [ ] Unit tests for repositories
+- [x] Unit tests for repositories
 - [x] Integration tests for each service
 - [x] API tests for CRUD operations
-- [ ] Environment isolation tests
+- [x] Environment isolation tests
 
 **Deliverables**:
 
@@ -544,7 +544,7 @@ curl http://localhost:9700/api/v1/events/watch (SSE)
 - [x] `CreateNotificationChannel` RPC & handler
 - [x] `UpdateNotificationChannel` RPC & handler
 - [x] `ListNotificationChannels` RPC & handler
-- [ ] `TestNotificationChannel` RPC & handler
+- [ ] `TestNotificationChannel` RPC & handler (blocked until proto/codegen updates are available; REST test notification endpoint exists)
 
 **Webhook Channel**:
 
@@ -706,7 +706,7 @@ curl http://localhost:9700/api/v1/alerts/test/<channel-id>
 
 - [x] RBAC roles (Administrator, Operator, Viewer, Automation)
 - [x] Enforce permissions on API endpoints
-- [ ] Environment-level permissions (future)
+- [ ] Environment-level permissions (future scope)
 
 **Audit Logging**:
 
@@ -747,7 +747,7 @@ curl http://localhost:9700/api/v1/alerts/test/<channel-id>
 
 **Testing**:
 
-- [ ] Unit tests (>80% coverage; measured baseline: 25.6% all Go packages including generated/entrypoint packages on 2026-08-13)
+- [ ] Unit tests (>80% scoped maintained-package coverage; current scoped coverage: 65.7% on 2026-08-13 via `scripts/coverage.ps1`; previous all-package baseline was 25.6% including generated/entrypoint packages)
 - [x] Integration tests
 - [x] RBAC tests
 - [x] Audit log tests

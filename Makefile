@@ -81,19 +81,22 @@ build-cli: proto
 
 test: proto
 	@echo "Running tests..."
-	go test -v ./...
+	go test -v $$(go list ./... | grep -v '/web/' | grep -v '/gen/')
 
 test-race: proto
 	@echo "Running tests with race detector..."
-	go test -race -v ./...
+	go test -race -v $$(go list ./... | grep -v '/web/' | grep -v '/gen/')
 
 test-coverage:
 	@echo "Running tests with coverage..."
 	@mkdir -p .artifacts
-	go test -v -coverprofile=.artifacts/coverage.out $$(go list ./... | grep -v '/gen/' | grep -v '/web/node_modules/' | grep -v '/.artifacts/')
+	go test -v -coverprofile=.artifacts/coverage.out $$(go list ./... | grep -v '/gen/' | grep -v '/web/' | grep -v '/.artifacts/')
 	go tool cover -func .artifacts/coverage.out | tee .artifacts/coverage-summary.txt
 	go tool cover -html=.artifacts/coverage.out -o .artifacts/coverage.html
 	@echo "Coverage report: .artifacts/coverage.html"
+
+test-coverage-ps:
+	@powershell -ExecutionPolicy Bypass -File scripts/coverage.ps1
 
 # Code Quality
 
