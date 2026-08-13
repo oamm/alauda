@@ -1,0 +1,42 @@
+server:
+  address: "0.0.0.0"
+  port: 9700
+  logLevel: "debug"
+  devMode: true
+
+storage:
+  path: "./data/registry.db"
+  busyTimeout: 5s
+
+health:
+  workerCount: 20
+  checkInterval: 10s
+  defaultTimeout: 5s
+  defaultFailureThreshold: 3
+  defaultSuccessThreshold: 2
+  resultRetentionHours: 24
+
+telemetry:
+  enabled: true
+  otlpEndpoint: "http://localhost:4317"
+  serviceName: "registry"
+  serviceVersion: "0.1.0"
+
+alerts:
+  enabled: true
+  cooldown: 10m
+  maxRetries: 5
+
+auth:
+  enabled: false
+  bootstrapAdminUsername: "admin"
+  bootstrapAdminEmail: "admin@example.local"
+  bootstrapAdminPassword: ""
+  bootstrapAdminTokenName: "bootstrap-admin"
+  bootstrapAdminToken: ""
+  tokenTTL: 24h
+
+rateLimit:
+  enabled: false
+  requestsPerMinute: 600
+  burst: 60

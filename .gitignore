@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.dylib
+
+# Generated code
+gen/*
+!gen/go/
+!gen/go/**
+*.pb.go
+*.pb.gw.go
+*.swagger.json
+!gen/go/**/*.pb.go
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.ai/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage.out
+coverage.html
+*.prof
+.artifacts/
+test-results/
+
+# Dependencies
+vendor/
+node_modules/
+
+# Environment
+.env
+.env.local
+config.local.yaml
+
+# Build cache
+.air.toml
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend
+web/dist
+web/.next
+web/out
+!internal/webstatic/dist/
+!internal/webstatic/dist/**
+
+# Root level build artifacts
+/registry
+/registryctl
+/registry.exe
+/registryctl.exe

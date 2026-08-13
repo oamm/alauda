@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  registry:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "9700:9700"
+      - "9090:9090"  # Prometheus metrics
+    environment:
+      REGISTRY_ENV: development
+      REGISTRY_LOG_LEVEL: debug
+      REGISTRY_STORAGE_PATH: /data/registry.db
+      REGISTRY_HEALTH_WORKERS: "20"
+      REGISTRY_TELEMETRY_ENABLED: "true"
+    volumes:
+      - ./:/app
+      - registry_data:/data
+    command: go run cmd/registry/main.go --dev
+    depends_on:
+      - postgres
+    networks:
+      - registry
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: registry
+      POSTGRES_USER: registry
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - registry
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U registry"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./deployments/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    networks:
+      - registry
+
+volumes:
+  registry_data:
+  postgres_data:
+  prometheus_data:
+
+networks:
+  registry:
+    driver: bridge
