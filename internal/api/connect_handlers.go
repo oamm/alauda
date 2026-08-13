@@ -52,7 +52,7 @@ func RegisterConnectHandlersWithMiddleware(mux *http.ServeMux, db *storage.Datab
 	path, handler = registryv1connect.NewEventServiceHandler(&eventHandler{repo: storage.NewEventRepository(db)})
 	mux.Handle(path, wrap(handler))
 
-	path, handler = registryv1connect.NewRegistryServiceHandler(&registryHandler{})
+	path, handler = registryv1connect.NewRegistryServiceHandler(&registryHandler{repo: storage.NewRegistryRepository(db)})
 	mux.Handle(path, wrap(handler))
 }
 
@@ -106,4 +106,5 @@ type eventHandler struct {
 
 type registryHandler struct {
 	registryv1connect.UnimplementedRegistryServiceHandler
+	repo *storage.RegistryRepository
 }

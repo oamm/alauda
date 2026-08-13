@@ -15,6 +15,16 @@ import (
 )
 
 func TestEventSSEStreamsEvents(t *testing.T) {
+	testEventSSEStreamsEvents(t, func(handler http.Handler) http.Handler {
+		return handler
+	})
+}
+
+func TestEventSSEStreamsEventsThroughHardeningMiddleware(t *testing.T) {
+	testEventSSEStreamsEvents(t, hardeningMiddleware)
+}
+
+func testEventSSEStreamsEvents(t *testing.T, wrap func(http.Handler) http.Handler) {
 	ctx := context.Background()
 	db, err := storage.NewDatabase(ctx, filepath.Join(t.TempDir(), "registry-test.db"))
 	if err != nil {
@@ -39,7 +49,7 @@ func TestEventSSEStreamsEvents(t *testing.T) {
 
 	mux := http.NewServeMux()
 	registerEventSSE(mux, eventRepo)
-	server := httptest.NewServer(mux)
+	server := httptest.NewServer(wrap(mux))
 	defer server.Close()
 
 	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)

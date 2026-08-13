@@ -221,6 +221,13 @@ function App() {
       deploymentIDs.has(instance.deploymentId),
     );
   }, [instances, selectedServiceDeployments]);
+  const selectedServiceInstanceById = useMemo(
+    () =>
+      new Map(
+        selectedServiceInstances.map((instance) => [instance.id, instance]),
+      ),
+    [selectedServiceInstances],
+  );
   const selectedServiceEndpoints = useMemo(() => {
     const instanceIDs = new Set(
       selectedServiceInstances.map((instance) => instance.id),
@@ -1390,15 +1397,22 @@ function App() {
                 {selectedServiceEndpoints.length === 0 ? (
                   <p className="empty">No endpoints found.</p>
                 ) : (
-                  selectedServiceEndpoints.map((endpoint) => (
-                    <div className="endpoint-row" key={endpoint.id}>
-                      <strong>{endpoint.name}</strong>
-                      <span>{formatProtocol(endpoint.protocol)}</span>
-                      <span>{endpoint.port}</span>
-                      <span>{endpoint.path || "/"}</span>
-                      <span>{endpoint.enabled ? "Enabled" : "Disabled"}</span>
-                    </div>
-                  ))
+                  selectedServiceEndpoints.map((endpoint) => {
+                    const instance = selectedServiceInstanceById.get(
+                      endpoint.instanceId,
+                    );
+                    return (
+                      <div className="endpoint-row" key={endpoint.id}>
+                        <div>
+                          <strong>{endpoint.name}</strong>
+                          <span>{endpoint.id}</span>
+                        </div>
+                        <span>{formatEndpointUrl(endpoint, instance)}</span>
+                        <span>{formatProtocol(endpoint.protocol)}</span>
+                        <span>{endpoint.enabled ? "Enabled" : "Disabled"}</span>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -2648,6 +2662,26 @@ function formatHealthState(value: string) {
 
 function formatProtocol(value: string) {
   return value.replace("PROTOCOL_", "").toLowerCase();
+}
+
+function formatEndpointUrl(endpoint: Endpoint, instance?: ServiceInstance) {
+  const host = instance?.address || endpoint.instanceId;
+  const port = endpoint.port || instance?.port || 0;
+  const path = endpoint.path || "";
+  switch (endpoint.protocol) {
+    case "PROTOCOL_HTTP":
+      return `http://${host}:${port}${path || "/"}`;
+    case "PROTOCOL_HTTPS":
+      return `https://${host}:${port}${path || "/"}`;
+    case "PROTOCOL_GRPC":
+      return `grpc://${host}:${port}${path}`;
+    case "PROTOCOL_TCP":
+      return `tcp://${host}:${port}`;
+    case "PROTOCOL_UDP":
+      return `udp://${host}:${port}`;
+    default:
+      return `${host}:${port}${path}`;
+  }
 }
 
 function formatTimestamp(value?: string) {

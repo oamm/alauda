@@ -498,8 +498,8 @@ textarea {
 
 .endpoint-row {
   grid-template-columns:
-    minmax(140px, 1fr) minmax(90px, 0.5fr) minmax(70px, 0.4fr)
-    minmax(160px, 1fr) minmax(90px, 0.5fr);
+    minmax(150px, 0.8fr) minmax(240px, 1.4fr) minmax(90px, 0.4fr)
+    minmax(90px, 0.4fr);
 }
 
 .compact-row span,
@@ -513,7 +513,8 @@ textarea {
 
 .policy-row div,
 .channel-row div,
-.instance-row div {
+.instance-row div,
+.endpoint-row div {
   display: grid;
   gap: 4px;
 }

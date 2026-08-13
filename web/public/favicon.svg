@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Service Registry">
+  <rect width="64" height="64" rx="12" fill="#14213d"/>
+  <path d="M18 20h28v8H18zM18 36h28v8H18z" fill="#fca311"/>
+  <path d="M22 24h20M22 40h20" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+</svg>

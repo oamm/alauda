@@ -57,6 +57,14 @@ func (w *statusRecorder) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
+func (w *statusRecorder) Flush() {
+	flusher, ok := w.ResponseWriter.(http.Flusher)
+	if !ok {
+		return
+	}
+	flusher.Flush()
+}
+
 func expectsBody(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch:
