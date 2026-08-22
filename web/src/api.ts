@@ -211,6 +211,10 @@ type CreateServiceResponse = {
   service?: Service;
 };
 
+type UpdateServiceResponse = {
+  service?: Service;
+};
+
 type DeleteServiceResponse = Record<string, never>;
 
 type CreateDeploymentResponse = {
@@ -262,6 +266,12 @@ type ListHealthChecksResponse = {
 type CreateHealthCheckResponse = {
   healthCheck?: HealthCheck;
 };
+
+type UpdateHealthCheckResponse = {
+  healthCheck?: HealthCheck;
+};
+
+type DeleteHealthCheckResponse = Record<string, never>;
 
 type RunHealthCheckResponse = {
   result?: HealthResult;
@@ -415,6 +425,27 @@ export async function createService(input: {
   );
   if (!response.service) {
     throw new Error("CreateService returned no service");
+  }
+  return response.service;
+}
+
+export async function updateService(input: {
+  id: string;
+  displayName: string;
+  description: string;
+  tags?: Record<string, string>;
+  metadata?: Record<string, string>;
+}): Promise<Service> {
+  const response = await connectRequest<UpdateServiceResponse>(
+    "/registry.v1.CatalogService/UpdateService",
+    {
+      ...input,
+      tags: input.tags ?? {},
+      metadata: input.metadata ?? {},
+    },
+  );
+  if (!response.service) {
+    throw new Error("UpdateService returned no service");
   }
   return response.service;
 }
@@ -646,6 +677,32 @@ export async function createHealthCheck(input: {
     throw new Error("CreateHealthCheck returned no health check");
   }
   return response.healthCheck;
+}
+
+export async function updateHealthCheck(input: {
+  id: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  timeoutSeconds: number;
+  failuresBeforeUnhealthy: number;
+  successesBeforeHealthy: number;
+  description: string;
+}): Promise<HealthCheck> {
+  const response = await connectRequest<UpdateHealthCheckResponse>(
+    "/registry.v1.HealthService/UpdateHealthCheck",
+    input,
+  );
+  if (!response.healthCheck) {
+    throw new Error("UpdateHealthCheck returned no health check");
+  }
+  return response.healthCheck;
+}
+
+export async function deleteHealthCheck(id: string): Promise<void> {
+  await connectRequest<DeleteHealthCheckResponse>(
+    "/registry.v1.HealthService/DeleteHealthCheck",
+    { id },
+  );
 }
 
 export async function runHealthCheck(

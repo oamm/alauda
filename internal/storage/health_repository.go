@@ -71,9 +71,54 @@ func (r *HealthRepository) CreateHealthCheck(ctx context.Context, req *registryv
 		now.Format(time.RFC3339Nano),
 	)
 	if err != nil {
+		if restored, restoreErr := r.restoreDeletedHealthCheck(ctx, req, string(tagsJSON), string(metadataJSON), now); restoreErr != nil {
+			return nil, restoreErr
+		} else if restored != nil {
+			return restored, nil
+		}
 		return nil, err
 	}
 
+	return r.GetHealthCheck(ctx, id)
+}
+
+func (r *HealthRepository) restoreDeletedHealthCheck(ctx context.Context, req *registryv1.CreateHealthCheckRequest, tagsJSON, metadataJSON string, now time.Time) (*registryv1.HealthCheck, error) {
+	var id string
+	err := r.db.QueryRow(ctx, `
+		SELECT id
+		FROM health_checks
+		WHERE instance_id = ? AND name = ? AND deleted_at IS NOT NULL
+	`, req.GetInstanceId(), req.GetName()).Scan(&id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	_, err = r.db.Exec(ctx, `
+		UPDATE health_checks
+		SET endpoint_id = ?, type = ?, enabled = ?, interval_seconds = ?, timeout_seconds = ?,
+		    failures_before_unhealthy = ?, successes_before_healthy = ?, description = ?,
+		    tags = ?, metadata = ?, deleted_at = NULL, updated_at = ?
+		WHERE id = ?
+	`,
+		nullIfEmpty(req.GetEndpointId()),
+		req.GetType().String(),
+		req.GetEnabled(),
+		req.GetIntervalSeconds(),
+		req.GetTimeoutSeconds(),
+		req.GetFailuresBeforeUnhealthy(),
+		req.GetSuccessesBeforeHealthy(),
+		req.GetDescription(),
+		tagsJSON,
+		metadataJSON,
+		now.Format(time.RFC3339Nano),
+		id,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return r.GetHealthCheck(ctx, id)
 }
 

@@ -26,11 +26,13 @@ import {
   createHealthCheck,
   createEnvironment,
   createAlertPolicy,
+  createEndpoint,
   createNotificationChannel,
   createService,
   createUser,
   AvailabilitySummary,
   deleteEndpoint,
+  deleteHealthCheck,
   deleteInstance,
   deleteService,
   Endpoint,
@@ -69,8 +71,10 @@ import {
   testNotificationChannel,
   updateAlertPolicy,
   updateEndpoint,
+  updateHealthCheck,
   updateInstance,
   updateNotificationChannel,
+  updateService,
   UserAccount,
 } from "./api";
 
@@ -134,7 +138,6 @@ function App() {
   >("overview");
   const [showCreateService, setShowCreateService] = useState(false);
   const [showAddRuntime, setShowAddRuntime] = useState(false);
-  const [showRuntimeEndpoint, setShowRuntimeEndpoint] = useState(true);
   const [showRuntimeHealth, setShowRuntimeHealth] = useState(false);
   const [healthStatusFilter, setHealthStatusFilter] = useState("all");
   const [selectedBulkServiceIds, setSelectedBulkServiceIds] = useState<
@@ -148,8 +151,11 @@ function App() {
   const [eventSearch, setEventSearch] = useState("");
   const [editingChannelId, setEditingChannelId] = useState("");
   const [editingPolicyId, setEditingPolicyId] = useState("");
+  const [editingServiceId, setEditingServiceId] = useState("");
   const [editingInstanceId, setEditingInstanceId] = useState("");
   const [editingEndpointId, setEditingEndpointId] = useState("");
+  const [addingEndpointInstanceId, setAddingEndpointInstanceId] = useState("");
+  const [editingHealthCheckId, setEditingHealthCheckId] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingService, setSavingService] = useState(false);
@@ -174,6 +180,10 @@ function App() {
   const [registrationSuccess, setRegistrationSuccess] = useState("");
   const [serviceForm, setServiceForm] = useState({
     name: "",
+    displayName: "",
+    description: "",
+  });
+  const [serviceEditForm, setServiceEditForm] = useState({
     displayName: "",
     description: "",
   });
@@ -224,6 +234,14 @@ function App() {
     description: "",
     path: "/healthz",
     expectedStatus: "200-299",
+  });
+  const [healthEditForm, setHealthEditForm] = useState({
+    enabled: true,
+    intervalSeconds: 10,
+    timeoutSeconds: 3,
+    failuresBeforeUnhealthy: 3,
+    successesBeforeHealthy: 2,
+    description: "",
   });
   const [channelForm, setChannelForm] = useState({
     type: "webhook",
@@ -747,6 +765,60 @@ function App() {
     }
   }
 
+  function startEditService(service: Service) {
+    setEditingServiceId(service.id);
+    setServiceEditForm({
+      displayName: service.displayName || service.name,
+      description: service.description ?? "",
+    });
+  }
+
+  async function handleUpdateService(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const current = services.find((service) => service.id === editingServiceId);
+    if (!current) {
+      return;
+    }
+    setSavingService(true);
+    setError("");
+    try {
+      const service = await updateService({
+        id: current.id,
+        displayName: serviceEditForm.displayName,
+        description: serviceEditForm.description,
+        tags: current.tags ?? {},
+        metadata: current.metadata ?? {},
+      });
+      await loadCatalog(selectedEnvironmentId);
+      setSelectedServiceId(service.id);
+      setEditingServiceId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update service");
+    } finally {
+      setSavingService(false);
+    }
+  }
+
+  async function handleDeleteService(service: Service) {
+    const confirmed = window.confirm(
+      `Delete service ${service.displayName || service.name}?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+    setSavingService(true);
+    setError("");
+    try {
+      await deleteService(service.id);
+      await loadCatalog(selectedEnvironmentId);
+      setEditingServiceId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete service");
+    } finally {
+      setSavingService(false);
+    }
+  }
+
   function updateRegistrationEndpoint(
     index: number,
     updates: Partial<ReturnType<typeof newRegistrationEndpoint>>,
@@ -793,6 +865,7 @@ function App() {
   }
 
   function focusRegistrationForm() {
+    setShowAddRuntime(true);
     setRegistrationStep(1);
     window.setTimeout(() => {
       document
@@ -811,6 +884,7 @@ function App() {
   }
 
   function startEditEndpoint(endpoint: Endpoint) {
+    setAddingEndpointInstanceId("");
     setEditingEndpointId(endpoint.id);
     setEndpointEditForm({
       name: endpoint.name,
@@ -819,6 +893,19 @@ function App() {
       path: endpoint.path ?? "",
       enabled: endpoint.enabled,
       primary: endpoint.primary,
+    });
+  }
+
+  function startAddEndpoint(instance: ServiceInstance) {
+    setEditingEndpointId("");
+    setAddingEndpointInstanceId(instance.id);
+    setEndpointEditForm({
+      name: "http",
+      protocol: "PROTOCOL_HTTP",
+      port: primaryEndpointForInstance(endpoints, instance.id)?.port || 8080,
+      path: "/",
+      enabled: true,
+      primary: !endpoints.some((endpoint) => endpoint.instanceId === instance.id),
     });
   }
 
@@ -888,7 +975,7 @@ function App() {
 
   async function handleUpdateEndpoint(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!editingEndpointId) {
+    if (!editingEndpointId && !addingEndpointInstanceId) {
       return;
     }
     const current = endpoints.find(
@@ -897,18 +984,31 @@ function App() {
     setSavingRuntimeEdit(true);
     setError("");
     try {
-      await updateEndpoint({
-        id: editingEndpointId,
-        name: endpointEditForm.name,
-        protocol: endpointEditForm.protocol,
-        port: endpointEditForm.port,
-        path: endpointEditForm.path,
-        enabled: endpointEditForm.enabled,
-        primary: endpointEditForm.primary,
-        tags: current?.tags ?? {},
-        metadata: current?.metadata ?? {},
-      });
+      if (addingEndpointInstanceId) {
+        await createEndpoint({
+          instanceId: addingEndpointInstanceId,
+          name: endpointEditForm.name,
+          protocol: endpointEditForm.protocol,
+          port: endpointEditForm.port,
+          path: endpointEditForm.path,
+          enabled: endpointEditForm.enabled,
+          primary: endpointEditForm.primary,
+        });
+      } else {
+        await updateEndpoint({
+          id: editingEndpointId,
+          name: endpointEditForm.name,
+          protocol: endpointEditForm.protocol,
+          port: endpointEditForm.port,
+          path: endpointEditForm.path,
+          enabled: endpointEditForm.enabled,
+          primary: endpointEditForm.primary,
+          tags: current?.tags ?? {},
+          metadata: current?.metadata ?? {},
+        });
+      }
       setEditingEndpointId("");
+      setAddingEndpointInstanceId("");
       await loadCatalog(selectedEnvironmentId);
     } catch (err) {
       setError(
@@ -916,6 +1016,93 @@ function App() {
       );
     } finally {
       setSavingRuntimeEdit(false);
+    }
+  }
+
+  function startEditHealthCheck(check: HealthCheck) {
+    setEditingHealthCheckId(check.id);
+    setHealthEditForm({
+      enabled: check.enabled,
+      intervalSeconds: check.intervalSeconds,
+      timeoutSeconds: check.timeoutSeconds,
+      failuresBeforeUnhealthy: check.failuresBeforeUnhealthy,
+      successesBeforeHealthy: check.successesBeforeHealthy,
+      description: check.description ?? "",
+    });
+  }
+
+  function startConfigureHealth(instance: ServiceInstance, endpoint?: Endpoint) {
+    setEditingHealthCheckId("new");
+    setHealthForm((current) => ({
+      ...current,
+      instanceId: instance.id,
+      endpointId: endpoint?.id ?? "",
+      name: "readiness",
+      type: endpoint ? healthTypeForEndpoint(endpoint.protocol) : current.type,
+    }));
+  }
+
+  async function handleUpdateHealthCheck(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingHealthCheck(true);
+    setError("");
+    try {
+      if (editingHealthCheckId === "new") {
+        const check = await createHealthCheck({
+          instanceId: healthForm.instanceId,
+          endpointId: healthForm.endpointId,
+          name: healthForm.name,
+          type: healthForm.type,
+          enabled: true,
+          intervalSeconds: healthForm.intervalSeconds,
+          timeoutSeconds: healthForm.timeoutSeconds,
+          failuresBeforeUnhealthy: healthForm.failuresBeforeUnhealthy,
+          successesBeforeHealthy: healthForm.successesBeforeHealthy,
+          description: healthForm.description,
+          metadata: compactMap({
+            path: healthForm.path,
+            expectedStatus: healthForm.expectedStatus,
+          }),
+        });
+        setSelectedHealthCheckId(check.id);
+      } else {
+        await updateHealthCheck({
+          id: editingHealthCheckId,
+          enabled: healthEditForm.enabled,
+          intervalSeconds: healthEditForm.intervalSeconds,
+          timeoutSeconds: healthEditForm.timeoutSeconds,
+          failuresBeforeUnhealthy: healthEditForm.failuresBeforeUnhealthy,
+          successesBeforeHealthy: healthEditForm.successesBeforeHealthy,
+          description: healthEditForm.description,
+        });
+      }
+      setEditingHealthCheckId("");
+      await loadCatalog(selectedEnvironmentId);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save health check",
+      );
+    } finally {
+      setSavingHealthCheck(false);
+    }
+  }
+
+  async function handleDeleteHealthCheck(check: HealthCheck) {
+    const confirmed = window.confirm(`Delete health check ${check.name}?`);
+    if (!confirmed) {
+      return;
+    }
+    setSavingHealthCheck(true);
+    setError("");
+    try {
+      await deleteHealthCheck(check.id);
+      await loadCatalog(selectedEnvironmentId);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete health check",
+      );
+    } finally {
+      setSavingHealthCheck(false);
     }
   }
 
@@ -950,6 +1137,27 @@ function App() {
     event.preventDefault();
     const serviceId = selectedServiceId;
     if (!serviceId) {
+      return;
+    }
+    const primaryEndpoint = registrationForm.endpoints[0];
+    if (
+      !registrationForm.environmentId ||
+      !registrationForm.instanceName.trim() ||
+      !registrationForm.address.trim() ||
+      !primaryEndpoint?.name.trim() ||
+      primaryEndpoint.port < 1 ||
+      primaryEndpoint.port > 65535
+    ) {
+      setError("Environment, instance name, address, endpoint name, and a valid endpoint port are required.");
+      return;
+    }
+    if (
+      registrationForm.configureHealth &&
+      (!registrationForm.healthName.trim() ||
+        registrationForm.healthIntervalSeconds < 1 ||
+        registrationForm.healthTimeoutSeconds < 1)
+    ) {
+      setError("Health check name, interval, and timeout are required when health monitoring is configured.");
       return;
     }
     setSavingRegistration(true);
@@ -999,7 +1207,7 @@ function App() {
               registrationForm.healthSuccessesBeforeHealthy,
             description: "Created during runtime registration",
             metadata: {
-              path: registrationForm.healthPath,
+              path: endpoint?.path || primaryEndpoint.path || "/",
               expectedStatus: "200-299",
             },
           });
@@ -1668,16 +1876,38 @@ function App() {
                       {selectedService.name} · {selectedServiceRuntimeSummary}
                     </span>
                   </div>
-                  <div className="workspace-actions">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddRuntime(true)}
-                    >
-                      {selectedEnvironmentDeployment
-                        ? "Add instance"
-                        : "Add runtime"}
-                    </button>
-                  </div>
+                  <details className="resource-menu">
+                    <summary aria-label="Service actions">...</summary>
+                    <div className="resource-menu-items">
+                      <button
+                        type="button"
+                        onClick={() => startEditService(selectedService)}
+                      >
+                        Edit service
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigator.clipboard
+                            .writeText(selectedService.id)
+                            .then(() => setTestResult("Service ID copied."))
+                            .catch(() =>
+                              setError("Failed to copy service ID."),
+                            )
+                        }
+                      >
+                        Copy service ID
+                      </button>
+                      <button
+                        className="button-danger"
+                        disabled={savingService}
+                        type="button"
+                        onClick={() => handleDeleteService(selectedService)}
+                      >
+                        Delete service
+                      </button>
+                    </div>
+                  </details>
                 </div>
 
                 <div
@@ -1778,14 +2008,14 @@ function App() {
                             : "Grouped by environment"}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddRuntime(true)}
-                      >
-                        {selectedEnvironmentDeployment
-                          ? "Add instance"
-                          : "Add runtime"}
-                      </button>
+                      {selectedServiceDeployments.length === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowAddRuntime(true)}
+                        >
+                          Add runtime
+                        </button>
+                      ) : null}
                     </div>
                     {selectedServiceDeployments.length === 0 ? (
                       <EmptyState
@@ -1837,6 +2067,18 @@ function App() {
                                   deploymentIncident ? "degraded" : "healthy"
                                 }
                               />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRegistrationForm((current) => ({
+                                    ...current,
+                                    environmentId: deployment.environmentId,
+                                  }));
+                                  setShowAddRuntime(true);
+                                }}
+                              >
+                                + Add instance
+                              </button>
                             </div>
                             {deploymentInstances.length === 0 ? (
                               <EmptyState
@@ -1873,6 +2115,9 @@ function App() {
                                     <div className="runtime-instance-header">
                                       <div>
                                         <strong>
+                                          {instance.name}
+                                        </strong>
+                                        <span>
                                           {instance.address}:
                                           {instance.port ||
                                             primaryEndpointForInstance(
@@ -1880,8 +2125,7 @@ function App() {
                                               instance.id,
                                             )?.port ||
                                             "dynamic"}
-                                        </strong>
-                                        <span>{instance.name}</span>
+                                        </span>
                                       </div>
                                       <StatusBadge
                                         status={
@@ -1894,9 +2138,225 @@ function App() {
                                               : "disabled"
                                         }
                                       />
+                                      <details className="resource-menu">
+                                        <summary
+                                          aria-label={`Instance actions for ${instance.name}`}
+                                        >
+                                          ...
+                                        </summary>
+                                        <div className="resource-menu-items">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              startEditInstance(instance)
+                                            }
+                                          >
+                                            Edit instance
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              startAddEndpoint(instance)
+                                            }
+                                          >
+                                            Add endpoint
+                                          </button>
+                                          <button
+                                            className="button-danger"
+                                            disabled={savingRuntimeEdit}
+                                            type="button"
+                                            onClick={() =>
+                                              handleDeleteInstance(instance)
+                                            }
+                                          >
+                                            Delete instance
+                                          </button>
+                                        </div>
+                                      </details>
                                     </div>
+                                    {editingInstanceId === instance.id ? (
+                                      <form
+                                        className="inline-edit-form runtime-edit-form"
+                                        onSubmit={handleUpdateInstance}
+                                      >
+                                        <label>
+                                          Address
+                                          <input
+                                            required
+                                            value={instanceEditForm.address}
+                                            onChange={(event) =>
+                                              setInstanceEditForm(
+                                                (current) => ({
+                                                  ...current,
+                                                  address: event.target.value,
+                                                }),
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                        <label>
+                                          Description
+                                          <input
+                                            value={
+                                              instanceEditForm.description
+                                            }
+                                            onChange={(event) =>
+                                              setInstanceEditForm(
+                                                (current) => ({
+                                                  ...current,
+                                                  description:
+                                                    event.target.value,
+                                                }),
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                        <label className="checkbox-label">
+                                          <input
+                                            checked={instanceEditForm.enabled}
+                                            type="checkbox"
+                                            onChange={(event) =>
+                                              setInstanceEditForm(
+                                                (current) => ({
+                                                  ...current,
+                                                  enabled:
+                                                    event.target.checked,
+                                                }),
+                                              )
+                                            }
+                                          />
+                                          Enabled
+                                        </label>
+                                        <button
+                                          disabled={savingRuntimeEdit}
+                                          type="submit"
+                                        >
+                                          Save instance
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setEditingInstanceId("")
+                                          }
+                                        >
+                                          Cancel
+                                        </button>
+                                      </form>
+                                    ) : null}
                                     <div className="runtime-nested">
-                                      <h4>Endpoints</h4>
+                                      <div className="runtime-subheading">
+                                        <h4>Endpoints</h4>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            startAddEndpoint(instance)
+                                          }
+                                        >
+                                          + Add endpoint
+                                        </button>
+                                      </div>
+                                      {addingEndpointInstanceId ===
+                                      instance.id ? (
+                                        <form
+                                          className="inline-edit-form runtime-edit-form"
+                                          onSubmit={handleUpdateEndpoint}
+                                        >
+                                          <label>
+                                            Name
+                                            <input
+                                              required
+                                              value={endpointEditForm.name}
+                                              onChange={(event) =>
+                                                setEndpointEditForm(
+                                                  (current) => ({
+                                                    ...current,
+                                                    name: event.target.value,
+                                                  }),
+                                                )
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            Protocol
+                                            <select
+                                              value={endpointEditForm.protocol}
+                                              onChange={(event) =>
+                                                setEndpointEditForm(
+                                                  (current) => ({
+                                                    ...current,
+                                                    protocol:
+                                                      event.target.value,
+                                                  }),
+                                                )
+                                              }
+                                            >
+                                              <option value="PROTOCOL_HTTP">
+                                                HTTP
+                                              </option>
+                                              <option value="PROTOCOL_HTTPS">
+                                                HTTPS
+                                              </option>
+                                              <option value="PROTOCOL_GRPC">
+                                                gRPC
+                                              </option>
+                                              <option value="PROTOCOL_TCP">
+                                                TCP
+                                              </option>
+                                              <option value="PROTOCOL_UDP">
+                                                UDP
+                                              </option>
+                                            </select>
+                                          </label>
+                                          <label>
+                                            Port
+                                            <input
+                                              max="65535"
+                                              min="1"
+                                              required
+                                              type="number"
+                                              value={endpointEditForm.port}
+                                              onChange={(event) =>
+                                                setEndpointEditForm(
+                                                  (current) => ({
+                                                    ...current,
+                                                    port: Number(
+                                                      event.target.value,
+                                                    ),
+                                                  }),
+                                                )
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            Path
+                                            <input
+                                              value={endpointEditForm.path}
+                                              onChange={(event) =>
+                                                setEndpointEditForm(
+                                                  (current) => ({
+                                                    ...current,
+                                                    path: event.target.value,
+                                                  }),
+                                                )
+                                              }
+                                            />
+                                          </label>
+                                          <button
+                                            disabled={savingRuntimeEdit}
+                                            type="submit"
+                                          >
+                                            Add endpoint
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setAddingEndpointInstanceId("")
+                                            }
+                                          >
+                                            Cancel
+                                          </button>
+                                        </form>
+                                      ) : null}
                                       {instanceEndpoints.length === 0 ? (
                                         <p>No endpoints attached.</p>
                                       ) : (
@@ -1905,13 +2365,11 @@ function App() {
                                             className="runtime-child-row"
                                             key={endpoint.id}
                                           >
-                                            <span>
+                                            <strong>
                                               {formatProtocol(
                                                 endpoint.protocol,
-                                              ).toUpperCase()}
-                                            </span>
-                                            <strong>
-                                              :{endpoint.port}
+                                              ).toUpperCase()}{" "}
+                                              · :{endpoint.port}
                                               {endpoint.path || ""}
                                             </strong>
                                             <StatusBadge
@@ -1921,25 +2379,221 @@ function App() {
                                                   : "disabled"
                                               }
                                             />
+                                            <details className="resource-menu">
+                                              <summary
+                                                aria-label={`Endpoint actions for ${endpoint.name}`}
+                                              >
+                                                ...
+                                              </summary>
+                                              <div className="resource-menu-items">
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    startEditEndpoint(endpoint)
+                                                  }
+                                                >
+                                                  Edit endpoint
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    startConfigureHealth(
+                                                      instance,
+                                                      endpoint,
+                                                    )
+                                                  }
+                                                >
+                                                  Configure health
+                                                </button>
+                                                <button
+                                                  className="button-danger"
+                                                  disabled={savingRuntimeEdit}
+                                                  type="button"
+                                                  onClick={() =>
+                                                    handleDeleteEndpoint(
+                                                      endpoint,
+                                                    )
+                                                  }
+                                                >
+                                                  Delete endpoint
+                                                </button>
+                                              </div>
+                                            </details>
+                                            {editingEndpointId ===
+                                            endpoint.id ? (
+                                              <form
+                                                className="inline-edit-form runtime-edit-form"
+                                                onSubmit={
+                                                  handleUpdateEndpoint
+                                                }
+                                              >
+                                                <label>
+                                                  Name
+                                                  <input
+                                                    required
+                                                    value={
+                                                      endpointEditForm.name
+                                                    }
+                                                    onChange={(event) =>
+                                                      setEndpointEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          name: event.target
+                                                            .value,
+                                                        }),
+                                                      )
+                                                    }
+                                                  />
+                                                </label>
+                                                <label>
+                                                  Protocol
+                                                  <select
+                                                    value={
+                                                      endpointEditForm.protocol
+                                                    }
+                                                    onChange={(event) =>
+                                                      setEndpointEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          protocol:
+                                                            event.target.value,
+                                                        }),
+                                                      )
+                                                    }
+                                                  >
+                                                    <option value="PROTOCOL_HTTP">
+                                                      HTTP
+                                                    </option>
+                                                    <option value="PROTOCOL_HTTPS">
+                                                      HTTPS
+                                                    </option>
+                                                    <option value="PROTOCOL_GRPC">
+                                                      gRPC
+                                                    </option>
+                                                    <option value="PROTOCOL_TCP">
+                                                      TCP
+                                                    </option>
+                                                    <option value="PROTOCOL_UDP">
+                                                      UDP
+                                                    </option>
+                                                  </select>
+                                                </label>
+                                                <label>
+                                                  Port
+                                                  <input
+                                                    max="65535"
+                                                    min="1"
+                                                    required
+                                                    type="number"
+                                                    value={
+                                                      endpointEditForm.port
+                                                    }
+                                                    onChange={(event) =>
+                                                      setEndpointEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          port: Number(
+                                                            event.target.value,
+                                                          ),
+                                                        }),
+                                                      )
+                                                    }
+                                                  />
+                                                </label>
+                                                <label>
+                                                  Path
+                                                  <input
+                                                    value={
+                                                      endpointEditForm.path
+                                                    }
+                                                    onChange={(event) =>
+                                                      setEndpointEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          path: event.target
+                                                            .value,
+                                                        }),
+                                                      )
+                                                    }
+                                                  />
+                                                </label>
+                                                <label className="checkbox-label">
+                                                  <input
+                                                    checked={
+                                                      endpointEditForm.enabled
+                                                    }
+                                                    type="checkbox"
+                                                    onChange={(event) =>
+                                                      setEndpointEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          enabled:
+                                                            event.target
+                                                              .checked,
+                                                        }),
+                                                      )
+                                                    }
+                                                  />
+                                                  Enabled
+                                                </label>
+                                                <button
+                                                  disabled={savingRuntimeEdit}
+                                                  type="submit"
+                                                >
+                                                  Save endpoint
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    setEditingEndpointId("")
+                                                  }
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </form>
+                                            ) : null}
                                           </div>
                                         ))
                                       )}
                                       <h4>Health</h4>
                                       {instanceChecks.length === 0 ? (
-                                        <p>No health check configured.</p>
+                                        <div className="runtime-empty-action">
+                                          <p>No health monitoring configured.</p>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              startConfigureHealth(
+                                                instance,
+                                                primaryEndpointForInstance(
+                                                  instanceEndpoints,
+                                                  instance.id,
+                                                ),
+                                              )
+                                            }
+                                          >
+                                            Configure health
+                                          </button>
+                                        </div>
                                       ) : (
                                         instanceChecks.map((check) => (
                                           <div
                                             className="runtime-child-row"
                                             key={check.id}
                                           >
-                                            <span>
-                                              {formatCheckType(check.type)}
-                                            </span>
                                             <strong>
-                                              {check.name} / every{" "}
+                                              {formatCheckType(check.type)
+                                                .toUpperCase()}{" "}
+                                              {check.name} · every{" "}
                                               {check.intervalSeconds}s
                                             </strong>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                startEditHealthCheck(check)
+                                              }
+                                            >
+                                              Edit health check
+                                            </button>
                                             <button
                                               type="button"
                                               onClick={() =>
@@ -1948,9 +2602,203 @@ function App() {
                                             >
                                               Run check
                                             </button>
+                                            <button
+                                              className="button-danger"
+                                              disabled={savingHealthCheck}
+                                              type="button"
+                                              onClick={() =>
+                                                handleDeleteHealthCheck(check)
+                                              }
+                                            >
+                                              Delete
+                                            </button>
+                                            {editingHealthCheckId ===
+                                            check.id ? (
+                                              <form
+                                                className="inline-edit-form runtime-edit-form"
+                                                onSubmit={
+                                                  handleUpdateHealthCheck
+                                                }
+                                              >
+                                                <label>
+                                                  Interval seconds
+                                                  <input
+                                                    min="1"
+                                                    type="number"
+                                                    value={
+                                                      healthEditForm.intervalSeconds
+                                                    }
+                                                    onChange={(event) =>
+                                                      setHealthEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          intervalSeconds:
+                                                            Number(
+                                                              event.target
+                                                                .value,
+                                                            ),
+                                                        }),
+                                                      )
+                                                    }
+                                                  />
+                                                </label>
+                                                <label>
+                                                  Timeout seconds
+                                                  <input
+                                                    min="1"
+                                                    type="number"
+                                                    value={
+                                                      healthEditForm.timeoutSeconds
+                                                    }
+                                                    onChange={(event) =>
+                                                      setHealthEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          timeoutSeconds:
+                                                            Number(
+                                                              event.target
+                                                                .value,
+                                                            ),
+                                                        }),
+                                                      )
+                                                    }
+                                                  />
+                                                </label>
+                                                <label className="checkbox-label">
+                                                  <input
+                                                    checked={
+                                                      healthEditForm.enabled
+                                                    }
+                                                    type="checkbox"
+                                                    onChange={(event) =>
+                                                      setHealthEditForm(
+                                                        (current) => ({
+                                                          ...current,
+                                                          enabled:
+                                                            event.target
+                                                              .checked,
+                                                        }),
+                                                      )
+                                                    }
+                                                  />
+                                                  Enabled
+                                                </label>
+                                                <button
+                                                  disabled={savingHealthCheck}
+                                                  type="submit"
+                                                >
+                                                  Save health check
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    setEditingHealthCheckId("")
+                                                  }
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </form>
+                                            ) : null}
                                           </div>
                                         ))
                                       )}
+                                      {editingHealthCheckId === "new" &&
+                                      healthForm.instanceId === instance.id ? (
+                                        <form
+                                          className="inline-edit-form runtime-edit-form"
+                                          onSubmit={handleUpdateHealthCheck}
+                                        >
+                                          <label>
+                                            Check name
+                                            <input
+                                              required
+                                              value={healthForm.name}
+                                              onChange={(event) =>
+                                                setHealthForm((current) => ({
+                                                  ...current,
+                                                  name: event.target.value,
+                                                }))
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            Check type
+                                            <select
+                                              value={healthForm.type}
+                                              onChange={(event) =>
+                                                setHealthForm((current) => ({
+                                                  ...current,
+                                                  type: event.target.value,
+                                                }))
+                                              }
+                                            >
+                                              <option value="HEALTH_CHECK_TYPE_HTTP">
+                                                HTTP
+                                              </option>
+                                              <option value="HEALTH_CHECK_TYPE_HTTPS">
+                                                HTTPS
+                                              </option>
+                                              <option value="HEALTH_CHECK_TYPE_GRPC">
+                                                gRPC
+                                              </option>
+                                              <option value="HEALTH_CHECK_TYPE_TCP">
+                                                TCP
+                                              </option>
+                                              <option value="HEALTH_CHECK_TYPE_UDP">
+                                                UDP
+                                              </option>
+                                            </select>
+                                          </label>
+                                          <label>
+                                            Interval seconds
+                                            <input
+                                              min="1"
+                                              type="number"
+                                              value={
+                                                healthForm.intervalSeconds
+                                              }
+                                              onChange={(event) =>
+                                                setHealthForm((current) => ({
+                                                  ...current,
+                                                  intervalSeconds: Number(
+                                                    event.target.value,
+                                                  ),
+                                                }))
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            Timeout seconds
+                                            <input
+                                              min="1"
+                                              type="number"
+                                              value={healthForm.timeoutSeconds}
+                                              onChange={(event) =>
+                                                setHealthForm((current) => ({
+                                                  ...current,
+                                                  timeoutSeconds: Number(
+                                                    event.target.value,
+                                                  ),
+                                                }))
+                                              }
+                                            />
+                                          </label>
+                                          <button
+                                            disabled={savingHealthCheck}
+                                            type="submit"
+                                          >
+                                            Configure health
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setEditingHealthCheckId("")
+                                            }
+                                          >
+                                            Cancel
+                                          </button>
+                                        </form>
+                                      ) : null}
                                     </div>
                                   </article>
                                 );
@@ -2621,18 +3469,25 @@ function App() {
             */}
 
           {showCreateService ? (
-            <div aria-modal="true" className="modal-backdrop" role="dialog">
+            <div
+              aria-labelledby="create-service-title"
+              aria-modal="true"
+              className="modal-backdrop"
+              role="dialog"
+            >
               <form
                 className="modal form-panel drawer-form"
                 onSubmit={handleCreateService}
               >
-                <div className="panel-heading">
-                  <h2>Create service</h2>
+                <div className="modal-header">
+                  <h2 id="create-service-title">Create service</h2>
                   <button
+                    aria-label="Close"
+                    className="icon-button"
                     type="button"
                     onClick={() => setShowCreateService(false)}
                   >
-                    Cancel
+                    x
                   </button>
                 </div>
                 <label>
@@ -2688,33 +3543,105 @@ function App() {
             </div>
           ) : null}
 
+          {editingServiceId ? (
+            <div
+              aria-labelledby="edit-service-title"
+              aria-modal="true"
+              className="modal-backdrop"
+              role="dialog"
+            >
+              <form
+                className="modal form-panel drawer-form"
+                onSubmit={handleUpdateService}
+              >
+                <div className="modal-header">
+                  <div>
+                    <h2 id="edit-service-title">Edit service</h2>
+                    <span>{selectedService?.name}</span>
+                  </div>
+                  <button
+                    aria-label="Close"
+                    className="icon-button"
+                    type="button"
+                    onClick={() => setEditingServiceId("")}
+                  >
+                    x
+                  </button>
+                </div>
+                <label>
+                  Display name
+                  <input
+                    required
+                    value={serviceEditForm.displayName}
+                    onChange={(event) =>
+                      setServiceEditForm((current) => ({
+                        ...current,
+                        displayName: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    value={serviceEditForm.description}
+                    onChange={(event) =>
+                      setServiceEditForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <div className="drawer-actions">
+                  <button
+                    type="button"
+                    onClick={() => setEditingServiceId("")}
+                  >
+                    Cancel
+                  </button>
+                  <button disabled={savingService} type="submit">
+                    {savingService ? "Saving" : "Save service"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+
           {showAddRuntime && selectedService ? (
-            <div aria-modal="true" className="modal-backdrop" role="dialog">
+            <div
+              aria-labelledby="add-instance-title"
+              aria-modal="true"
+              className="modal-backdrop"
+              role="dialog"
+            >
               <form
                 className="modal form-panel drawer-form"
                 onSubmit={handleRegisterInstance}
               >
-                <div className="panel-heading">
+                <div className="modal-header">
                   <div>
-                    <h2>
+                    <h2 id="add-instance-title">
                       {selectedEnvironmentDeployment
-                        ? "Add instance"
+                        ? `Add instance to ${selectedService.displayName || selectedService.name}`
                         : "Add runtime"}
                     </h2>
                     <span>
-                      {selectedService.displayName || selectedService.name}
+                      Service
                     </span>
                   </div>
                   <button
+                    aria-label="Close"
+                    className="icon-button"
                     type="button"
                     onClick={() => setShowAddRuntime(false)}
                   >
-                    Cancel
+                    x
                   </button>
                 </div>
                 <div className="context-strip">
                   <span>Service</span>
-                  <strong>{selectedService.name}</strong>
+                  <strong>{selectedService.displayName || selectedService.name}</strong>
                 </div>
                 <label>
                   Environment
@@ -2777,15 +3704,12 @@ function App() {
                     }
                   />
                 </label>
-                <details
-                  open={showRuntimeEndpoint}
-                  onToggle={(event) =>
-                    setShowRuntimeEndpoint(event.currentTarget.open)
-                  }
-                >
-                  <summary>
-                    Endpoint <span>Required by current registration API</span>
-                  </summary>
+                <section className="form-section">
+                  <div className="form-section-heading">
+                    <span>Endpoint</span>
+                    <strong>Required</strong>
+                  </div>
+                  <p>An instance must have at least one endpoint.</p>
                   <div className="form-fields-grid">
                     <label>
                       Name
@@ -2846,20 +3770,38 @@ function App() {
                       />
                     </label>
                   </div>
-                </details>
-                <details
-                  open={showRuntimeHealth}
-                  onToggle={(event) => {
-                    setShowRuntimeHealth(event.currentTarget.open);
-                    setRegistrationForm((current) => ({
-                      ...current,
-                      configureHealth: event.currentTarget.open,
-                    }));
-                  }}
-                >
-                  <summary>
-                    Health monitoring <span>Optional</span>
-                  </summary>
+                </section>
+                <section className="form-section">
+                  <button
+                    aria-controls="health-monitoring-fields"
+                    aria-expanded={showRuntimeHealth}
+                    className="accordion-button"
+                    type="button"
+                    onClick={() => {
+                      setShowRuntimeHealth((value) => {
+                        const next = !value;
+                        setRegistrationForm((current) => ({
+                          ...current,
+                          configureHealth: next,
+                        }));
+                        return next;
+                      });
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={
+                        showRuntimeHealth
+                          ? "accordion-chevron expanded"
+                          : "accordion-chevron"
+                      }
+                    >
+                      &gt;
+                    </span>
+                    <span>Health monitoring</span>
+                    <strong>Optional</strong>
+                  </button>
+                  {showRuntimeHealth ? (
                   <div className="form-fields-grid">
                     <label>
                       Check name
@@ -2874,7 +3816,7 @@ function App() {
                       />
                     </label>
                     <label>
-                      Type
+                      Check type
                       <select
                         value={registrationForm.healthType}
                         onChange={(event) =>
@@ -2892,7 +3834,7 @@ function App() {
                       </select>
                     </label>
                     <label>
-                      Interval seconds
+                      Interval
                       <input
                         min="1"
                         type="number"
@@ -2906,7 +3848,7 @@ function App() {
                       />
                     </label>
                     <label>
-                      Timeout seconds
+                      Timeout
                       <input
                         min="1"
                         type="number"
@@ -2920,7 +3862,8 @@ function App() {
                       />
                     </label>
                   </div>
-                </details>
+                  ) : null}
+                </section>
                 <div className="drawer-actions">
                   <button
                     type="button"
@@ -4196,6 +5139,21 @@ function formatHealthState(value: string) {
 
 function formatProtocol(value: string) {
   return value.replace("PROTOCOL_", "").toLowerCase();
+}
+
+function healthTypeForEndpoint(protocol: string) {
+  switch (protocol) {
+    case "PROTOCOL_HTTPS":
+      return "HEALTH_CHECK_TYPE_HTTPS";
+    case "PROTOCOL_GRPC":
+      return "HEALTH_CHECK_TYPE_GRPC";
+    case "PROTOCOL_TCP":
+      return "HEALTH_CHECK_TYPE_TCP";
+    case "PROTOCOL_UDP":
+      return "HEALTH_CHECK_TYPE_UDP";
+    default:
+      return "HEALTH_CHECK_TYPE_HTTP";
+  }
 }
 
 function environmentName(environments: Environment[], id: string) {

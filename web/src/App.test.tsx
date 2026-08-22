@@ -102,7 +102,8 @@ describe("App", () => {
     await screen.findByText("Checkout service created");
     fireEvent.click(screen.getByRole("button", { name: "Services" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
     fireEvent.change(screen.getByLabelText("Instance name"), {
       target: { value: "checkout-prod-02" },
     });
@@ -159,8 +160,12 @@ describe("App", () => {
     expect(screen.getByText("Endpoints")).toBeInTheDocument();
     expect(screen.getAllByText("Health").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Add instance" })[0]);
-    expect(screen.getByText("Service")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add instance" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
+    expect(screen.getAllByText("Service").length).toBeGreaterThan(0);
     expect(screen.getAllByText("checkout").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Environment")).toHaveValue("env-1");
@@ -170,12 +175,63 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Address"), {
       target: { value: "10.0.0.3" },
     });
-    fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
-    fireEvent.click(screen.getAllByRole("button", { name: "Add instance" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
     expect(screen.getByLabelText("Instance name")).toHaveValue(
       "checkout-prod-03",
     );
     expect(screen.getByLabelText("Address")).toHaveValue("10.0.0.3");
+  });
+
+  it("expands health monitoring locally without submitting or losing form state", async () => {
+    const startingUrl = window.location.href;
+    render(<App />);
+
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", { name: "Services" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
+
+    fireEvent.change(screen.getByLabelText("Instance name"), {
+      target: { value: "checkout-prod-04" },
+    });
+    fireEvent.change(screen.getByLabelText("Address"), {
+      target: { value: "10.0.0.4" },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "public" },
+    });
+
+    const healthToggle = screen.getByRole("button", {
+      name: /Health monitoring/i,
+    });
+    expect(healthToggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(healthToggle);
+
+    expect(healthToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Check type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Interval")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("Instance name")).toHaveValue(
+      "checkout-prod-04",
+    );
+    expect(screen.getByLabelText("Address")).toHaveValue("10.0.0.4");
+    expect(screen.getByLabelText("Name")).toHaveValue("public");
+    expect(window.location.href).toBe(startingUrl);
+    expect(
+      vi.mocked(fetch).mock.calls.filter(([input]) =>
+        input.toString().includes("RegisterRuntime"),
+      ),
+    ).toHaveLength(0);
+
+    fireEvent.click(healthToggle);
+
+    expect(healthToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("Check type")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Instance name")).toHaveValue(
+      "checkout-prod-04",
+    );
   });
 
   it("has no WCAG 2 A/AA axe violations on the dashboard", async () => {

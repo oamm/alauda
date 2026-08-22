@@ -102,6 +102,45 @@ func TestRecordHealthResultDispatchesAlertsAfterTransitions(t *testing.T) {
 	}
 }
 
+func TestCreateHealthCheckRestoresSoftDeletedName(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDatabase(t)
+	defer db.Close()
+
+	repo := NewHealthRepository(db)
+	check := createTestHealthCheck(t, ctx, db)
+
+	if err := repo.DeleteHealthCheck(ctx, check.GetId()); err != nil {
+		t.Fatalf("delete health check: %v", err)
+	}
+
+	restored, err := repo.CreateHealthCheck(ctx, &registryv1.CreateHealthCheckRequest{
+		InstanceId:              check.GetInstanceId(),
+		EndpointId:              check.GetEndpointId(),
+		Name:                    check.GetName(),
+		Type:                    registryv1.HealthCheckType_HEALTH_CHECK_TYPE_TCP,
+		Enabled:                 true,
+		IntervalSeconds:         15,
+		TimeoutSeconds:          4,
+		FailuresBeforeUnhealthy: 3,
+		SuccessesBeforeHealthy:  2,
+		Description:             "restored",
+		Metadata:                map[string]string{"path": "/healthz"},
+	})
+	if err != nil {
+		t.Fatalf("restore health check: %v", err)
+	}
+	if restored.GetId() != check.GetId() {
+		t.Fatalf("restored id = %q, want original %q", restored.GetId(), check.GetId())
+	}
+	if restored.GetType() != registryv1.HealthCheckType_HEALTH_CHECK_TYPE_TCP {
+		t.Fatalf("restored type = %s, want TCP", restored.GetType())
+	}
+	if restored.GetIntervalSeconds() != 15 || restored.GetTimeoutSeconds() != 4 {
+		t.Fatalf("restored timing = %ds/%ds, want 15s/4s", restored.GetIntervalSeconds(), restored.GetTimeoutSeconds())
+	}
+}
+
 type recordingAlertDispatcher struct {
 	calls []recordedAlertCall
 }

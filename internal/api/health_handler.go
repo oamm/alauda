@@ -16,7 +16,7 @@ func (h *healthHandler) CreateHealthCheck(ctx context.Context, req *connect.Requ
 	}
 	item, err := h.repo.CreateHealthCheck(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateHealthCheckResponse{HealthCheck: item}), nil
 }
