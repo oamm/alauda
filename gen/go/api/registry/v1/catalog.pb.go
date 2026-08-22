@@ -381,6 +381,7 @@ type Endpoint struct {
 	Enabled       bool                   `protobuf:"varint,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	Tags          map[string]string      `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Metadata      map[string]string      `protobuf:"bytes,9,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Primary       bool                   `protobuf:"varint,10,opt,name=primary,proto3" json:"primary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -476,6 +477,13 @@ func (x *Endpoint) GetMetadata() map[string]string {
 		return x.Metadata
 	}
 	return nil
+}
+
+func (x *Endpoint) GetPrimary() bool {
+	if x != nil {
+		return x.Primary
+	}
+	return false
 }
 
 type CreateServiceRequest struct {
@@ -1678,6 +1686,318 @@ func (x *CreateInstanceResponse) GetInstance() *ServiceInstance {
 	return nil
 }
 
+type RuntimeInstanceRegistration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Address       string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Enabled       bool                   `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Tags          map[string]string      `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Metadata      map[string]string      `protobuf:"bytes,6,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RuntimeInstanceRegistration) Reset() {
+	*x = RuntimeInstanceRegistration{}
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RuntimeInstanceRegistration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuntimeInstanceRegistration) ProtoMessage() {}
+
+func (x *RuntimeInstanceRegistration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuntimeInstanceRegistration.ProtoReflect.Descriptor instead.
+func (*RuntimeInstanceRegistration) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RuntimeInstanceRegistration) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RuntimeInstanceRegistration) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *RuntimeInstanceRegistration) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *RuntimeInstanceRegistration) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *RuntimeInstanceRegistration) GetTags() map[string]string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *RuntimeInstanceRegistration) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type RuntimeEndpointRegistration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Protocol      Protocol               `protobuf:"varint,2,opt,name=protocol,proto3,enum=registry.v1.Protocol" json:"protocol,omitempty"`
+	Port          int32                  `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	Enabled       bool                   `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Primary       bool                   `protobuf:"varint,6,opt,name=primary,proto3" json:"primary,omitempty"`
+	Tags          map[string]string      `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Metadata      map[string]string      `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RuntimeEndpointRegistration) Reset() {
+	*x = RuntimeEndpointRegistration{}
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RuntimeEndpointRegistration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuntimeEndpointRegistration) ProtoMessage() {}
+
+func (x *RuntimeEndpointRegistration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuntimeEndpointRegistration.ProtoReflect.Descriptor instead.
+func (*RuntimeEndpointRegistration) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RuntimeEndpointRegistration) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RuntimeEndpointRegistration) GetProtocol() Protocol {
+	if x != nil {
+		return x.Protocol
+	}
+	return Protocol_PROTOCOL_UNSPECIFIED
+}
+
+func (x *RuntimeEndpointRegistration) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *RuntimeEndpointRegistration) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *RuntimeEndpointRegistration) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *RuntimeEndpointRegistration) GetPrimary() bool {
+	if x != nil {
+		return x.Primary
+	}
+	return false
+}
+
+func (x *RuntimeEndpointRegistration) GetTags() map[string]string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *RuntimeEndpointRegistration) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type RegisterRuntimeRequest struct {
+	state         protoimpl.MessageState         `protogen:"open.v1"`
+	ServiceId     string                         `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
+	EnvironmentId string                         `protobuf:"bytes,2,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
+	Instance      *RuntimeInstanceRegistration   `protobuf:"bytes,3,opt,name=instance,proto3" json:"instance,omitempty"`
+	Endpoints     []*RuntimeEndpointRegistration `protobuf:"bytes,4,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterRuntimeRequest) Reset() {
+	*x = RegisterRuntimeRequest{}
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterRuntimeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterRuntimeRequest) ProtoMessage() {}
+
+func (x *RegisterRuntimeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterRuntimeRequest.ProtoReflect.Descriptor instead.
+func (*RegisterRuntimeRequest) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *RegisterRuntimeRequest) GetServiceId() string {
+	if x != nil {
+		return x.ServiceId
+	}
+	return ""
+}
+
+func (x *RegisterRuntimeRequest) GetEnvironmentId() string {
+	if x != nil {
+		return x.EnvironmentId
+	}
+	return ""
+}
+
+func (x *RegisterRuntimeRequest) GetInstance() *RuntimeInstanceRegistration {
+	if x != nil {
+		return x.Instance
+	}
+	return nil
+}
+
+func (x *RegisterRuntimeRequest) GetEndpoints() []*RuntimeEndpointRegistration {
+	if x != nil {
+		return x.Endpoints
+	}
+	return nil
+}
+
+type RegisterRuntimeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Deployment    *ServiceDeployment     `protobuf:"bytes,1,opt,name=deployment,proto3" json:"deployment,omitempty"`
+	Instance      *ServiceInstance       `protobuf:"bytes,2,opt,name=instance,proto3" json:"instance,omitempty"`
+	Endpoints     []*Endpoint            `protobuf:"bytes,3,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterRuntimeResponse) Reset() {
+	*x = RegisterRuntimeResponse{}
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterRuntimeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterRuntimeResponse) ProtoMessage() {}
+
+func (x *RegisterRuntimeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterRuntimeResponse.ProtoReflect.Descriptor instead.
+func (*RegisterRuntimeResponse) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *RegisterRuntimeResponse) GetDeployment() *ServiceDeployment {
+	if x != nil {
+		return x.Deployment
+	}
+	return nil
+}
+
+func (x *RegisterRuntimeResponse) GetInstance() *ServiceInstance {
+	if x != nil {
+		return x.Instance
+	}
+	return nil
+}
+
+func (x *RegisterRuntimeResponse) GetEndpoints() []*Endpoint {
+	if x != nil {
+		return x.Endpoints
+	}
+	return nil
+}
+
 type GetInstanceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1687,7 +2007,7 @@ type GetInstanceRequest struct {
 
 func (x *GetInstanceRequest) Reset() {
 	*x = GetInstanceRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[26]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1699,7 +2019,7 @@ func (x *GetInstanceRequest) String() string {
 func (*GetInstanceRequest) ProtoMessage() {}
 
 func (x *GetInstanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[26]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1712,7 +2032,7 @@ func (x *GetInstanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInstanceRequest.ProtoReflect.Descriptor instead.
 func (*GetInstanceRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{26}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetInstanceRequest) GetId() string {
@@ -1731,7 +2051,7 @@ type GetInstanceResponse struct {
 
 func (x *GetInstanceResponse) Reset() {
 	*x = GetInstanceResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[27]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1743,7 +2063,7 @@ func (x *GetInstanceResponse) String() string {
 func (*GetInstanceResponse) ProtoMessage() {}
 
 func (x *GetInstanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[27]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1756,7 +2076,7 @@ func (x *GetInstanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInstanceResponse.ProtoReflect.Descriptor instead.
 func (*GetInstanceResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{27}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *GetInstanceResponse) GetInstance() *ServiceInstance {
@@ -1776,7 +2096,7 @@ type ListInstancesRequest struct {
 
 func (x *ListInstancesRequest) Reset() {
 	*x = ListInstancesRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[28]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1788,7 +2108,7 @@ func (x *ListInstancesRequest) String() string {
 func (*ListInstancesRequest) ProtoMessage() {}
 
 func (x *ListInstancesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[28]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1801,7 +2121,7 @@ func (x *ListInstancesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInstancesRequest.ProtoReflect.Descriptor instead.
 func (*ListInstancesRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{28}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListInstancesRequest) GetPagination() *PaginationRequest {
@@ -1828,7 +2148,7 @@ type ListInstancesResponse struct {
 
 func (x *ListInstancesResponse) Reset() {
 	*x = ListInstancesResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[29]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1840,7 +2160,7 @@ func (x *ListInstancesResponse) String() string {
 func (*ListInstancesResponse) ProtoMessage() {}
 
 func (x *ListInstancesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[29]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1853,7 +2173,7 @@ func (x *ListInstancesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInstancesResponse.ProtoReflect.Descriptor instead.
 func (*ListInstancesResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{29}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ListInstancesResponse) GetInstances() []*ServiceInstance {
@@ -1885,7 +2205,7 @@ type UpdateInstanceRequest struct {
 
 func (x *UpdateInstanceRequest) Reset() {
 	*x = UpdateInstanceRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[30]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1897,7 +2217,7 @@ func (x *UpdateInstanceRequest) String() string {
 func (*UpdateInstanceRequest) ProtoMessage() {}
 
 func (x *UpdateInstanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[30]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1910,7 +2230,7 @@ func (x *UpdateInstanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateInstanceRequest.ProtoReflect.Descriptor instead.
 func (*UpdateInstanceRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{30}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *UpdateInstanceRequest) GetId() string {
@@ -1971,7 +2291,7 @@ type UpdateInstanceResponse struct {
 
 func (x *UpdateInstanceResponse) Reset() {
 	*x = UpdateInstanceResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[31]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1983,7 +2303,7 @@ func (x *UpdateInstanceResponse) String() string {
 func (*UpdateInstanceResponse) ProtoMessage() {}
 
 func (x *UpdateInstanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[31]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1996,7 +2316,7 @@ func (x *UpdateInstanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateInstanceResponse.ProtoReflect.Descriptor instead.
 func (*UpdateInstanceResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{31}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *UpdateInstanceResponse) GetInstance() *ServiceInstance {
@@ -2015,7 +2335,7 @@ type DeleteInstanceRequest struct {
 
 func (x *DeleteInstanceRequest) Reset() {
 	*x = DeleteInstanceRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[32]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2027,7 +2347,7 @@ func (x *DeleteInstanceRequest) String() string {
 func (*DeleteInstanceRequest) ProtoMessage() {}
 
 func (x *DeleteInstanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[32]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2040,7 +2360,7 @@ func (x *DeleteInstanceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteInstanceRequest.ProtoReflect.Descriptor instead.
 func (*DeleteInstanceRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{32}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *DeleteInstanceRequest) GetId() string {
@@ -2058,7 +2378,7 @@ type DeleteInstanceResponse struct {
 
 func (x *DeleteInstanceResponse) Reset() {
 	*x = DeleteInstanceResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[33]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2070,7 +2390,7 @@ func (x *DeleteInstanceResponse) String() string {
 func (*DeleteInstanceResponse) ProtoMessage() {}
 
 func (x *DeleteInstanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[33]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2083,7 +2403,7 @@ func (x *DeleteInstanceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteInstanceResponse.ProtoReflect.Descriptor instead.
 func (*DeleteInstanceResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{33}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{37}
 }
 
 type CreateEndpointRequest struct {
@@ -2096,13 +2416,14 @@ type CreateEndpointRequest struct {
 	Enabled       bool                   `protobuf:"varint,6,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	Tags          map[string]string      `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Metadata      map[string]string      `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Primary       bool                   `protobuf:"varint,9,opt,name=primary,proto3" json:"primary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateEndpointRequest) Reset() {
 	*x = CreateEndpointRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[34]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2114,7 +2435,7 @@ func (x *CreateEndpointRequest) String() string {
 func (*CreateEndpointRequest) ProtoMessage() {}
 
 func (x *CreateEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[34]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2127,7 +2448,7 @@ func (x *CreateEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEndpointRequest.ProtoReflect.Descriptor instead.
 func (*CreateEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{34}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *CreateEndpointRequest) GetInstanceId() string {
@@ -2186,6 +2507,13 @@ func (x *CreateEndpointRequest) GetMetadata() map[string]string {
 	return nil
 }
 
+func (x *CreateEndpointRequest) GetPrimary() bool {
+	if x != nil {
+		return x.Primary
+	}
+	return false
+}
+
 type CreateEndpointResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Endpoint      *Endpoint              `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
@@ -2195,7 +2523,7 @@ type CreateEndpointResponse struct {
 
 func (x *CreateEndpointResponse) Reset() {
 	*x = CreateEndpointResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[35]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2207,7 +2535,7 @@ func (x *CreateEndpointResponse) String() string {
 func (*CreateEndpointResponse) ProtoMessage() {}
 
 func (x *CreateEndpointResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[35]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2220,7 +2548,7 @@ func (x *CreateEndpointResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEndpointResponse.ProtoReflect.Descriptor instead.
 func (*CreateEndpointResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{35}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *CreateEndpointResponse) GetEndpoint() *Endpoint {
@@ -2239,7 +2567,7 @@ type GetEndpointRequest struct {
 
 func (x *GetEndpointRequest) Reset() {
 	*x = GetEndpointRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[36]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2251,7 +2579,7 @@ func (x *GetEndpointRequest) String() string {
 func (*GetEndpointRequest) ProtoMessage() {}
 
 func (x *GetEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[36]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2264,7 +2592,7 @@ func (x *GetEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEndpointRequest.ProtoReflect.Descriptor instead.
 func (*GetEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{36}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *GetEndpointRequest) GetId() string {
@@ -2283,7 +2611,7 @@ type GetEndpointResponse struct {
 
 func (x *GetEndpointResponse) Reset() {
 	*x = GetEndpointResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[37]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2295,7 +2623,7 @@ func (x *GetEndpointResponse) String() string {
 func (*GetEndpointResponse) ProtoMessage() {}
 
 func (x *GetEndpointResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[37]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2308,7 +2636,7 @@ func (x *GetEndpointResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEndpointResponse.ProtoReflect.Descriptor instead.
 func (*GetEndpointResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{37}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetEndpointResponse) GetEndpoint() *Endpoint {
@@ -2328,7 +2656,7 @@ type ListEndpointsRequest struct {
 
 func (x *ListEndpointsRequest) Reset() {
 	*x = ListEndpointsRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[38]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2340,7 +2668,7 @@ func (x *ListEndpointsRequest) String() string {
 func (*ListEndpointsRequest) ProtoMessage() {}
 
 func (x *ListEndpointsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[38]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2353,7 +2681,7 @@ func (x *ListEndpointsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEndpointsRequest.ProtoReflect.Descriptor instead.
 func (*ListEndpointsRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{38}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ListEndpointsRequest) GetPagination() *PaginationRequest {
@@ -2380,7 +2708,7 @@ type ListEndpointsResponse struct {
 
 func (x *ListEndpointsResponse) Reset() {
 	*x = ListEndpointsResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[39]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2392,7 +2720,7 @@ func (x *ListEndpointsResponse) String() string {
 func (*ListEndpointsResponse) ProtoMessage() {}
 
 func (x *ListEndpointsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[39]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2405,7 +2733,7 @@ func (x *ListEndpointsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEndpointsResponse.ProtoReflect.Descriptor instead.
 func (*ListEndpointsResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{39}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ListEndpointsResponse) GetEndpoints() []*Endpoint {
@@ -2432,13 +2760,14 @@ type UpdateEndpointRequest struct {
 	Enabled       bool                   `protobuf:"varint,6,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	Tags          map[string]string      `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	Metadata      map[string]string      `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Primary       *bool                  `protobuf:"varint,9,opt,name=primary,proto3,oneof" json:"primary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateEndpointRequest) Reset() {
 	*x = UpdateEndpointRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[40]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2450,7 +2779,7 @@ func (x *UpdateEndpointRequest) String() string {
 func (*UpdateEndpointRequest) ProtoMessage() {}
 
 func (x *UpdateEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[40]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2463,7 +2792,7 @@ func (x *UpdateEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateEndpointRequest.ProtoReflect.Descriptor instead.
 func (*UpdateEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{40}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *UpdateEndpointRequest) GetId() string {
@@ -2522,6 +2851,13 @@ func (x *UpdateEndpointRequest) GetMetadata() map[string]string {
 	return nil
 }
 
+func (x *UpdateEndpointRequest) GetPrimary() bool {
+	if x != nil && x.Primary != nil {
+		return *x.Primary
+	}
+	return false
+}
+
 type UpdateEndpointResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Endpoint      *Endpoint              `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
@@ -2531,7 +2867,7 @@ type UpdateEndpointResponse struct {
 
 func (x *UpdateEndpointResponse) Reset() {
 	*x = UpdateEndpointResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[41]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2543,7 +2879,7 @@ func (x *UpdateEndpointResponse) String() string {
 func (*UpdateEndpointResponse) ProtoMessage() {}
 
 func (x *UpdateEndpointResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[41]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2556,7 +2892,7 @@ func (x *UpdateEndpointResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateEndpointResponse.ProtoReflect.Descriptor instead.
 func (*UpdateEndpointResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{41}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *UpdateEndpointResponse) GetEndpoint() *Endpoint {
@@ -2575,7 +2911,7 @@ type DeleteEndpointRequest struct {
 
 func (x *DeleteEndpointRequest) Reset() {
 	*x = DeleteEndpointRequest{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[42]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2587,7 +2923,7 @@ func (x *DeleteEndpointRequest) String() string {
 func (*DeleteEndpointRequest) ProtoMessage() {}
 
 func (x *DeleteEndpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[42]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2600,7 +2936,7 @@ func (x *DeleteEndpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteEndpointRequest.ProtoReflect.Descriptor instead.
 func (*DeleteEndpointRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{42}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *DeleteEndpointRequest) GetId() string {
@@ -2618,7 +2954,7 @@ type DeleteEndpointResponse struct {
 
 func (x *DeleteEndpointResponse) Reset() {
 	*x = DeleteEndpointResponse{}
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[43]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2630,7 +2966,7 @@ func (x *DeleteEndpointResponse) String() string {
 func (*DeleteEndpointResponse) ProtoMessage() {}
 
 func (x *DeleteEndpointResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_catalog_proto_msgTypes[43]
+	mi := &file_api_registry_v1_catalog_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2643,7 +2979,7 @@ func (x *DeleteEndpointResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteEndpointResponse.ProtoReflect.Descriptor instead.
 func (*DeleteEndpointResponse) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{43}
+	return file_api_registry_v1_catalog_proto_rawDescGZIP(), []int{47}
 }
 
 var File_api_registry_v1_catalog_proto protoreflect.FileDescriptor
@@ -2711,7 +3047,7 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb0\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xca\x03\n" +
 	"\bEndpoint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vinstance_id\x18\x02 \x01(\tR\n" +
@@ -2722,7 +3058,9 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\x04path\x18\x06 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\a \x01(\bR\aenabled\x123\n" +
 	"\x04tags\x18\b \x03(\v2\x1f.registry.v1.Endpoint.TagsEntryR\x04tags\x12?\n" +
-	"\bmetadata\x18\t \x03(\v2#.registry.v1.Endpoint.MetadataEntryR\bmetadata\x1a7\n" +
+	"\bmetadata\x18\t \x03(\v2#.registry.v1.Endpoint.MetadataEntryR\bmetadata\x12\x18\n" +
+	"\aprimary\x18\n" +
+	" \x01(\bR\aprimary\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
@@ -2847,7 +3185,47 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"R\n" +
 	"\x16CreateInstanceResponse\x128\n" +
-	"\binstance\x18\x01 \x01(\v2\x1c.registry.v1.ServiceInstanceR\binstance\"$\n" +
+	"\binstance\x18\x01 \x01(\v2\x1c.registry.v1.ServiceInstanceR\binstance\"\x99\x03\n" +
+	"\x1bRuntimeInstanceRegistration\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\aaddress\x18\x02 \x01(\tR\aaddress\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
+	"\aenabled\x18\x04 \x01(\bR\aenabled\x12F\n" +
+	"\x04tags\x18\x05 \x03(\v22.registry.v1.RuntimeInstanceRegistration.TagsEntryR\x04tags\x12R\n" +
+	"\bmetadata\x18\x06 \x03(\v26.registry.v1.RuntimeInstanceRegistration.MetadataEntryR\bmetadata\x1a7\n" +
+	"\tTagsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd2\x03\n" +
+	"\x1bRuntimeEndpointRegistration\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x121\n" +
+	"\bprotocol\x18\x02 \x01(\x0e2\x15.registry.v1.ProtocolR\bprotocol\x12\x12\n" +
+	"\x04port\x18\x03 \x01(\x05R\x04port\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x18\n" +
+	"\aenabled\x18\x05 \x01(\bR\aenabled\x12\x18\n" +
+	"\aprimary\x18\x06 \x01(\bR\aprimary\x12F\n" +
+	"\x04tags\x18\a \x03(\v22.registry.v1.RuntimeEndpointRegistration.TagsEntryR\x04tags\x12R\n" +
+	"\bmetadata\x18\b \x03(\v26.registry.v1.RuntimeEndpointRegistration.MetadataEntryR\bmetadata\x1a7\n" +
+	"\tTagsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xec\x01\n" +
+	"\x16RegisterRuntimeRequest\x12\x1d\n" +
+	"\n" +
+	"service_id\x18\x01 \x01(\tR\tserviceId\x12%\n" +
+	"\x0eenvironment_id\x18\x02 \x01(\tR\renvironmentId\x12D\n" +
+	"\binstance\x18\x03 \x01(\v2(.registry.v1.RuntimeInstanceRegistrationR\binstance\x12F\n" +
+	"\tendpoints\x18\x04 \x03(\v2(.registry.v1.RuntimeEndpointRegistrationR\tendpoints\"\xc8\x01\n" +
+	"\x17RegisterRuntimeResponse\x12>\n" +
+	"\n" +
+	"deployment\x18\x01 \x01(\v2\x1e.registry.v1.ServiceDeploymentR\n" +
+	"deployment\x128\n" +
+	"\binstance\x18\x02 \x01(\v2\x1c.registry.v1.ServiceInstanceR\binstance\x123\n" +
+	"\tendpoints\x18\x03 \x03(\v2\x15.registry.v1.EndpointR\tendpoints\"$\n" +
 	"\x12GetInstanceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"O\n" +
 	"\x13GetInstanceResponse\x128\n" +
@@ -2880,7 +3258,7 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\binstance\x18\x01 \x01(\v2\x1c.registry.v1.ServiceInstanceR\binstance\"'\n" +
 	"\x15DeleteInstanceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
-	"\x16DeleteInstanceResponse\"\xc7\x03\n" +
+	"\x16DeleteInstanceResponse\"\xe1\x03\n" +
 	"\x15CreateEndpointRequest\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x12\n" +
@@ -2890,7 +3268,8 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\x04path\x18\x05 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\x06 \x01(\bR\aenabled\x12@\n" +
 	"\x04tags\x18\a \x03(\v2,.registry.v1.CreateEndpointRequest.TagsEntryR\x04tags\x12L\n" +
-	"\bmetadata\x18\b \x03(\v20.registry.v1.CreateEndpointRequest.MetadataEntryR\bmetadata\x1a7\n" +
+	"\bmetadata\x18\b \x03(\v20.registry.v1.CreateEndpointRequest.MetadataEntryR\bmetadata\x12\x18\n" +
+	"\aprimary\x18\t \x01(\bR\aprimary\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
@@ -2913,7 +3292,7 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\tendpoints\x18\x01 \x03(\v2\x15.registry.v1.EndpointR\tendpoints\x12?\n" +
 	"\n" +
 	"pagination\x18\x02 \x01(\v2\x1f.registry.v1.PaginationResponseR\n" +
-	"pagination\"\xb6\x03\n" +
+	"pagination\"\xe1\x03\n" +
 	"\x15UpdateEndpointRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
@@ -2922,13 +3301,16 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\x04path\x18\x05 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\x06 \x01(\bR\aenabled\x12@\n" +
 	"\x04tags\x18\a \x03(\v2,.registry.v1.UpdateEndpointRequest.TagsEntryR\x04tags\x12L\n" +
-	"\bmetadata\x18\b \x03(\v20.registry.v1.UpdateEndpointRequest.MetadataEntryR\bmetadata\x1a7\n" +
+	"\bmetadata\x18\b \x03(\v20.registry.v1.UpdateEndpointRequest.MetadataEntryR\bmetadata\x12\x1d\n" +
+	"\aprimary\x18\t \x01(\bH\x00R\aprimary\x88\x01\x01\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"K\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
+	"\n" +
+	"\b_primary\"K\n" +
 	"\x16UpdateEndpointResponse\x121\n" +
 	"\bendpoint\x18\x01 \x01(\v2\x15.registry.v1.EndpointR\bendpoint\"'\n" +
 	"\x15DeleteEndpointRequest\x12\x0e\n" +
@@ -2952,8 +3334,9 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\rGetDeployment\x12!.registry.v1.GetDeploymentRequest\x1a\".registry.v1.GetDeploymentResponse\x12\\\n" +
 	"\x0fListDeployments\x12#.registry.v1.ListDeploymentsRequest\x1a$.registry.v1.ListDeploymentsResponse\x12_\n" +
 	"\x10UpdateDeployment\x12$.registry.v1.UpdateDeploymentRequest\x1a%.registry.v1.UpdateDeploymentResponse\x12_\n" +
-	"\x10DeleteDeployment\x12$.registry.v1.DeleteDeploymentRequest\x1a%.registry.v1.DeleteDeploymentResponse2\xcc\x03\n" +
-	"\x0fInstanceService\x12Y\n" +
+	"\x10DeleteDeployment\x12$.registry.v1.DeleteDeploymentRequest\x1a%.registry.v1.DeleteDeploymentResponse2\xaa\x04\n" +
+	"\x0fInstanceService\x12\\\n" +
+	"\x0fRegisterRuntime\x12#.registry.v1.RegisterRuntimeRequest\x1a$.registry.v1.RegisterRuntimeResponse\x12Y\n" +
 	"\x0eCreateInstance\x12\".registry.v1.CreateInstanceRequest\x1a#.registry.v1.CreateInstanceResponse\x12P\n" +
 	"\vGetInstance\x12\x1f.registry.v1.GetInstanceRequest\x1a .registry.v1.GetInstanceResponse\x12V\n" +
 	"\rListInstances\x12!.registry.v1.ListInstancesRequest\x1a\".registry.v1.ListInstancesResponse\x12Y\n" +
@@ -2973,185 +3356,205 @@ func file_api_registry_v1_catalog_proto_rawDescGZIP() []byte {
 	return file_api_registry_v1_catalog_proto_rawDescData
 }
 
-var file_api_registry_v1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 68)
+var file_api_registry_v1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 76)
 var file_api_registry_v1_catalog_proto_goTypes = []any{
-	(*Service)(nil),                  // 0: registry.v1.Service
-	(*ServiceDeployment)(nil),        // 1: registry.v1.ServiceDeployment
-	(*ServiceInstance)(nil),          // 2: registry.v1.ServiceInstance
-	(*Endpoint)(nil),                 // 3: registry.v1.Endpoint
-	(*CreateServiceRequest)(nil),     // 4: registry.v1.CreateServiceRequest
-	(*CreateServiceResponse)(nil),    // 5: registry.v1.CreateServiceResponse
-	(*GetServiceRequest)(nil),        // 6: registry.v1.GetServiceRequest
-	(*GetServiceResponse)(nil),       // 7: registry.v1.GetServiceResponse
-	(*ListServicesRequest)(nil),      // 8: registry.v1.ListServicesRequest
-	(*ListServicesResponse)(nil),     // 9: registry.v1.ListServicesResponse
-	(*UpdateServiceRequest)(nil),     // 10: registry.v1.UpdateServiceRequest
-	(*UpdateServiceResponse)(nil),    // 11: registry.v1.UpdateServiceResponse
-	(*DeleteServiceRequest)(nil),     // 12: registry.v1.DeleteServiceRequest
-	(*DeleteServiceResponse)(nil),    // 13: registry.v1.DeleteServiceResponse
-	(*CreateDeploymentRequest)(nil),  // 14: registry.v1.CreateDeploymentRequest
-	(*CreateDeploymentResponse)(nil), // 15: registry.v1.CreateDeploymentResponse
-	(*GetDeploymentRequest)(nil),     // 16: registry.v1.GetDeploymentRequest
-	(*GetDeploymentResponse)(nil),    // 17: registry.v1.GetDeploymentResponse
-	(*ListDeploymentsRequest)(nil),   // 18: registry.v1.ListDeploymentsRequest
-	(*ListDeploymentsResponse)(nil),  // 19: registry.v1.ListDeploymentsResponse
-	(*UpdateDeploymentRequest)(nil),  // 20: registry.v1.UpdateDeploymentRequest
-	(*UpdateDeploymentResponse)(nil), // 21: registry.v1.UpdateDeploymentResponse
-	(*DeleteDeploymentRequest)(nil),  // 22: registry.v1.DeleteDeploymentRequest
-	(*DeleteDeploymentResponse)(nil), // 23: registry.v1.DeleteDeploymentResponse
-	(*CreateInstanceRequest)(nil),    // 24: registry.v1.CreateInstanceRequest
-	(*CreateInstanceResponse)(nil),   // 25: registry.v1.CreateInstanceResponse
-	(*GetInstanceRequest)(nil),       // 26: registry.v1.GetInstanceRequest
-	(*GetInstanceResponse)(nil),      // 27: registry.v1.GetInstanceResponse
-	(*ListInstancesRequest)(nil),     // 28: registry.v1.ListInstancesRequest
-	(*ListInstancesResponse)(nil),    // 29: registry.v1.ListInstancesResponse
-	(*UpdateInstanceRequest)(nil),    // 30: registry.v1.UpdateInstanceRequest
-	(*UpdateInstanceResponse)(nil),   // 31: registry.v1.UpdateInstanceResponse
-	(*DeleteInstanceRequest)(nil),    // 32: registry.v1.DeleteInstanceRequest
-	(*DeleteInstanceResponse)(nil),   // 33: registry.v1.DeleteInstanceResponse
-	(*CreateEndpointRequest)(nil),    // 34: registry.v1.CreateEndpointRequest
-	(*CreateEndpointResponse)(nil),   // 35: registry.v1.CreateEndpointResponse
-	(*GetEndpointRequest)(nil),       // 36: registry.v1.GetEndpointRequest
-	(*GetEndpointResponse)(nil),      // 37: registry.v1.GetEndpointResponse
-	(*ListEndpointsRequest)(nil),     // 38: registry.v1.ListEndpointsRequest
-	(*ListEndpointsResponse)(nil),    // 39: registry.v1.ListEndpointsResponse
-	(*UpdateEndpointRequest)(nil),    // 40: registry.v1.UpdateEndpointRequest
-	(*UpdateEndpointResponse)(nil),   // 41: registry.v1.UpdateEndpointResponse
-	(*DeleteEndpointRequest)(nil),    // 42: registry.v1.DeleteEndpointRequest
-	(*DeleteEndpointResponse)(nil),   // 43: registry.v1.DeleteEndpointResponse
-	nil,                              // 44: registry.v1.Service.TagsEntry
-	nil,                              // 45: registry.v1.Service.MetadataEntry
-	nil,                              // 46: registry.v1.ServiceDeployment.TagsEntry
-	nil,                              // 47: registry.v1.ServiceDeployment.MetadataEntry
-	nil,                              // 48: registry.v1.ServiceInstance.TagsEntry
-	nil,                              // 49: registry.v1.ServiceInstance.MetadataEntry
-	nil,                              // 50: registry.v1.Endpoint.TagsEntry
-	nil,                              // 51: registry.v1.Endpoint.MetadataEntry
-	nil,                              // 52: registry.v1.CreateServiceRequest.TagsEntry
-	nil,                              // 53: registry.v1.CreateServiceRequest.MetadataEntry
-	nil,                              // 54: registry.v1.UpdateServiceRequest.TagsEntry
-	nil,                              // 55: registry.v1.UpdateServiceRequest.MetadataEntry
-	nil,                              // 56: registry.v1.CreateDeploymentRequest.TagsEntry
-	nil,                              // 57: registry.v1.CreateDeploymentRequest.MetadataEntry
-	nil,                              // 58: registry.v1.UpdateDeploymentRequest.TagsEntry
-	nil,                              // 59: registry.v1.UpdateDeploymentRequest.MetadataEntry
-	nil,                              // 60: registry.v1.CreateInstanceRequest.TagsEntry
-	nil,                              // 61: registry.v1.CreateInstanceRequest.MetadataEntry
-	nil,                              // 62: registry.v1.UpdateInstanceRequest.TagsEntry
-	nil,                              // 63: registry.v1.UpdateInstanceRequest.MetadataEntry
-	nil,                              // 64: registry.v1.CreateEndpointRequest.TagsEntry
-	nil,                              // 65: registry.v1.CreateEndpointRequest.MetadataEntry
-	nil,                              // 66: registry.v1.UpdateEndpointRequest.TagsEntry
-	nil,                              // 67: registry.v1.UpdateEndpointRequest.MetadataEntry
-	(*timestamppb.Timestamp)(nil),    // 68: google.protobuf.Timestamp
-	(Protocol)(0),                    // 69: registry.v1.Protocol
-	(*PaginationRequest)(nil),        // 70: registry.v1.PaginationRequest
-	(*PaginationResponse)(nil),       // 71: registry.v1.PaginationResponse
+	(*Service)(nil),                     // 0: registry.v1.Service
+	(*ServiceDeployment)(nil),           // 1: registry.v1.ServiceDeployment
+	(*ServiceInstance)(nil),             // 2: registry.v1.ServiceInstance
+	(*Endpoint)(nil),                    // 3: registry.v1.Endpoint
+	(*CreateServiceRequest)(nil),        // 4: registry.v1.CreateServiceRequest
+	(*CreateServiceResponse)(nil),       // 5: registry.v1.CreateServiceResponse
+	(*GetServiceRequest)(nil),           // 6: registry.v1.GetServiceRequest
+	(*GetServiceResponse)(nil),          // 7: registry.v1.GetServiceResponse
+	(*ListServicesRequest)(nil),         // 8: registry.v1.ListServicesRequest
+	(*ListServicesResponse)(nil),        // 9: registry.v1.ListServicesResponse
+	(*UpdateServiceRequest)(nil),        // 10: registry.v1.UpdateServiceRequest
+	(*UpdateServiceResponse)(nil),       // 11: registry.v1.UpdateServiceResponse
+	(*DeleteServiceRequest)(nil),        // 12: registry.v1.DeleteServiceRequest
+	(*DeleteServiceResponse)(nil),       // 13: registry.v1.DeleteServiceResponse
+	(*CreateDeploymentRequest)(nil),     // 14: registry.v1.CreateDeploymentRequest
+	(*CreateDeploymentResponse)(nil),    // 15: registry.v1.CreateDeploymentResponse
+	(*GetDeploymentRequest)(nil),        // 16: registry.v1.GetDeploymentRequest
+	(*GetDeploymentResponse)(nil),       // 17: registry.v1.GetDeploymentResponse
+	(*ListDeploymentsRequest)(nil),      // 18: registry.v1.ListDeploymentsRequest
+	(*ListDeploymentsResponse)(nil),     // 19: registry.v1.ListDeploymentsResponse
+	(*UpdateDeploymentRequest)(nil),     // 20: registry.v1.UpdateDeploymentRequest
+	(*UpdateDeploymentResponse)(nil),    // 21: registry.v1.UpdateDeploymentResponse
+	(*DeleteDeploymentRequest)(nil),     // 22: registry.v1.DeleteDeploymentRequest
+	(*DeleteDeploymentResponse)(nil),    // 23: registry.v1.DeleteDeploymentResponse
+	(*CreateInstanceRequest)(nil),       // 24: registry.v1.CreateInstanceRequest
+	(*CreateInstanceResponse)(nil),      // 25: registry.v1.CreateInstanceResponse
+	(*RuntimeInstanceRegistration)(nil), // 26: registry.v1.RuntimeInstanceRegistration
+	(*RuntimeEndpointRegistration)(nil), // 27: registry.v1.RuntimeEndpointRegistration
+	(*RegisterRuntimeRequest)(nil),      // 28: registry.v1.RegisterRuntimeRequest
+	(*RegisterRuntimeResponse)(nil),     // 29: registry.v1.RegisterRuntimeResponse
+	(*GetInstanceRequest)(nil),          // 30: registry.v1.GetInstanceRequest
+	(*GetInstanceResponse)(nil),         // 31: registry.v1.GetInstanceResponse
+	(*ListInstancesRequest)(nil),        // 32: registry.v1.ListInstancesRequest
+	(*ListInstancesResponse)(nil),       // 33: registry.v1.ListInstancesResponse
+	(*UpdateInstanceRequest)(nil),       // 34: registry.v1.UpdateInstanceRequest
+	(*UpdateInstanceResponse)(nil),      // 35: registry.v1.UpdateInstanceResponse
+	(*DeleteInstanceRequest)(nil),       // 36: registry.v1.DeleteInstanceRequest
+	(*DeleteInstanceResponse)(nil),      // 37: registry.v1.DeleteInstanceResponse
+	(*CreateEndpointRequest)(nil),       // 38: registry.v1.CreateEndpointRequest
+	(*CreateEndpointResponse)(nil),      // 39: registry.v1.CreateEndpointResponse
+	(*GetEndpointRequest)(nil),          // 40: registry.v1.GetEndpointRequest
+	(*GetEndpointResponse)(nil),         // 41: registry.v1.GetEndpointResponse
+	(*ListEndpointsRequest)(nil),        // 42: registry.v1.ListEndpointsRequest
+	(*ListEndpointsResponse)(nil),       // 43: registry.v1.ListEndpointsResponse
+	(*UpdateEndpointRequest)(nil),       // 44: registry.v1.UpdateEndpointRequest
+	(*UpdateEndpointResponse)(nil),      // 45: registry.v1.UpdateEndpointResponse
+	(*DeleteEndpointRequest)(nil),       // 46: registry.v1.DeleteEndpointRequest
+	(*DeleteEndpointResponse)(nil),      // 47: registry.v1.DeleteEndpointResponse
+	nil,                                 // 48: registry.v1.Service.TagsEntry
+	nil,                                 // 49: registry.v1.Service.MetadataEntry
+	nil,                                 // 50: registry.v1.ServiceDeployment.TagsEntry
+	nil,                                 // 51: registry.v1.ServiceDeployment.MetadataEntry
+	nil,                                 // 52: registry.v1.ServiceInstance.TagsEntry
+	nil,                                 // 53: registry.v1.ServiceInstance.MetadataEntry
+	nil,                                 // 54: registry.v1.Endpoint.TagsEntry
+	nil,                                 // 55: registry.v1.Endpoint.MetadataEntry
+	nil,                                 // 56: registry.v1.CreateServiceRequest.TagsEntry
+	nil,                                 // 57: registry.v1.CreateServiceRequest.MetadataEntry
+	nil,                                 // 58: registry.v1.UpdateServiceRequest.TagsEntry
+	nil,                                 // 59: registry.v1.UpdateServiceRequest.MetadataEntry
+	nil,                                 // 60: registry.v1.CreateDeploymentRequest.TagsEntry
+	nil,                                 // 61: registry.v1.CreateDeploymentRequest.MetadataEntry
+	nil,                                 // 62: registry.v1.UpdateDeploymentRequest.TagsEntry
+	nil,                                 // 63: registry.v1.UpdateDeploymentRequest.MetadataEntry
+	nil,                                 // 64: registry.v1.CreateInstanceRequest.TagsEntry
+	nil,                                 // 65: registry.v1.CreateInstanceRequest.MetadataEntry
+	nil,                                 // 66: registry.v1.RuntimeInstanceRegistration.TagsEntry
+	nil,                                 // 67: registry.v1.RuntimeInstanceRegistration.MetadataEntry
+	nil,                                 // 68: registry.v1.RuntimeEndpointRegistration.TagsEntry
+	nil,                                 // 69: registry.v1.RuntimeEndpointRegistration.MetadataEntry
+	nil,                                 // 70: registry.v1.UpdateInstanceRequest.TagsEntry
+	nil,                                 // 71: registry.v1.UpdateInstanceRequest.MetadataEntry
+	nil,                                 // 72: registry.v1.CreateEndpointRequest.TagsEntry
+	nil,                                 // 73: registry.v1.CreateEndpointRequest.MetadataEntry
+	nil,                                 // 74: registry.v1.UpdateEndpointRequest.TagsEntry
+	nil,                                 // 75: registry.v1.UpdateEndpointRequest.MetadataEntry
+	(*timestamppb.Timestamp)(nil),       // 76: google.protobuf.Timestamp
+	(Protocol)(0),                       // 77: registry.v1.Protocol
+	(*PaginationRequest)(nil),           // 78: registry.v1.PaginationRequest
+	(*PaginationResponse)(nil),          // 79: registry.v1.PaginationResponse
 }
 var file_api_registry_v1_catalog_proto_depIdxs = []int32{
-	44, // 0: registry.v1.Service.tags:type_name -> registry.v1.Service.TagsEntry
-	45, // 1: registry.v1.Service.metadata:type_name -> registry.v1.Service.MetadataEntry
-	68, // 2: registry.v1.Service.created_at:type_name -> google.protobuf.Timestamp
-	68, // 3: registry.v1.Service.updated_at:type_name -> google.protobuf.Timestamp
-	46, // 4: registry.v1.ServiceDeployment.tags:type_name -> registry.v1.ServiceDeployment.TagsEntry
-	47, // 5: registry.v1.ServiceDeployment.metadata:type_name -> registry.v1.ServiceDeployment.MetadataEntry
-	68, // 6: registry.v1.ServiceDeployment.created_at:type_name -> google.protobuf.Timestamp
-	68, // 7: registry.v1.ServiceDeployment.updated_at:type_name -> google.protobuf.Timestamp
-	48, // 8: registry.v1.ServiceInstance.tags:type_name -> registry.v1.ServiceInstance.TagsEntry
-	49, // 9: registry.v1.ServiceInstance.metadata:type_name -> registry.v1.ServiceInstance.MetadataEntry
-	68, // 10: registry.v1.ServiceInstance.created_at:type_name -> google.protobuf.Timestamp
-	68, // 11: registry.v1.ServiceInstance.updated_at:type_name -> google.protobuf.Timestamp
-	68, // 12: registry.v1.ServiceInstance.last_seen_at:type_name -> google.protobuf.Timestamp
-	69, // 13: registry.v1.Endpoint.protocol:type_name -> registry.v1.Protocol
-	50, // 14: registry.v1.Endpoint.tags:type_name -> registry.v1.Endpoint.TagsEntry
-	51, // 15: registry.v1.Endpoint.metadata:type_name -> registry.v1.Endpoint.MetadataEntry
-	52, // 16: registry.v1.CreateServiceRequest.tags:type_name -> registry.v1.CreateServiceRequest.TagsEntry
-	53, // 17: registry.v1.CreateServiceRequest.metadata:type_name -> registry.v1.CreateServiceRequest.MetadataEntry
+	48, // 0: registry.v1.Service.tags:type_name -> registry.v1.Service.TagsEntry
+	49, // 1: registry.v1.Service.metadata:type_name -> registry.v1.Service.MetadataEntry
+	76, // 2: registry.v1.Service.created_at:type_name -> google.protobuf.Timestamp
+	76, // 3: registry.v1.Service.updated_at:type_name -> google.protobuf.Timestamp
+	50, // 4: registry.v1.ServiceDeployment.tags:type_name -> registry.v1.ServiceDeployment.TagsEntry
+	51, // 5: registry.v1.ServiceDeployment.metadata:type_name -> registry.v1.ServiceDeployment.MetadataEntry
+	76, // 6: registry.v1.ServiceDeployment.created_at:type_name -> google.protobuf.Timestamp
+	76, // 7: registry.v1.ServiceDeployment.updated_at:type_name -> google.protobuf.Timestamp
+	52, // 8: registry.v1.ServiceInstance.tags:type_name -> registry.v1.ServiceInstance.TagsEntry
+	53, // 9: registry.v1.ServiceInstance.metadata:type_name -> registry.v1.ServiceInstance.MetadataEntry
+	76, // 10: registry.v1.ServiceInstance.created_at:type_name -> google.protobuf.Timestamp
+	76, // 11: registry.v1.ServiceInstance.updated_at:type_name -> google.protobuf.Timestamp
+	76, // 12: registry.v1.ServiceInstance.last_seen_at:type_name -> google.protobuf.Timestamp
+	77, // 13: registry.v1.Endpoint.protocol:type_name -> registry.v1.Protocol
+	54, // 14: registry.v1.Endpoint.tags:type_name -> registry.v1.Endpoint.TagsEntry
+	55, // 15: registry.v1.Endpoint.metadata:type_name -> registry.v1.Endpoint.MetadataEntry
+	56, // 16: registry.v1.CreateServiceRequest.tags:type_name -> registry.v1.CreateServiceRequest.TagsEntry
+	57, // 17: registry.v1.CreateServiceRequest.metadata:type_name -> registry.v1.CreateServiceRequest.MetadataEntry
 	0,  // 18: registry.v1.CreateServiceResponse.service:type_name -> registry.v1.Service
 	0,  // 19: registry.v1.GetServiceResponse.service:type_name -> registry.v1.Service
-	70, // 20: registry.v1.ListServicesRequest.pagination:type_name -> registry.v1.PaginationRequest
+	78, // 20: registry.v1.ListServicesRequest.pagination:type_name -> registry.v1.PaginationRequest
 	0,  // 21: registry.v1.ListServicesResponse.services:type_name -> registry.v1.Service
-	71, // 22: registry.v1.ListServicesResponse.pagination:type_name -> registry.v1.PaginationResponse
-	54, // 23: registry.v1.UpdateServiceRequest.tags:type_name -> registry.v1.UpdateServiceRequest.TagsEntry
-	55, // 24: registry.v1.UpdateServiceRequest.metadata:type_name -> registry.v1.UpdateServiceRequest.MetadataEntry
+	79, // 22: registry.v1.ListServicesResponse.pagination:type_name -> registry.v1.PaginationResponse
+	58, // 23: registry.v1.UpdateServiceRequest.tags:type_name -> registry.v1.UpdateServiceRequest.TagsEntry
+	59, // 24: registry.v1.UpdateServiceRequest.metadata:type_name -> registry.v1.UpdateServiceRequest.MetadataEntry
 	0,  // 25: registry.v1.UpdateServiceResponse.service:type_name -> registry.v1.Service
-	56, // 26: registry.v1.CreateDeploymentRequest.tags:type_name -> registry.v1.CreateDeploymentRequest.TagsEntry
-	57, // 27: registry.v1.CreateDeploymentRequest.metadata:type_name -> registry.v1.CreateDeploymentRequest.MetadataEntry
+	60, // 26: registry.v1.CreateDeploymentRequest.tags:type_name -> registry.v1.CreateDeploymentRequest.TagsEntry
+	61, // 27: registry.v1.CreateDeploymentRequest.metadata:type_name -> registry.v1.CreateDeploymentRequest.MetadataEntry
 	1,  // 28: registry.v1.CreateDeploymentResponse.deployment:type_name -> registry.v1.ServiceDeployment
 	1,  // 29: registry.v1.GetDeploymentResponse.deployment:type_name -> registry.v1.ServiceDeployment
-	70, // 30: registry.v1.ListDeploymentsRequest.pagination:type_name -> registry.v1.PaginationRequest
+	78, // 30: registry.v1.ListDeploymentsRequest.pagination:type_name -> registry.v1.PaginationRequest
 	1,  // 31: registry.v1.ListDeploymentsResponse.deployments:type_name -> registry.v1.ServiceDeployment
-	71, // 32: registry.v1.ListDeploymentsResponse.pagination:type_name -> registry.v1.PaginationResponse
-	58, // 33: registry.v1.UpdateDeploymentRequest.tags:type_name -> registry.v1.UpdateDeploymentRequest.TagsEntry
-	59, // 34: registry.v1.UpdateDeploymentRequest.metadata:type_name -> registry.v1.UpdateDeploymentRequest.MetadataEntry
+	79, // 32: registry.v1.ListDeploymentsResponse.pagination:type_name -> registry.v1.PaginationResponse
+	62, // 33: registry.v1.UpdateDeploymentRequest.tags:type_name -> registry.v1.UpdateDeploymentRequest.TagsEntry
+	63, // 34: registry.v1.UpdateDeploymentRequest.metadata:type_name -> registry.v1.UpdateDeploymentRequest.MetadataEntry
 	1,  // 35: registry.v1.UpdateDeploymentResponse.deployment:type_name -> registry.v1.ServiceDeployment
-	60, // 36: registry.v1.CreateInstanceRequest.tags:type_name -> registry.v1.CreateInstanceRequest.TagsEntry
-	61, // 37: registry.v1.CreateInstanceRequest.metadata:type_name -> registry.v1.CreateInstanceRequest.MetadataEntry
+	64, // 36: registry.v1.CreateInstanceRequest.tags:type_name -> registry.v1.CreateInstanceRequest.TagsEntry
+	65, // 37: registry.v1.CreateInstanceRequest.metadata:type_name -> registry.v1.CreateInstanceRequest.MetadataEntry
 	2,  // 38: registry.v1.CreateInstanceResponse.instance:type_name -> registry.v1.ServiceInstance
-	2,  // 39: registry.v1.GetInstanceResponse.instance:type_name -> registry.v1.ServiceInstance
-	70, // 40: registry.v1.ListInstancesRequest.pagination:type_name -> registry.v1.PaginationRequest
-	2,  // 41: registry.v1.ListInstancesResponse.instances:type_name -> registry.v1.ServiceInstance
-	71, // 42: registry.v1.ListInstancesResponse.pagination:type_name -> registry.v1.PaginationResponse
-	62, // 43: registry.v1.UpdateInstanceRequest.tags:type_name -> registry.v1.UpdateInstanceRequest.TagsEntry
-	63, // 44: registry.v1.UpdateInstanceRequest.metadata:type_name -> registry.v1.UpdateInstanceRequest.MetadataEntry
-	2,  // 45: registry.v1.UpdateInstanceResponse.instance:type_name -> registry.v1.ServiceInstance
-	69, // 46: registry.v1.CreateEndpointRequest.protocol:type_name -> registry.v1.Protocol
-	64, // 47: registry.v1.CreateEndpointRequest.tags:type_name -> registry.v1.CreateEndpointRequest.TagsEntry
-	65, // 48: registry.v1.CreateEndpointRequest.metadata:type_name -> registry.v1.CreateEndpointRequest.MetadataEntry
-	3,  // 49: registry.v1.CreateEndpointResponse.endpoint:type_name -> registry.v1.Endpoint
-	3,  // 50: registry.v1.GetEndpointResponse.endpoint:type_name -> registry.v1.Endpoint
-	70, // 51: registry.v1.ListEndpointsRequest.pagination:type_name -> registry.v1.PaginationRequest
-	3,  // 52: registry.v1.ListEndpointsResponse.endpoints:type_name -> registry.v1.Endpoint
-	71, // 53: registry.v1.ListEndpointsResponse.pagination:type_name -> registry.v1.PaginationResponse
-	69, // 54: registry.v1.UpdateEndpointRequest.protocol:type_name -> registry.v1.Protocol
-	66, // 55: registry.v1.UpdateEndpointRequest.tags:type_name -> registry.v1.UpdateEndpointRequest.TagsEntry
-	67, // 56: registry.v1.UpdateEndpointRequest.metadata:type_name -> registry.v1.UpdateEndpointRequest.MetadataEntry
-	3,  // 57: registry.v1.UpdateEndpointResponse.endpoint:type_name -> registry.v1.Endpoint
-	4,  // 58: registry.v1.CatalogService.CreateService:input_type -> registry.v1.CreateServiceRequest
-	6,  // 59: registry.v1.CatalogService.GetService:input_type -> registry.v1.GetServiceRequest
-	8,  // 60: registry.v1.CatalogService.ListServices:input_type -> registry.v1.ListServicesRequest
-	10, // 61: registry.v1.CatalogService.UpdateService:input_type -> registry.v1.UpdateServiceRequest
-	12, // 62: registry.v1.CatalogService.DeleteService:input_type -> registry.v1.DeleteServiceRequest
-	34, // 63: registry.v1.EndpointService.CreateEndpoint:input_type -> registry.v1.CreateEndpointRequest
-	36, // 64: registry.v1.EndpointService.GetEndpoint:input_type -> registry.v1.GetEndpointRequest
-	38, // 65: registry.v1.EndpointService.ListEndpoints:input_type -> registry.v1.ListEndpointsRequest
-	40, // 66: registry.v1.EndpointService.UpdateEndpoint:input_type -> registry.v1.UpdateEndpointRequest
-	42, // 67: registry.v1.EndpointService.DeleteEndpoint:input_type -> registry.v1.DeleteEndpointRequest
-	14, // 68: registry.v1.DeploymentService.CreateDeployment:input_type -> registry.v1.CreateDeploymentRequest
-	16, // 69: registry.v1.DeploymentService.GetDeployment:input_type -> registry.v1.GetDeploymentRequest
-	18, // 70: registry.v1.DeploymentService.ListDeployments:input_type -> registry.v1.ListDeploymentsRequest
-	20, // 71: registry.v1.DeploymentService.UpdateDeployment:input_type -> registry.v1.UpdateDeploymentRequest
-	22, // 72: registry.v1.DeploymentService.DeleteDeployment:input_type -> registry.v1.DeleteDeploymentRequest
-	24, // 73: registry.v1.InstanceService.CreateInstance:input_type -> registry.v1.CreateInstanceRequest
-	26, // 74: registry.v1.InstanceService.GetInstance:input_type -> registry.v1.GetInstanceRequest
-	28, // 75: registry.v1.InstanceService.ListInstances:input_type -> registry.v1.ListInstancesRequest
-	30, // 76: registry.v1.InstanceService.UpdateInstance:input_type -> registry.v1.UpdateInstanceRequest
-	32, // 77: registry.v1.InstanceService.DeleteInstance:input_type -> registry.v1.DeleteInstanceRequest
-	5,  // 78: registry.v1.CatalogService.CreateService:output_type -> registry.v1.CreateServiceResponse
-	7,  // 79: registry.v1.CatalogService.GetService:output_type -> registry.v1.GetServiceResponse
-	9,  // 80: registry.v1.CatalogService.ListServices:output_type -> registry.v1.ListServicesResponse
-	11, // 81: registry.v1.CatalogService.UpdateService:output_type -> registry.v1.UpdateServiceResponse
-	13, // 82: registry.v1.CatalogService.DeleteService:output_type -> registry.v1.DeleteServiceResponse
-	35, // 83: registry.v1.EndpointService.CreateEndpoint:output_type -> registry.v1.CreateEndpointResponse
-	37, // 84: registry.v1.EndpointService.GetEndpoint:output_type -> registry.v1.GetEndpointResponse
-	39, // 85: registry.v1.EndpointService.ListEndpoints:output_type -> registry.v1.ListEndpointsResponse
-	41, // 86: registry.v1.EndpointService.UpdateEndpoint:output_type -> registry.v1.UpdateEndpointResponse
-	43, // 87: registry.v1.EndpointService.DeleteEndpoint:output_type -> registry.v1.DeleteEndpointResponse
-	15, // 88: registry.v1.DeploymentService.CreateDeployment:output_type -> registry.v1.CreateDeploymentResponse
-	17, // 89: registry.v1.DeploymentService.GetDeployment:output_type -> registry.v1.GetDeploymentResponse
-	19, // 90: registry.v1.DeploymentService.ListDeployments:output_type -> registry.v1.ListDeploymentsResponse
-	21, // 91: registry.v1.DeploymentService.UpdateDeployment:output_type -> registry.v1.UpdateDeploymentResponse
-	23, // 92: registry.v1.DeploymentService.DeleteDeployment:output_type -> registry.v1.DeleteDeploymentResponse
-	25, // 93: registry.v1.InstanceService.CreateInstance:output_type -> registry.v1.CreateInstanceResponse
-	27, // 94: registry.v1.InstanceService.GetInstance:output_type -> registry.v1.GetInstanceResponse
-	29, // 95: registry.v1.InstanceService.ListInstances:output_type -> registry.v1.ListInstancesResponse
-	31, // 96: registry.v1.InstanceService.UpdateInstance:output_type -> registry.v1.UpdateInstanceResponse
-	33, // 97: registry.v1.InstanceService.DeleteInstance:output_type -> registry.v1.DeleteInstanceResponse
-	78, // [78:98] is the sub-list for method output_type
-	58, // [58:78] is the sub-list for method input_type
-	58, // [58:58] is the sub-list for extension type_name
-	58, // [58:58] is the sub-list for extension extendee
-	0,  // [0:58] is the sub-list for field type_name
+	66, // 39: registry.v1.RuntimeInstanceRegistration.tags:type_name -> registry.v1.RuntimeInstanceRegistration.TagsEntry
+	67, // 40: registry.v1.RuntimeInstanceRegistration.metadata:type_name -> registry.v1.RuntimeInstanceRegistration.MetadataEntry
+	77, // 41: registry.v1.RuntimeEndpointRegistration.protocol:type_name -> registry.v1.Protocol
+	68, // 42: registry.v1.RuntimeEndpointRegistration.tags:type_name -> registry.v1.RuntimeEndpointRegistration.TagsEntry
+	69, // 43: registry.v1.RuntimeEndpointRegistration.metadata:type_name -> registry.v1.RuntimeEndpointRegistration.MetadataEntry
+	26, // 44: registry.v1.RegisterRuntimeRequest.instance:type_name -> registry.v1.RuntimeInstanceRegistration
+	27, // 45: registry.v1.RegisterRuntimeRequest.endpoints:type_name -> registry.v1.RuntimeEndpointRegistration
+	1,  // 46: registry.v1.RegisterRuntimeResponse.deployment:type_name -> registry.v1.ServiceDeployment
+	2,  // 47: registry.v1.RegisterRuntimeResponse.instance:type_name -> registry.v1.ServiceInstance
+	3,  // 48: registry.v1.RegisterRuntimeResponse.endpoints:type_name -> registry.v1.Endpoint
+	2,  // 49: registry.v1.GetInstanceResponse.instance:type_name -> registry.v1.ServiceInstance
+	78, // 50: registry.v1.ListInstancesRequest.pagination:type_name -> registry.v1.PaginationRequest
+	2,  // 51: registry.v1.ListInstancesResponse.instances:type_name -> registry.v1.ServiceInstance
+	79, // 52: registry.v1.ListInstancesResponse.pagination:type_name -> registry.v1.PaginationResponse
+	70, // 53: registry.v1.UpdateInstanceRequest.tags:type_name -> registry.v1.UpdateInstanceRequest.TagsEntry
+	71, // 54: registry.v1.UpdateInstanceRequest.metadata:type_name -> registry.v1.UpdateInstanceRequest.MetadataEntry
+	2,  // 55: registry.v1.UpdateInstanceResponse.instance:type_name -> registry.v1.ServiceInstance
+	77, // 56: registry.v1.CreateEndpointRequest.protocol:type_name -> registry.v1.Protocol
+	72, // 57: registry.v1.CreateEndpointRequest.tags:type_name -> registry.v1.CreateEndpointRequest.TagsEntry
+	73, // 58: registry.v1.CreateEndpointRequest.metadata:type_name -> registry.v1.CreateEndpointRequest.MetadataEntry
+	3,  // 59: registry.v1.CreateEndpointResponse.endpoint:type_name -> registry.v1.Endpoint
+	3,  // 60: registry.v1.GetEndpointResponse.endpoint:type_name -> registry.v1.Endpoint
+	78, // 61: registry.v1.ListEndpointsRequest.pagination:type_name -> registry.v1.PaginationRequest
+	3,  // 62: registry.v1.ListEndpointsResponse.endpoints:type_name -> registry.v1.Endpoint
+	79, // 63: registry.v1.ListEndpointsResponse.pagination:type_name -> registry.v1.PaginationResponse
+	77, // 64: registry.v1.UpdateEndpointRequest.protocol:type_name -> registry.v1.Protocol
+	74, // 65: registry.v1.UpdateEndpointRequest.tags:type_name -> registry.v1.UpdateEndpointRequest.TagsEntry
+	75, // 66: registry.v1.UpdateEndpointRequest.metadata:type_name -> registry.v1.UpdateEndpointRequest.MetadataEntry
+	3,  // 67: registry.v1.UpdateEndpointResponse.endpoint:type_name -> registry.v1.Endpoint
+	4,  // 68: registry.v1.CatalogService.CreateService:input_type -> registry.v1.CreateServiceRequest
+	6,  // 69: registry.v1.CatalogService.GetService:input_type -> registry.v1.GetServiceRequest
+	8,  // 70: registry.v1.CatalogService.ListServices:input_type -> registry.v1.ListServicesRequest
+	10, // 71: registry.v1.CatalogService.UpdateService:input_type -> registry.v1.UpdateServiceRequest
+	12, // 72: registry.v1.CatalogService.DeleteService:input_type -> registry.v1.DeleteServiceRequest
+	38, // 73: registry.v1.EndpointService.CreateEndpoint:input_type -> registry.v1.CreateEndpointRequest
+	40, // 74: registry.v1.EndpointService.GetEndpoint:input_type -> registry.v1.GetEndpointRequest
+	42, // 75: registry.v1.EndpointService.ListEndpoints:input_type -> registry.v1.ListEndpointsRequest
+	44, // 76: registry.v1.EndpointService.UpdateEndpoint:input_type -> registry.v1.UpdateEndpointRequest
+	46, // 77: registry.v1.EndpointService.DeleteEndpoint:input_type -> registry.v1.DeleteEndpointRequest
+	14, // 78: registry.v1.DeploymentService.CreateDeployment:input_type -> registry.v1.CreateDeploymentRequest
+	16, // 79: registry.v1.DeploymentService.GetDeployment:input_type -> registry.v1.GetDeploymentRequest
+	18, // 80: registry.v1.DeploymentService.ListDeployments:input_type -> registry.v1.ListDeploymentsRequest
+	20, // 81: registry.v1.DeploymentService.UpdateDeployment:input_type -> registry.v1.UpdateDeploymentRequest
+	22, // 82: registry.v1.DeploymentService.DeleteDeployment:input_type -> registry.v1.DeleteDeploymentRequest
+	28, // 83: registry.v1.InstanceService.RegisterRuntime:input_type -> registry.v1.RegisterRuntimeRequest
+	24, // 84: registry.v1.InstanceService.CreateInstance:input_type -> registry.v1.CreateInstanceRequest
+	30, // 85: registry.v1.InstanceService.GetInstance:input_type -> registry.v1.GetInstanceRequest
+	32, // 86: registry.v1.InstanceService.ListInstances:input_type -> registry.v1.ListInstancesRequest
+	34, // 87: registry.v1.InstanceService.UpdateInstance:input_type -> registry.v1.UpdateInstanceRequest
+	36, // 88: registry.v1.InstanceService.DeleteInstance:input_type -> registry.v1.DeleteInstanceRequest
+	5,  // 89: registry.v1.CatalogService.CreateService:output_type -> registry.v1.CreateServiceResponse
+	7,  // 90: registry.v1.CatalogService.GetService:output_type -> registry.v1.GetServiceResponse
+	9,  // 91: registry.v1.CatalogService.ListServices:output_type -> registry.v1.ListServicesResponse
+	11, // 92: registry.v1.CatalogService.UpdateService:output_type -> registry.v1.UpdateServiceResponse
+	13, // 93: registry.v1.CatalogService.DeleteService:output_type -> registry.v1.DeleteServiceResponse
+	39, // 94: registry.v1.EndpointService.CreateEndpoint:output_type -> registry.v1.CreateEndpointResponse
+	41, // 95: registry.v1.EndpointService.GetEndpoint:output_type -> registry.v1.GetEndpointResponse
+	43, // 96: registry.v1.EndpointService.ListEndpoints:output_type -> registry.v1.ListEndpointsResponse
+	45, // 97: registry.v1.EndpointService.UpdateEndpoint:output_type -> registry.v1.UpdateEndpointResponse
+	47, // 98: registry.v1.EndpointService.DeleteEndpoint:output_type -> registry.v1.DeleteEndpointResponse
+	15, // 99: registry.v1.DeploymentService.CreateDeployment:output_type -> registry.v1.CreateDeploymentResponse
+	17, // 100: registry.v1.DeploymentService.GetDeployment:output_type -> registry.v1.GetDeploymentResponse
+	19, // 101: registry.v1.DeploymentService.ListDeployments:output_type -> registry.v1.ListDeploymentsResponse
+	21, // 102: registry.v1.DeploymentService.UpdateDeployment:output_type -> registry.v1.UpdateDeploymentResponse
+	23, // 103: registry.v1.DeploymentService.DeleteDeployment:output_type -> registry.v1.DeleteDeploymentResponse
+	29, // 104: registry.v1.InstanceService.RegisterRuntime:output_type -> registry.v1.RegisterRuntimeResponse
+	25, // 105: registry.v1.InstanceService.CreateInstance:output_type -> registry.v1.CreateInstanceResponse
+	31, // 106: registry.v1.InstanceService.GetInstance:output_type -> registry.v1.GetInstanceResponse
+	33, // 107: registry.v1.InstanceService.ListInstances:output_type -> registry.v1.ListInstancesResponse
+	35, // 108: registry.v1.InstanceService.UpdateInstance:output_type -> registry.v1.UpdateInstanceResponse
+	37, // 109: registry.v1.InstanceService.DeleteInstance:output_type -> registry.v1.DeleteInstanceResponse
+	89, // [89:110] is the sub-list for method output_type
+	68, // [68:89] is the sub-list for method input_type
+	68, // [68:68] is the sub-list for extension type_name
+	68, // [68:68] is the sub-list for extension extendee
+	0,  // [0:68] is the sub-list for field type_name
 }
 
 func init() { file_api_registry_v1_catalog_proto_init() }
@@ -3160,13 +3563,14 @@ func file_api_registry_v1_catalog_proto_init() {
 		return
 	}
 	file_api_registry_v1_common_proto_init()
+	file_api_registry_v1_catalog_proto_msgTypes[44].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_registry_v1_catalog_proto_rawDesc), len(file_api_registry_v1_catalog_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   68,
+			NumMessages:   76,
 			NumExtensions: 0,
 			NumServices:   4,
 		},

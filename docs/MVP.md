@@ -1,5 +1,7 @@
 # Repository Structure & Implementation Plan
 
+> Next iteration: see [MVP.2.md](MVP.2.md) for Runtime Registration & Management.
+
 ## Part 1: Repository Structure
 
 This monorepo contains the complete Service Registry system in a single repository.

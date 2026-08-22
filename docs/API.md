@@ -22,6 +22,7 @@ The API is organized into logical services around domain boundaries:
 - `CatalogService` (services management)
 - `DeploymentService` (service deployments)
 - `InstanceService` (service instances)
+- `RuntimeRegistrationService` (composite runtime registration workflow)
 - `HealthService` (health checks and state)
 - `IncidentService` (incidents)
 - `AlertService` (alerts and policies)
@@ -419,7 +420,7 @@ message ServiceInstance {
   string deployment_id = 2;
   string name = 3;
   string address = 4;
-  int32 port = 5;  // Optional
+  int32 port = 5;  // Legacy optional default; prefer Endpoint.port for new workflows
   string description = 6;
   bool enabled = 7;
   repeated Tag tags = 8;
@@ -433,7 +434,7 @@ message RegisterInstanceRequest {
   string deployment_id = 1;
   string name = 2;
   string address = 3;
-  int32 port = 4;  // Optional
+  int32 port = 4;  // Legacy optional default; prefer creating Endpoint records
   string description = 5;
   repeated Tag tags = 6;
   map<string, string> metadata = 7;
@@ -512,6 +513,7 @@ message Endpoint {
   bool enabled = 8;
   repeated Tag tags = 9;
   map<string, string> metadata = 10;
+  bool primary = 11;  // Optional display/discovery default for the instance
 }
 
 message CreateEndpointRequest {
@@ -523,6 +525,7 @@ message CreateEndpointRequest {
   string description = 6;
   repeated Tag tags = 7;
   map<string, string> metadata = 8;
+  bool primary = 9;
 }
 
 message CreateEndpointResponse {
@@ -539,6 +542,7 @@ message UpdateEndpointRequest {
   bool enabled = 7;
   repeated Tag tags = 8;
   map<string, string> metadata = 9;
+  bool primary = 10;
 }
 
 message UpdateEndpointResponse {
@@ -558,6 +562,75 @@ message ListEndpointsResponse {
   repeated Endpoint endpoints = 1;
 }
 ```
+
+---
+
+## Runtime Registration (runtime_registration.proto)
+
+```protobuf
+syntax = "proto3";
+
+package registry.v1;
+
+import "registry/v1/catalog.proto";
+import "registry/v1/common.proto";
+import "registry/v1/health.proto";
+
+service RuntimeRegistrationService {
+  rpc RegisterRuntime(RegisterRuntimeRequest) returns (RegisterRuntimeResponse);
+}
+
+message RegisterRuntimeRequest {
+  string service_id = 1;
+  string environment_id = 2;
+  RuntimeInstanceInput instance = 3;
+  repeated RuntimeEndpointInput endpoints = 4;
+  RuntimeHealthCheckInput health_check = 5; // Optional
+  string request_id = 6; // Optional idempotency key
+}
+
+message RuntimeInstanceInput {
+  string name = 1;
+  string address = 2;
+  string description = 3;
+  map<string, string> tags = 4;
+  map<string, string> metadata = 5;
+}
+
+message RuntimeEndpointInput {
+  string name = 1;
+  Protocol protocol = 2;
+  int32 port = 3;
+  string path = 4;
+  bool primary = 5;
+  bool enabled = 6;
+  map<string, string> metadata = 7;
+}
+
+message RuntimeHealthCheckInput {
+  string name = 1;
+  HealthCheckType type = 2;
+  string endpoint_name = 3;
+  string path = 4;
+  int32 interval_seconds = 5;
+  int32 timeout_seconds = 6;
+  int32 failures_before_unhealthy = 7;
+  int32 successes_before_healthy = 8;
+  string description = 9;
+  map<string, string> metadata = 10;
+}
+
+message RegisterRuntimeResponse {
+  ServiceDeployment deployment = 1;
+  ServiceInstance instance = 2;
+  repeated Endpoint endpoints = 3;
+  HealthCheck health_check = 4; // Set only when requested and created
+}
+```
+
+`RegisterRuntime` is the preferred API for the standard web workflow. It resolves or creates the unique Service + Environment deployment, creates the runtime Instance, creates one or more Endpoints, enforces the one-primary-endpoint invariant, and returns the complete runtime registration result.
+
+The persistence portion should behave as one logical operation. For SQLite, deployment resolution, instance creation, and endpoint creation should occur inside one transaction where possible. Events should be published after commit. If health-check creation is not included in the same transaction, the response/error must clearly indicate whether runtime registration succeeded and health-check creation failed.
 
 ---
 

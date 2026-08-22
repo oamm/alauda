@@ -15,7 +15,7 @@ func (h *deploymentHandler) CreateDeployment(ctx context.Context, req *connect.R
 	}
 	item, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateDeploymentResponse{Deployment: item}), nil
 }

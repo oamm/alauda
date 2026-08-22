@@ -84,6 +84,9 @@ const (
 	// DeploymentServiceDeleteDeploymentProcedure is the fully-qualified name of the DeploymentService's
 	// DeleteDeployment RPC.
 	DeploymentServiceDeleteDeploymentProcedure = "/registry.v1.DeploymentService/DeleteDeployment"
+	// InstanceServiceRegisterRuntimeProcedure is the fully-qualified name of the InstanceService's
+	// RegisterRuntime RPC.
+	InstanceServiceRegisterRuntimeProcedure = "/registry.v1.InstanceService/RegisterRuntime"
 	// InstanceServiceCreateInstanceProcedure is the fully-qualified name of the InstanceService's
 	// CreateInstance RPC.
 	InstanceServiceCreateInstanceProcedure = "/registry.v1.InstanceService/CreateInstance"
@@ -625,6 +628,7 @@ func (UnimplementedDeploymentServiceHandler) DeleteDeployment(context.Context, *
 
 // InstanceServiceClient is a client for the registry.v1.InstanceService service.
 type InstanceServiceClient interface {
+	RegisterRuntime(context.Context, *connect.Request[v1.RegisterRuntimeRequest]) (*connect.Response[v1.RegisterRuntimeResponse], error)
 	CreateInstance(context.Context, *connect.Request[v1.CreateInstanceRequest]) (*connect.Response[v1.CreateInstanceResponse], error)
 	GetInstance(context.Context, *connect.Request[v1.GetInstanceRequest]) (*connect.Response[v1.GetInstanceResponse], error)
 	ListInstances(context.Context, *connect.Request[v1.ListInstancesRequest]) (*connect.Response[v1.ListInstancesResponse], error)
@@ -643,6 +647,12 @@ func NewInstanceServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 	baseURL = strings.TrimRight(baseURL, "/")
 	instanceServiceMethods := v1.File_api_registry_v1_catalog_proto.Services().ByName("InstanceService").Methods()
 	return &instanceServiceClient{
+		registerRuntime: connect.NewClient[v1.RegisterRuntimeRequest, v1.RegisterRuntimeResponse](
+			httpClient,
+			baseURL+InstanceServiceRegisterRuntimeProcedure,
+			connect.WithSchema(instanceServiceMethods.ByName("RegisterRuntime")),
+			connect.WithClientOptions(opts...),
+		),
 		createInstance: connect.NewClient[v1.CreateInstanceRequest, v1.CreateInstanceResponse](
 			httpClient,
 			baseURL+InstanceServiceCreateInstanceProcedure,
@@ -678,11 +688,17 @@ func NewInstanceServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // instanceServiceClient implements InstanceServiceClient.
 type instanceServiceClient struct {
-	createInstance *connect.Client[v1.CreateInstanceRequest, v1.CreateInstanceResponse]
-	getInstance    *connect.Client[v1.GetInstanceRequest, v1.GetInstanceResponse]
-	listInstances  *connect.Client[v1.ListInstancesRequest, v1.ListInstancesResponse]
-	updateInstance *connect.Client[v1.UpdateInstanceRequest, v1.UpdateInstanceResponse]
-	deleteInstance *connect.Client[v1.DeleteInstanceRequest, v1.DeleteInstanceResponse]
+	registerRuntime *connect.Client[v1.RegisterRuntimeRequest, v1.RegisterRuntimeResponse]
+	createInstance  *connect.Client[v1.CreateInstanceRequest, v1.CreateInstanceResponse]
+	getInstance     *connect.Client[v1.GetInstanceRequest, v1.GetInstanceResponse]
+	listInstances   *connect.Client[v1.ListInstancesRequest, v1.ListInstancesResponse]
+	updateInstance  *connect.Client[v1.UpdateInstanceRequest, v1.UpdateInstanceResponse]
+	deleteInstance  *connect.Client[v1.DeleteInstanceRequest, v1.DeleteInstanceResponse]
+}
+
+// RegisterRuntime calls registry.v1.InstanceService.RegisterRuntime.
+func (c *instanceServiceClient) RegisterRuntime(ctx context.Context, req *connect.Request[v1.RegisterRuntimeRequest]) (*connect.Response[v1.RegisterRuntimeResponse], error) {
+	return c.registerRuntime.CallUnary(ctx, req)
 }
 
 // CreateInstance calls registry.v1.InstanceService.CreateInstance.
@@ -712,6 +728,7 @@ func (c *instanceServiceClient) DeleteInstance(ctx context.Context, req *connect
 
 // InstanceServiceHandler is an implementation of the registry.v1.InstanceService service.
 type InstanceServiceHandler interface {
+	RegisterRuntime(context.Context, *connect.Request[v1.RegisterRuntimeRequest]) (*connect.Response[v1.RegisterRuntimeResponse], error)
 	CreateInstance(context.Context, *connect.Request[v1.CreateInstanceRequest]) (*connect.Response[v1.CreateInstanceResponse], error)
 	GetInstance(context.Context, *connect.Request[v1.GetInstanceRequest]) (*connect.Response[v1.GetInstanceResponse], error)
 	ListInstances(context.Context, *connect.Request[v1.ListInstancesRequest]) (*connect.Response[v1.ListInstancesResponse], error)
@@ -726,6 +743,12 @@ type InstanceServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	instanceServiceMethods := v1.File_api_registry_v1_catalog_proto.Services().ByName("InstanceService").Methods()
+	instanceServiceRegisterRuntimeHandler := connect.NewUnaryHandler(
+		InstanceServiceRegisterRuntimeProcedure,
+		svc.RegisterRuntime,
+		connect.WithSchema(instanceServiceMethods.ByName("RegisterRuntime")),
+		connect.WithHandlerOptions(opts...),
+	)
 	instanceServiceCreateInstanceHandler := connect.NewUnaryHandler(
 		InstanceServiceCreateInstanceProcedure,
 		svc.CreateInstance,
@@ -758,6 +781,8 @@ func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.Handl
 	)
 	return "/registry.v1.InstanceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case InstanceServiceRegisterRuntimeProcedure:
+			instanceServiceRegisterRuntimeHandler.ServeHTTP(w, r)
 		case InstanceServiceCreateInstanceProcedure:
 			instanceServiceCreateInstanceHandler.ServeHTTP(w, r)
 		case InstanceServiceGetInstanceProcedure:
@@ -776,6 +801,10 @@ func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.Handl
 
 // UnimplementedInstanceServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedInstanceServiceHandler struct{}
+
+func (UnimplementedInstanceServiceHandler) RegisterRuntime(context.Context, *connect.Request[v1.RegisterRuntimeRequest]) (*connect.Response[v1.RegisterRuntimeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.InstanceService.RegisterRuntime is not implemented"))
+}
 
 func (UnimplementedInstanceServiceHandler) CreateInstance(context.Context, *connect.Request[v1.CreateInstanceRequest]) (*connect.Response[v1.CreateInstanceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.InstanceService.CreateInstance is not implemented"))

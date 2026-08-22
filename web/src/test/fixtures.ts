@@ -223,6 +223,39 @@ export function mockResponse(path: string) {
           port: 8080,
           path: "/healthz",
           enabled: true,
+          primary: true,
+        },
+      ],
+    };
+  }
+  if (path.includes("RegisterRuntime")) {
+    return {
+      deployment: {
+        id: "dep-1",
+        serviceId: "svc-1",
+        environmentId: "env-1",
+        healthEnabled: true,
+        alertsEnabled: true,
+        alertCooldownMinutes: 15,
+      },
+      instance: {
+        id: "inst-2",
+        deploymentId: "dep-1",
+        name: "checkout-prod-02",
+        address: "10.0.0.2",
+        port: 0,
+        enabled: true,
+      },
+      endpoints: [
+        {
+          id: "end-2",
+          instanceId: "inst-2",
+          name: "http",
+          protocol: "PROTOCOL_HTTP",
+          port: 8080,
+          path: "/",
+          enabled: true,
+          primary: true,
         },
       ],
     };

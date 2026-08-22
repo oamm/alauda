@@ -7,7 +7,20 @@ import (
 
 	"connectrpc.com/connect"
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
+	"github.com/company/service-registry/internal/storage"
 )
+
+func (h *instanceHandler) RegisterRuntime(ctx context.Context, req *connect.Request[registryv1.RegisterRuntimeRequest]) (*connect.Response[registryv1.RegisterRuntimeResponse], error) {
+	item, err := h.runtimeRepo.RegisterRuntime(ctx, req.Msg)
+	if err != nil {
+		code := codeForStorageError(err)
+		if errors.Is(err, storage.ErrInvalidRuntimeRegistration) {
+			code = connect.CodeInvalidArgument
+		}
+		return nil, connect.NewError(code, err)
+	}
+	return connect.NewResponse(item), nil
+}
 
 func (h *instanceHandler) CreateInstance(ctx context.Context, req *connect.Request[registryv1.CreateInstanceRequest]) (*connect.Response[registryv1.CreateInstanceResponse], error) {
 	if req.Msg.GetDeploymentId() == "" || req.Msg.GetName() == "" || req.Msg.GetAddress() == "" {
@@ -15,7 +28,7 @@ func (h *instanceHandler) CreateInstance(ctx context.Context, req *connect.Reque
 	}
 	item, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateInstanceResponse{Instance: item}), nil
 }

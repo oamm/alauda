@@ -56,6 +56,7 @@ message Endpoint {
   bool enabled = 7;
   map<string, string> tags = 8;
   map<string, string> metadata = 9;
+  bool primary = 10;
 }
 
 message CreateServiceRequest {
@@ -131,6 +132,35 @@ message CreateInstanceRequest {
   map<string, string> metadata = 8;
 }
 message CreateInstanceResponse { ServiceInstance instance = 1; }
+message RuntimeInstanceRegistration {
+  string name = 1;
+  string address = 2;
+  string description = 3;
+  bool enabled = 4;
+  map<string, string> tags = 5;
+  map<string, string> metadata = 6;
+}
+message RuntimeEndpointRegistration {
+  string name = 1;
+  Protocol protocol = 2;
+  int32 port = 3;
+  string path = 4;
+  bool enabled = 5;
+  bool primary = 6;
+  map<string, string> tags = 7;
+  map<string, string> metadata = 8;
+}
+message RegisterRuntimeRequest {
+  string service_id = 1;
+  string environment_id = 2;
+  RuntimeInstanceRegistration instance = 3;
+  repeated RuntimeEndpointRegistration endpoints = 4;
+}
+message RegisterRuntimeResponse {
+  ServiceDeployment deployment = 1;
+  ServiceInstance instance = 2;
+  repeated Endpoint endpoints = 3;
+}
 message GetInstanceRequest { string id = 1; }
 message GetInstanceResponse { ServiceInstance instance = 1; }
 message ListInstancesRequest {
@@ -163,6 +193,7 @@ message CreateEndpointRequest {
   bool enabled = 6;
   map<string, string> tags = 7;
   map<string, string> metadata = 8;
+  bool primary = 9;
 }
 message CreateEndpointResponse { Endpoint endpoint = 1; }
 message GetEndpointRequest { string id = 1; }
@@ -184,6 +215,7 @@ message UpdateEndpointRequest {
   bool enabled = 6;
   map<string, string> tags = 7;
   map<string, string> metadata = 8;
+  optional bool primary = 9;
 }
 message UpdateEndpointResponse { Endpoint endpoint = 1; }
 message DeleteEndpointRequest { string id = 1; }
@@ -214,6 +246,7 @@ service DeploymentService {
 }
 
 service InstanceService {
+  rpc RegisterRuntime(RegisterRuntimeRequest) returns (RegisterRuntimeResponse);
   rpc CreateInstance(CreateInstanceRequest) returns (CreateInstanceResponse);
   rpc GetInstance(GetInstanceRequest) returns (GetInstanceResponse);
   rpc ListInstances(ListInstancesRequest) returns (ListInstancesResponse);

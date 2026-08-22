@@ -60,6 +60,7 @@ export type Endpoint = {
   port: number;
   path: string;
   enabled: boolean;
+  primary: boolean;
   tags?: Record<string, string>;
   metadata?: Record<string, string>;
 };
@@ -212,13 +213,43 @@ type CreateServiceResponse = {
 
 type DeleteServiceResponse = Record<string, never>;
 
+type CreateDeploymentResponse = {
+  deployment?: ServiceDeployment;
+};
+
 type ListDeploymentsResponse = {
   deployments?: ServiceDeployment[];
+};
+
+type CreateInstanceResponse = {
+  instance?: ServiceInstance;
+};
+
+type UpdateInstanceResponse = {
+  instance?: ServiceInstance;
+};
+
+type DeleteInstanceResponse = Record<string, never>;
+
+type RegisterRuntimeResponse = {
+  deployment?: ServiceDeployment;
+  instance?: ServiceInstance;
+  endpoints?: Endpoint[];
 };
 
 type ListInstancesResponse = {
   instances?: ServiceInstance[];
 };
+
+type CreateEndpointResponse = {
+  endpoint?: Endpoint;
+};
+
+type UpdateEndpointResponse = {
+  endpoint?: Endpoint;
+};
+
+type DeleteEndpointResponse = Record<string, never>;
 
 type ListEndpointsResponse = {
   endpoints?: Endpoint[];
@@ -409,6 +440,23 @@ export async function listDeployments(input: {
   return response.deployments ?? [];
 }
 
+export async function createDeployment(input: {
+  serviceId: string;
+  environmentId: string;
+  healthEnabled: boolean;
+  alertsEnabled: boolean;
+  alertCooldownMinutes: number;
+}): Promise<ServiceDeployment> {
+  const response = await connectRequest<CreateDeploymentResponse>(
+    "/registry.v1.DeploymentService/CreateDeployment",
+    input,
+  );
+  if (!response.deployment) {
+    throw new Error("CreateDeployment returned no deployment");
+  }
+  return response.deployment;
+}
+
 export async function listInstances(
   deploymentId?: string,
 ): Promise<ServiceInstance[]> {
@@ -422,6 +470,82 @@ export async function listInstances(
   return response.instances ?? [];
 }
 
+export async function createInstance(input: {
+  deploymentId: string;
+  name: string;
+  address: string;
+  port: number;
+  description: string;
+  enabled: boolean;
+}): Promise<ServiceInstance> {
+  const response = await connectRequest<CreateInstanceResponse>(
+    "/registry.v1.InstanceService/CreateInstance",
+    input,
+  );
+  if (!response.instance) {
+    throw new Error("CreateInstance returned no instance");
+  }
+  return response.instance;
+}
+
+export async function updateInstance(input: {
+  id: string;
+  address: string;
+  port: number;
+  description: string;
+  enabled: boolean;
+  tags?: Record<string, string>;
+  metadata?: Record<string, string>;
+}): Promise<ServiceInstance> {
+  const response = await connectRequest<UpdateInstanceResponse>(
+    "/registry.v1.InstanceService/UpdateInstance",
+    {
+      ...input,
+      tags: input.tags ?? {},
+      metadata: input.metadata ?? {},
+    },
+  );
+  if (!response.instance) {
+    throw new Error("UpdateInstance returned no instance");
+  }
+  return response.instance;
+}
+
+export async function deleteInstance(id: string): Promise<void> {
+  await connectRequest<DeleteInstanceResponse>(
+    "/registry.v1.InstanceService/DeleteInstance",
+    { id },
+  );
+}
+
+export async function registerRuntime(input: {
+  serviceId: string;
+  environmentId: string;
+  instance: {
+    name: string;
+    address: string;
+    description: string;
+    enabled: boolean;
+  };
+  endpoints: {
+    name: string;
+    protocol: string;
+    port: number;
+    path: string;
+    enabled: boolean;
+    primary: boolean;
+  }[];
+}): Promise<RegisterRuntimeResponse> {
+  const response = await connectRequest<RegisterRuntimeResponse>(
+    "/registry.v1.InstanceService/RegisterRuntime",
+    input,
+  );
+  if (!response.deployment || !response.instance) {
+    throw new Error("RegisterRuntime returned no runtime registration");
+  }
+  return response;
+}
+
 export async function listEndpoints(instanceId?: string): Promise<Endpoint[]> {
   const response = await connectRequest<ListEndpointsResponse>(
     "/registry.v1.EndpointService/ListEndpoints",
@@ -431,6 +555,57 @@ export async function listEndpoints(instanceId?: string): Promise<Endpoint[]> {
     },
   );
   return response.endpoints ?? [];
+}
+
+export async function createEndpoint(input: {
+  instanceId: string;
+  name: string;
+  protocol: string;
+  port: number;
+  path: string;
+  enabled: boolean;
+  primary?: boolean;
+}): Promise<Endpoint> {
+  const response = await connectRequest<CreateEndpointResponse>(
+    "/registry.v1.EndpointService/CreateEndpoint",
+    input,
+  );
+  if (!response.endpoint) {
+    throw new Error("CreateEndpoint returned no endpoint");
+  }
+  return response.endpoint;
+}
+
+export async function updateEndpoint(input: {
+  id: string;
+  name: string;
+  protocol: string;
+  port: number;
+  path: string;
+  enabled: boolean;
+  primary?: boolean;
+  tags?: Record<string, string>;
+  metadata?: Record<string, string>;
+}): Promise<Endpoint> {
+  const response = await connectRequest<UpdateEndpointResponse>(
+    "/registry.v1.EndpointService/UpdateEndpoint",
+    {
+      ...input,
+      tags: input.tags ?? {},
+      metadata: input.metadata ?? {},
+    },
+  );
+  if (!response.endpoint) {
+    throw new Error("UpdateEndpoint returned no endpoint");
+  }
+  return response.endpoint;
+}
+
+export async function deleteEndpoint(id: string): Promise<void> {
+  await connectRequest<DeleteEndpointResponse>(
+    "/registry.v1.EndpointService/DeleteEndpoint",
+    { id },
+  );
 }
 
 export async function listHealthChecks(

@@ -30,7 +30,10 @@ func RegisterConnectHandlersWithMiddleware(mux *http.ServeMux, db *storage.Datab
 	path, handler = registryv1connect.NewDeploymentServiceHandler(&deploymentHandler{repo: storage.NewDeploymentRepository(db)})
 	mux.Handle(path, wrap(handler))
 
-	path, handler = registryv1connect.NewInstanceServiceHandler(&instanceHandler{repo: storage.NewInstanceRepository(db)})
+	path, handler = registryv1connect.NewInstanceServiceHandler(&instanceHandler{
+		repo:        storage.NewInstanceRepository(db),
+		runtimeRepo: storage.NewRuntimeRepository(db),
+	})
 	mux.Handle(path, wrap(handler))
 
 	path, handler = registryv1connect.NewEndpointServiceHandler(&endpointHandler{repo: storage.NewEndpointRepository(db)})
@@ -73,7 +76,8 @@ type deploymentHandler struct {
 
 type instanceHandler struct {
 	registryv1connect.UnimplementedInstanceServiceHandler
-	repo *storage.InstanceRepository
+	repo        *storage.InstanceRepository
+	runtimeRepo *storage.RuntimeRepository
 }
 
 type endpointHandler struct {

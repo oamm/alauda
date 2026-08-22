@@ -13,9 +13,12 @@ func (h *endpointHandler) CreateEndpoint(ctx context.Context, req *connect.Reque
 	if req.Msg.GetInstanceId() == "" || req.Msg.GetName() == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("instance_id and name are required"))
 	}
+	if req.Msg.GetProtocol() == registryv1.Protocol_PROTOCOL_UNSPECIFIED || req.Msg.GetPort() < 1 || req.Msg.GetPort() > 65535 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("protocol and a port between 1 and 65535 are required"))
+	}
 	item, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateEndpointResponse{Endpoint: item}), nil
 }

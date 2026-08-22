@@ -96,6 +96,88 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
+  it("registers runtime through the composite API", async () => {
+    render(<App />);
+
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", { name: "Services" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
+    fireEvent.change(screen.getByLabelText("Instance name"), {
+      target: { value: "checkout-prod-02" },
+    });
+    fireEvent.change(screen.getByLabelText("Address"), {
+      target: { value: "10.0.0.2" },
+    });
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "http" },
+    });
+    const addInstanceButtons = screen.getAllByRole("button", {
+      name: "Add instance",
+    });
+    fireEvent.click(addInstanceButtons[addInstanceButtons.length - 1]);
+
+    await screen.findByText(
+      "Runtime registered successfully: checkout-prod-02.",
+    );
+
+    const registerCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([input]) =>
+        input.toString().includes("RegisterRuntime"),
+      );
+    expect(registerCall).toBeDefined();
+    const body = JSON.parse(registerCall?.[1]?.body?.toString() ?? "{}");
+    expect(body.serviceId).toBe("svc-1");
+    expect(body.environmentId).toBe("env-1");
+    expect(body.deploymentId).toBeUndefined();
+    expect(body.instance).toMatchObject({
+      name: "checkout-prod-02",
+      address: "10.0.0.2",
+    });
+    expect(body.endpoints[0]).toMatchObject({
+      name: "http",
+      port: 8080,
+      primary: true,
+    });
+  });
+
+  it("scopes runtime registration to the selected service workspace", async () => {
+    render(<App />);
+
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", { name: "Services" }));
+
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByText("Register Runtime")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Target" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+    expect(screen.getByText("Endpoints")).toBeInTheDocument();
+    expect(screen.getAllByText("Health").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add instance" })[0]);
+    expect(screen.getByText("Service")).toBeInTheDocument();
+    expect(screen.getAllByText("checkout").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Environment")).toHaveValue("env-1");
+    fireEvent.change(screen.getByLabelText("Instance name"), {
+      target: { value: "checkout-prod-03" },
+    });
+    fireEvent.change(screen.getByLabelText("Address"), {
+      target: { value: "10.0.0.3" },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Add instance" })[0]);
+    expect(screen.getByLabelText("Instance name")).toHaveValue(
+      "checkout-prod-03",
+    );
+    expect(screen.getByLabelText("Address")).toHaveValue("10.0.0.3");
+  });
+
   it("has no WCAG 2 A/AA axe violations on the dashboard", async () => {
     const { container } = render(<App />);
 

@@ -33,20 +33,38 @@ func (r *EndpointRepository) Create(ctx context.Context, req *registryv1.CreateE
 		return nil, err
 	}
 
-	_, err = r.db.Exec(ctx, `
-		INSERT INTO endpoints (id, instance_id, name, protocol, port, path, enabled, tags, metadata, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	tx, err := r.db.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE endpoints
+		SET primary_endpoint = FALSE, updated_at = ?
+		WHERE instance_id = ? AND deleted_at IS NULL AND ? = TRUE
+	`, now, req.GetInstanceId(), req.GetPrimary())
+	if err != nil {
+		return nil, fmt.Errorf("failed to clear existing primary endpoint: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO endpoints (id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, id, req.GetInstanceId(), req.GetName(), int32(req.GetProtocol()),
-		req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), now, now)
+		req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), req.GetPrimary(), now, now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create endpoint: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return r.Get(ctx, id)
 }
 
 func (r *EndpointRepository) Get(ctx context.Context, id string) (*registryv1.Endpoint, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata
+		SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint
 		FROM endpoints
 		WHERE id = ? AND deleted_at IS NULL
 	`, id)
@@ -66,7 +84,7 @@ func (r *EndpointRepository) List(ctx context.Context, instanceID string, pageSi
 	}
 
 	query := `
-		SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata
+		SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint
 		FROM endpoints
 		WHERE deleted_at IS NULL
 	`
@@ -116,6 +134,7 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 		    port = COALESCE(?, port),
 		    path = COALESCE(?, path),
 		    enabled = ?,
+		    primary_endpoint = COALESCE(?, primary_endpoint),
 		    updated_at = ?
 		WHERE id = ? AND deleted_at IS NULL
 	`
@@ -137,9 +156,39 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 		path = &req.Path
 	}
 
-	_, err := r.db.Exec(ctx, query, name, proto, port, path, req.GetEnabled(), now, req.GetId())
+	tx, err := r.db.GetDB().BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var instanceID string
+	var primary *bool
+	if req.Primary != nil {
+		primary = req.Primary
+	}
+	if primary != nil && *primary {
+		if err := tx.QueryRowContext(ctx, `
+			SELECT instance_id FROM endpoints WHERE id = ? AND deleted_at IS NULL
+		`, req.GetId()).Scan(&instanceID); err != nil {
+			return nil, fmt.Errorf("failed to load endpoint instance: %w", err)
+		}
+		_, err := tx.ExecContext(ctx, `
+			UPDATE endpoints
+			SET primary_endpoint = FALSE, updated_at = ?
+			WHERE instance_id = ? AND id != ? AND deleted_at IS NULL
+		`, now, instanceID, req.GetId())
+		if err != nil {
+			return nil, fmt.Errorf("failed to clear existing primary endpoint: %w", err)
+		}
+	}
+
+	_, err = tx.ExecContext(ctx, query, name, proto, port, path, req.GetEnabled(), primary, now, req.GetId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to update endpoint: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return r.Get(ctx, req.GetId())
 }
@@ -174,9 +223,10 @@ func scanEndpoint(scanner interface{ Scan(...interface{}) error }) (*registryv1.
 		enabled      bool
 		tagsJSON     string
 		metadataJSON string
+		primary      bool
 	)
 
-	err := scanner.Scan(&id, &instanceID, &name, &protocol, &port, &path, &enabled, &tagsJSON, &metadataJSON)
+	err := scanner.Scan(&id, &instanceID, &name, &protocol, &port, &path, &enabled, &tagsJSON, &metadataJSON, &primary)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, sql.ErrNoRows
@@ -194,6 +244,7 @@ func scanEndpoint(scanner interface{ Scan(...interface{}) error }) (*registryv1.
 		Enabled:    enabled,
 		Tags:       make(map[string]string),
 		Metadata:   make(map[string]string),
+		Primary:    primary,
 	}
 
 	if tagsJSON != "" {

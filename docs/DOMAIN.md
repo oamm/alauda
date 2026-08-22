@@ -41,11 +41,27 @@ AuditLog (administrative changes)
 
 ---
 
+Runtime registration follows this hierarchy:
+
+```text
+Service
+  Deployment in Environment
+    Instance
+      Endpoint
+```
+
+A Service describes what an application is. An Instance describes where one running copy exists. An Endpoint describes how a particular protocol can reach that Instance.
+
+Alauda observes and catalogs runtime topology. It does not route, proxy, load balance, rewrite, or control service-to-service traffic.
+
+---
+
 ## 1. Environment
 
 **Purpose**: First-class domain concept representing deployment boundaries.
 
 ### Properties
+
 ```
 id: UUID                    # Immutable identifier
 key: string                 # Unique string identifier (e.g., "prod")
@@ -60,6 +76,7 @@ deletedAt: timestamp?       # Soft delete
 ```
 
 ### Constraints
+
 - `key` must be unique across all environments
 - `key` immutable after creation
 - `key` alphanumeric + underscores only (validate)
@@ -67,6 +84,7 @@ deletedAt: timestamp?       # Soft delete
 - At least one environment must exist
 
 ### Example
+
 ```
 Environment {
   id: "env-prod-001"
@@ -91,6 +109,7 @@ Environment {
 **Purpose**: Logical application definition, independent of environment.
 
 ### Properties
+
 ```
 id: UUID                    # Immutable identifier
 name: string                # Unique service name (e.g., "lynx-authentication")
@@ -104,12 +123,14 @@ deletedAt: timestamp?       # Soft delete
 ```
 
 ### Constraints
+
 - `name` unique across all services
 - `name` immutable after creation
 - `name` must match pattern: `^[a-z][a-z0-9-]*[a-z0-9]$` (alphanumeric + hyphens)
 - Must have at least a `displayName` or `description`
 
 ### Tag Examples
+
 ```
 team=platform              # Team ownership
 type=backend              # Service category
@@ -119,6 +140,7 @@ owner=platform-team       # Team contact
 ```
 
 ### Example
+
 ```
 Service {
   id: "svc-auth-001"
@@ -148,6 +170,7 @@ Service {
 **Purpose**: Links a Service to an Environment with environment-specific configuration.
 
 ### Properties
+
 ```
 id: UUID                          # Immutable
 serviceId: UUID                   # Foreign key
@@ -163,12 +186,14 @@ deletedAt: timestamp?
 ```
 
 ### Constraints
+
 - Combination of (serviceId, environmentId) must be unique
 - Cannot have duplicate deployments
 - At least one environment must have the deployment
 - If service deleted, cascade-delete deployments
 
 ### Tag Examples
+
 ```
 version=2.8.1            # Service version in this env
 region=us-east-1         # Regional deployment
@@ -176,6 +201,7 @@ cluster=prod-cluster-01  # Cluster assignment
 ```
 
 ### Example
+
 ```
 ServiceDeployment {
   id: "deploy-auth-prod-001"
@@ -205,12 +231,12 @@ ServiceDeployment {
 **Purpose**: Individual running copy of a service in an environment.
 
 ### Properties
+
 ```
 id: UUID                    # Immutable
 deploymentId: UUID         # Foreign key (service + environment)
 name: string               # e.g., "auth-prod-01"
 address: string            # IPv4, IPv6, hostname, FQDN
-port: int32?               # Optional default port
 description: string        # Purpose of this instance
 enabled: bool              # Can execute health checks
 tags: map<string, string> # Instance-specific tags
@@ -222,12 +248,21 @@ deletedAt: timestamp?
 ```
 
 ### Constraints
+
 - `name` unique within a deployment (multiple envs can have same name)
 - `address` can be IPv4, IPv6, hostname (no protocol)
+- Runtime ports belong to Endpoints in the preferred model
 - Cannot modify immutable fields
 - Soft delete only (keeps history)
 
+### Compatibility
+
+- `port` exists in current persisted/public contracts as a legacy optional default
+- New runtime registration should prefer Endpoint ports
+- Removing `Instance.port` requires an explicit migration and compatibility plan
+
 ### Address Examples
+
 ```
 10.20.1.15                    # IPv4
 2001:db8::1                   # IPv6
@@ -236,13 +271,13 @@ auth-prod-01.example.com      # FQDN
 ```
 
 ### Example
+
 ```
 ServiceInstance {
   id: "inst-auth-prod-01"
   deploymentId: "deploy-auth-prod-001"
   name: "auth-prod-01"
   address: "10.20.1.15"
-  port: null
   description: "Primary authentication instance in us-east-1a"
   enabled: true
   tags: {
@@ -264,16 +299,18 @@ ServiceInstance {
 
 ## 5. Endpoint
 
-**Purpose**: Network location exposed by a service instance.
+**Purpose**: Protocol-specific addressable interface exposed by a service instance.
 
 ### Properties
+
 ```
 id: UUID                    # Immutable
 instanceId: UUID           # Foreign key
 name: string               # e.g., "http", "grpc", "metrics"
 protocol: string           # http, https, grpc, tcp, udp
-port: int32               # Network port (0-65535)
+port: int32               # Network port (1-65535)
 path: string?             # Optional path (e.g., /health)
+primary: bool             # Optional display/discovery default for the instance
 description: string       # Purpose of this endpoint
 enabled: bool             # Can be checked by health checks
 tags: map<string, string> # Endpoint classification
@@ -283,12 +320,18 @@ updatedAt: timestamp
 ```
 
 ### Constraints
+
 - Combination of (instanceId, name) must be unique
 - `protocol` must be known type or configurable enum
-- `port` must be valid (0-65535), typically > 1024
-- `path` only valid for HTTP/HTTPS
+- `port` must be valid (1-65535)
+- `path` is relevant for HTTP/HTTPS and optional otherwise
+- At most one enabled, non-deleted endpoint per instance may have `primary = true`
+- If exactly one endpoint exists for an instance, it may automatically become primary
+- Creating a new primary endpoint should transactionally replace the previous primary endpoint
+- `primary` is display/discovery metadata only, not traffic routing priority
 
 ### Protocol Values
+
 ```
 http     - TCP/IP HTTP
 https    - TCP/IP HTTPS
@@ -298,6 +341,7 @@ udp      - UDP protocol
 ```
 
 ### Example
+
 ```
 Endpoint {
   id: "ep-auth-prod-01-http"
@@ -306,6 +350,7 @@ Endpoint {
   protocol: "https"
   port: 8080
   path: "/health"
+  primary: true
   description: "Main authentication HTTP API"
   enabled: true
   tags: {
@@ -328,6 +373,7 @@ Endpoint {
 **Purpose**: Configuration for checking an instance or endpoint's availability.
 
 ### Properties
+
 ```
 id: UUID                          # Immutable
 instanceId: UUID                 # Foreign key
@@ -365,6 +411,7 @@ updatedAt: timestamp
 ```
 
 ### Constraints
+
 - Must have instanceId
 - Either endpointId or instance-level
 - `interval` >= 5s (minimum)
@@ -374,6 +421,7 @@ updatedAt: timestamp
 - `type` must be valid
 
 ### Example: HTTP Health Check
+
 ```
 HealthCheck {
   id: "hc-auth-prod-01-http"
@@ -406,6 +454,7 @@ HealthCheck {
 ```
 
 ### Example: TCP Health Check
+
 ```
 HealthCheck {
   id: "hc-auth-prod-01-tcp"
@@ -432,6 +481,7 @@ HealthCheck {
 **Purpose**: Current health status and transition tracking for an instance.
 
 ### Properties
+
 ```
 id: UUID                              # Immutable
 instanceId: UUID                     # Foreign key
@@ -445,6 +495,7 @@ updatedAt: timestamp
 ```
 
 ### State Enum
+
 ```
 UNKNOWN       # No checks configured or never checked
 HEALTHY       # All required checks passing
@@ -454,6 +505,7 @@ DISABLED      # Instance disabled or checks disabled
 ```
 
 ### State Transition Rules
+
 ```
 Entry:      UNKNOWN
 
@@ -478,6 +530,7 @@ Manual:     Any → DISABLED
 ```
 
 ### Example
+
 ```
 HealthState {
   id: "hs-auth-prod-01"
@@ -501,6 +554,7 @@ HealthState {
 **Purpose**: Individual health check execution record.
 
 ### Properties
+
 ```
 id: UUID                    # Immutable
 healthCheckId: UUID        # Foreign key
@@ -516,6 +570,7 @@ expiresAt: timestamp?     # For automatic cleanup
 ```
 
 ### Error Types
+
 ```
 CONNECTION_REFUSED
 CONNECTION_TIMEOUT
@@ -529,11 +584,13 @@ OTHER
 ```
 
 ### Data Retention
+
 - Store: Last 24 hours of detailed results
 - Purge: Older results deleted (configurable)
 - Purpose: Recent diagnosis only
 
 ### Example
+
 ```
 HealthResult {
   id: "hr-20260812-143542-001"
@@ -560,6 +617,7 @@ HealthResult {
 **Purpose**: Operational event representing a service becoming unhealthy or recovering.
 
 ### Properties
+
 ```
 id: UUID                      # Immutable
 instanceId: UUID             # Foreign key
@@ -578,12 +636,14 @@ createdAt: timestamp
 ```
 
 ### State Enum
+
 ```
 OPEN       # Incident active, service unhealthy
 RESOLVED   # Service recovered, incident closed
 ```
 
 ### Example
+
 ```
 Incident {
   id: "inc-20260812-143542-001"
@@ -617,6 +677,7 @@ Incident {
 **Purpose**: Configuration for when/how to alert on incidents.
 
 ### Properties
+
 ```
 id: UUID                          # Immutable
 deploymentId: UUID?              # Deployment-specific (or null for global)
@@ -632,6 +693,7 @@ updatedAt: timestamp
 ```
 
 ### Notification Types
+
 ```
 unhealthy     # When check starts failing
 degraded      # When degraded state reached
@@ -641,12 +703,14 @@ deleted       # Optional: instance removed
 ```
 
 ### Hierarchy
+
 - Global default (any)
 - Environment-specific (if set)
 - Deployment-specific (if set)
 - Per service (future)
 
 ### Example
+
 ```
 AlertPolicy {
   id: "ap-prod-auth-001"
@@ -676,6 +740,7 @@ AlertPolicy {
 **Purpose**: Destination for alert notifications.
 
 ### Properties
+
 ```
 id: UUID                    # Immutable
 type: string                # webhook, email
@@ -692,6 +757,7 @@ updatedAt: timestamp
 ### Channel Types
 
 #### Webhook
+
 ```
 configuration: {
   url: "https://hooks.slack.com/...",
@@ -702,6 +768,7 @@ configuration: {
 ```
 
 #### Email
+
 ```
 configuration: {
   smtpServer: "smtp.company.com",
@@ -713,6 +780,7 @@ configuration: {
 ```
 
 ### Example
+
 ```
 NotificationChannel {
   id: "nc-webhook-pagerduty"
@@ -745,6 +813,7 @@ NotificationChannel {
 **Purpose**: Immutable record of significant operations for audit trail and UI updates.
 
 ### Properties
+
 ```
 id: UUID
 type: string                # ServiceCreated, IncidentOpened, etc
@@ -765,6 +834,7 @@ expiresAt: timestamp?      # For automatic cleanup
 ```
 
 ### Event Types
+
 ```
 # Service lifecycle
 ServiceCreated
@@ -813,11 +883,13 @@ TokenRevoked
 ```
 
 ### Data Retention
+
 - Store: 30 days (configurable)
 - Purge: Older events deleted
 - Purpose: Operational timeline
 
 ### Example
+
 ```
 Event {
   id: "evt-20260812-143542-001"
@@ -850,6 +922,7 @@ Event {
 **Purpose**: Track administrative changes for compliance and debugging.
 
 ### Properties
+
 ```
 id: UUID
 timestamp: timestamp        # When change occurred
@@ -871,6 +944,7 @@ expiresAt: timestamp?     # For retention policies
 ```
 
 ### Actions
+
 ```
 Create
 Update
@@ -885,11 +959,13 @@ TokenRevoked
 ```
 
 ### Data Retention
+
 - Store: Indefinitely (for compliance)
 - Purge: Never (unless configured)
 - Purpose: Audit trail and compliance
 
 ### Example
+
 ```
 AuditLog {
   id: "audit-20260812-143542-001"
@@ -929,6 +1005,7 @@ AuditLog {
 **Purpose**: Local user account for authentication.
 
 ### Properties
+
 ```
 id: UUID
 username: string           # Unique, immutable
@@ -945,6 +1022,7 @@ deletedAt: timestamp?     # Soft delete
 ```
 
 ### Roles
+
 ```
 Administrator   # Full access
 Operator        # Service operations
@@ -959,6 +1037,7 @@ Automation      # API token only (no password)
 **Purpose**: Token-based access for automation.
 
 ### Properties
+
 ```
 id: UUID
 userId: UUID              # Foreign key
@@ -978,6 +1057,7 @@ createdBy: UUID          # User who created token
 ## 16. Value Objects & Enums
 
 ### Duration
+
 ```
 type Duration struct {
   value int       // milliseconds
@@ -990,6 +1070,7 @@ methods:
 ```
 
 ### HealthState
+
 ```
 enum HealthState:
   UNKNOWN
@@ -1000,6 +1081,7 @@ enum HealthState:
 ```
 
 ### Protocol
+
 ```
 enum Protocol:
   HTTP
@@ -1010,6 +1092,7 @@ enum Protocol:
 ```
 
 ### IncidentState
+
 ```
 enum IncidentState:
   OPEN
@@ -1017,6 +1100,7 @@ enum IncidentState:
 ```
 
 ### CheckType
+
 ```
 enum CheckType:
   HTTP
@@ -1032,23 +1116,35 @@ enum CheckType:
 ## 17. Domain Invariants
 
 ### Service Invariants
+
 - Service name globally unique
 - Service name immutable
 - Service must have at least one deployment to be operational
 - Service deletion cascades to all deployments
 
 ### Deployment Invariants
+
 - Combination (service, environment) unique
 - Cannot change service or environment after creation
 - Deletion cascades to all instances
+- Runtime registration must resolve or create the unique Service + Environment deployment idempotently
 
 ### Instance Invariants
+
 - Instance name unique within deployment
 - Instance address must be valid (IP or hostname)
 - Cannot be healthy in multiple deployments
 - Instance deletion preserves health history
 
+### Endpoint Invariants
+
+- Endpoint name unique within instance
+- Endpoint port must be valid (1-65535)
+- Maximum one primary endpoint per instance
+- Primary endpoint is optional and must not imply traffic routing
+
 ### HealthCheck Invariants
+
 - Health checks execute outside transactions
 - Timeout < interval
 - Consecutive failure threshold >= 1
@@ -1056,6 +1152,7 @@ enum CheckType:
 - No concurrent executions of same check
 
 ### State Transition Invariants
+
 - Transitions deterministic based on consecutive threshold
 - State changes only on threshold, not single check
 - Incident created only on entry to UNHEALTHY
@@ -1063,6 +1160,7 @@ enum CheckType:
 - Transitions logged as events
 
 ### Alert Invariants
+
 - Alert cooldown prevents duplicate notifications
 - Recovery notification always sent (no cooldown)
 - Alert channels must be reachable before enable
@@ -1073,6 +1171,7 @@ enum CheckType:
 ## 18. Aggregates
 
 ### Service Aggregate
+
 ```
 Root: Service
 Children:
@@ -1086,6 +1185,7 @@ Children:
 ```
 
 ### Incident Aggregate
+
 ```
 Root: Incident
 Children:
@@ -1099,6 +1199,7 @@ Children:
 ## 19. Domain Events
 
 All events implement:
+
 ```
 interface DomainEvent {
   ID() UUID
@@ -1111,6 +1212,7 @@ interface DomainEvent {
 ```
 
 Published to event subscribers for:
+
 - Persistence (event store)
 - Audit logging
 - Alert triggering
