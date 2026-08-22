@@ -91,11 +91,14 @@ export function AppShell({
         </nav>
         <div className="sidebar-status">
           <span>System status</span>
-          <strong>{openIncidentCount === 0 ? "Healthy" : "Attention needed"}</strong>
+          <strong>
+            <i aria-hidden="true" />
+            {openIncidentCount === 0 ? "Healthy" : "Attention required"}
+          </strong>
           <small>
             {openIncidentCount === 0
-              ? "All monitored services are operating normally."
-              : `${degradedServiceCount} degraded service${degradedServiceCount === 1 ? "" : "s"} / ${openIncidentCount} open incident${openIncidentCount === 1 ? "" : "s"}.`}
+              ? "All monitored services operational"
+              : `${degradedServiceCount} degraded service${degradedServiceCount === 1 ? "" : "s"} · ${openIncidentCount} open incident${openIncidentCount === 1 ? "" : "s"}`}
           </small>
         </div>
       </aside>
@@ -103,8 +106,8 @@ export function AppShell({
       <main className="workspace">
         <header className="toolbar">
           <div className="toolbar-copy">
-            <span>Registry command center</span>
-            <h2>{currentEnvironmentName}</h2>
+            <h2>{navItems.find((item) => item.view === activeView)?.label}</h2>
+            <span>{currentEnvironmentName}</span>
           </div>
           <div className="toolbar-control">
             <span>Environment</span>
@@ -122,11 +125,21 @@ export function AppShell({
             </select>
           </div>
           <div className="toolbar-actions">
-            <button type="button" onClick={onRefresh}>
-              Refresh
+            <button
+              aria-label="Refresh data"
+              title="Refresh data"
+              type="button"
+              onClick={onRefresh}
+            >
+              ↻
             </button>
-            <button type="button" onClick={onToggleDarkMode}>
-              {darkMode ? "Light mode" : "Dark mode"}
+            <button
+              aria-label={darkMode ? "Light mode" : "Dark mode"}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              type="button"
+              onClick={onToggleDarkMode}
+            >
+              {darkMode ? "☀" : "◐"}
             </button>
           </div>
         </header>

@@ -9,8 +9,17 @@ import {
   Service,
 } from "../api";
 import { AvailabilityCard, MetricCard } from "../components/Cards";
-import { EmptyState, PageHeader, StatusBadge } from "../components/OperationsUI";
-import { formatAvailability, formatTimestamp } from "../utils/format";
+import {
+  EmptyState,
+  PageHeader,
+  StatusBadge,
+} from "../components/OperationsUI";
+import {
+  formatActivityTimestamp,
+  formatAvailability,
+  formatEventType,
+  formatTimestamp,
+} from "../utils/format";
 
 type DashboardViewProps = {
   alertPolicies: AlertPolicy[];
@@ -66,7 +75,9 @@ export function DashboardView({
             label={registryState}
           />
           <strong>
-            {formatAvailability(availability.availability24h?.availabilityPercent)}
+            {formatAvailability(
+              availability.availability24h?.availabilityPercent,
+            )}
           </strong>
           <span>
             24h availability · {healthChecks.length} checks ·{" "}
@@ -74,7 +85,9 @@ export function DashboardView({
           </span>
         </div>
         <div className="summary-actions">
-          <span>{selectedEnvironmentId ? "Environment scoped" : "Global scope"}</span>
+          <span>
+            {selectedEnvironmentId ? "Environment scoped" : "Global scope"}
+          </span>
           <StatusBadge
             status={openIncidents.length === 0 ? "healthy" : "open"}
             label={
@@ -115,9 +128,18 @@ export function DashboardView({
           <span>{selectedEnvironmentId ? "Filtered" : "Global"}</span>
         </div>
         <div className="availability-grid">
-          <AvailabilityCard label="24h" summary={availability.availability24h} />
-          <AvailabilityCard label="7d" summary={availability.availability7d} />
-          <AvailabilityCard label="30d" summary={availability.availability30d} />
+          <AvailabilityCard
+            label="24 hours"
+            summary={availability.availability24h}
+          />
+          <AvailabilityCard
+            label="7 days"
+            summary={availability.availability7d}
+          />
+          <AvailabilityCard
+            label="30 days"
+            summary={availability.availability30d}
+          />
         </div>
       </div>
 
@@ -139,7 +161,9 @@ export function DashboardView({
                   <div>
                     <StatusBadge status="open" />
                     <strong>{incident.reason || "Open incident"}</strong>
-                    <span>{incident.impactSummary || "Impact not recorded"}</span>
+                    <span>
+                      {incident.impactSummary || "Impact not recorded"}
+                    </span>
                   </div>
                   <span>{incident.serviceId || incident.instanceId}</span>
                   <span>{formatTimestamp(incident.openedAt)}</span>
@@ -164,8 +188,10 @@ export function DashboardView({
             ) : (
               events.slice(0, 8).map((event) => (
                 <div className="timeline-row" key={event.id}>
-                  <time>{formatTimestamp(event.timestamp)}</time>
-                  <strong>{event.type}</strong>
+                  <time title={formatTimestamp(event.timestamp)}>
+                    {formatActivityTimestamp(event.timestamp)}
+                  </time>
+                  <strong>{formatEventType(event.type)}</strong>
                   <span>{event.message}</span>
                   <small>{event.resourceType}</small>
                 </div>

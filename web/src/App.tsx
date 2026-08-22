@@ -11,7 +11,13 @@ import {
   StatusBadge,
 } from "./components/OperationsUI";
 import { ActiveView } from "./types";
-import { formatDuration, formatTimestamp } from "./utils/format";
+import {
+  formatActivityTimestamp,
+  formatDuration,
+  formatEventType,
+  formatTimestamp,
+  pluralize,
+} from "./utils/format";
 import { DashboardView } from "./views/DashboardView";
 import {
   AlertPolicy,
@@ -855,7 +861,13 @@ function App() {
       (check) => check.instanceId === instance.id,
     ).length;
     const confirmed = window.confirm(
-      `Delete instance ${instance.name}?\n\nThis will also remove:\n- ${relatedEndpoints} endpoint(s)\n- ${relatedChecks} health check(s)\n\nExisting incident/event history will be preserved where appropriate.`,
+      `Delete instance ${instance.name}?\n\nThis will also remove:\n- ${pluralize(
+        relatedEndpoints,
+        "endpoint",
+      )}\n- ${pluralize(
+        relatedChecks,
+        "health check",
+      )}\n\nExisting incident/event history will be preserved where appropriate.`,
     );
     if (!confirmed) {
       return;
@@ -912,7 +924,10 @@ function App() {
       (check) => check.endpointId === endpoint.id,
     ).length;
     const confirmed = window.confirm(
-      `Delete endpoint ${endpoint.name}?\n\nThis will also remove or detach:\n- ${relatedChecks} health check(s)\n\nExisting incident/event history will be preserved where appropriate.`,
+      `Delete endpoint ${endpoint.name}?\n\nThis will also remove or detach:\n- ${pluralize(
+        relatedChecks,
+        "health check",
+      )}\n\nExisting incident/event history will be preserved where appropriate.`,
     );
     if (!confirmed) {
       return;
@@ -1031,7 +1046,7 @@ function App() {
       return;
     }
     const confirmed = window.confirm(
-      `Delete ${selectedBulkServiceIds.length} selected service(s)?`,
+      `Delete ${pluralize(selectedBulkServiceIds.length, "selected service")}?`,
     );
     if (!confirmed) {
       return;
@@ -1362,6 +1377,15 @@ function App() {
   const degradedServiceCount = services.filter(
     (service) => serviceOperationalStatus(service, incidents) === "degraded",
   ).length;
+  const selectedServiceRuntimeSummary = [
+    pluralize(selectedServiceDeployments.length, "environment"),
+    pluralize(selectedServiceInstances.length, "instance"),
+    pluralize(selectedServiceEndpoints.length, "endpoint"),
+  ].join(" · ");
+  const selectedServiceLastActivity =
+    selectedServiceEvents.length > 0
+      ? formatActivityTimestamp(selectedServiceEvents[0].timestamp)
+      : "No activity";
   void savingRuntimeEdit;
   void registrationSuccess;
   void registrationStep;
@@ -1407,77 +1431,87 @@ function App() {
       onToggleDarkMode={() => setDarkMode((value) => !value)}
       onViewChange={setActiveView}
     >
+      {loading ? <div className="status">Loading registry data...</div> : null}
 
-        {loading ? (
-          <div className="status">Loading registry data...</div>
-        ) : null}
+      {error && (
+        <div className="error" role="alert">
+          {error}
+        </div>
+      )}
 
-        {error && (
-          <div className="error" role="alert">
-            {error}
-          </div>
-        )}
+      {testResult && <div className="success">{testResult}</div>}
+      {authMessage && <div className="success">{authMessage}</div>}
 
-        {testResult && <div className="success">{testResult}</div>}
-        {authMessage && <div className="success">{authMessage}</div>}
-
-        {activeView === "dashboard" ? (
-          <DashboardView
-            alertPolicies={alertPolicies}
-            availability={availability}
-            environments={environments}
-            events={events}
-            healthChecks={healthChecks}
-            incidents={incidents}
-            notificationChannels={notificationChannels}
-            selectedEnvironmentId={selectedEnvironmentId}
-            services={services}
+      {activeView === "dashboard" ? (
+        <DashboardView
+          alertPolicies={alertPolicies}
+          availability={availability}
+          environments={environments}
+          events={events}
+          healthChecks={healthChecks}
+          incidents={incidents}
+          notificationChannels={notificationChannels}
+          selectedEnvironmentId={selectedEnvironmentId}
+          services={services}
+        />
+      ) : activeView === "services" ? (
+        <section className="services-workflow">
+          <PageHeader
+            title="Services"
+            context={`${pluralize(filteredServices.length, "service")} ${
+              selectedEnvironmentId
+                ? `in ${currentEnvironmentName}`
+                : "across all environments"
+            }`}
+            description="Manage service catalog and runtime registrations."
+            action={
+              <button
+                className="button-primary"
+                type="button"
+                onClick={() => setShowCreateService(true)}
+              >
+                + Create service
+              </button>
+            }
           />
-        ) : activeView === "services" ? (
-          <section className="services-workflow">
-            <PageHeader
-              title="Services"
-              context={`${filteredServices.length} services in ${currentEnvironmentName}`}
-              description="Select a service, then manage runtime, health, incidents, and events from that service context."
-              action={
-                <button type="button" onClick={() => setShowCreateService(true)}>
-                  Create service
-                </button>
-              }
-            />
-            <div className="panel services-master">
-              <div className="panel-heading">
-                <h2>Services</h2>
-                <span>
-                  {loading
-                    ? "Loading"
-                    : `${filteredServices.length} of ${services.length}`}
-                </span>
-              </div>
-              <div className="filter-bar">
+          <div className="panel services-master">
+            <div className="panel-heading">
+              <h2>Services</h2>
+              <span>
+                {loading
+                  ? "Loading"
+                  : `${filteredServices.length} of ${services.length}`}
+              </span>
+            </div>
+            <div className="service-filter-bar">
+              <label className="service-search">
+                <span>Search</span>
+                <input
+                  aria-label="Search services"
+                  placeholder="Search services..."
+                  value={serviceSearch}
+                  onChange={(event) => setServiceSearch(event.target.value)}
+                />
+              </label>
+              <div className="service-filter-row">
                 <label>
-                  Search
-                  <input
-                    value={serviceSearch}
-                    onChange={(event) => setServiceSearch(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Health
+                  <span>Health</span>
                   <select
                     value={serviceHealthFilter}
                     onChange={(event) =>
                       setServiceHealthFilter(event.target.value)
                     }
                   >
-                    <option value="all">All statuses</option>
+                    <option value="all">All health</option>
                     <option value="healthy">Healthy</option>
                     <option value="degraded">Degraded</option>
                   </select>
                 </label>
                 <label>
-                  Team or tag
+                  <span>Tags</span>
                   <input
+                    aria-label="Filter by tag"
+                    placeholder="Any tag"
                     value={serviceTagFilter}
                     onChange={(event) =>
                       setServiceTagFilter(event.target.value)
@@ -1485,414 +1519,579 @@ function App() {
                   />
                 </label>
               </div>
+              {serviceSearch ||
+              serviceHealthFilter !== "all" ||
+              serviceTagFilter ? (
+                <button
+                  className="button-ghost clear-filters"
+                  type="button"
+                  onClick={() => {
+                    setServiceSearch("");
+                    setServiceHealthFilter("all");
+                    setServiceTagFilter("");
+                  }}
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+            {selectedBulkServiceIds.length > 0 ? (
               <div className="bulk-bar">
                 <span>{selectedBulkServiceIds.length} selected</span>
                 <button type="button" onClick={selectVisibleServices}>
                   Select visible
                 </button>
-                <button
-                  disabled={selectedBulkServiceIds.length === 0}
-                  type="button"
-                  onClick={() => setSelectedBulkServiceIds([])}
-                >
-                  Clear
-                </button>
-                <button
-                  disabled={selectedBulkServiceIds.length === 0}
-                  type="button"
-                  onClick={handleCopySelectedServiceIds}
-                >
+                <button type="button" onClick={handleCopySelectedServiceIds}>
                   Copy IDs
                 </button>
                 <button
-                  disabled={
-                    selectedBulkServiceIds.length === 0 || bulkActionRunning
-                  }
+                  disabled={bulkActionRunning}
                   type="button"
                   onClick={handleDeleteSelectedServices}
                 >
                   {bulkActionRunning ? "Deleting" : "Delete"}
                 </button>
+                <button
+                  className="button-ghost"
+                  type="button"
+                  onClick={() => setSelectedBulkServiceIds([])}
+                >
+                  Clear
+                </button>
               </div>
-              {loading ? (
-                <LoadingRows rows={5} />
-              ) : filteredServices.length === 0 ? (
-                <EmptyState
-                  title="No matching services"
-                  description="No catalog services match the current search, health, and tag filters."
-                />
-              ) : (
-                <div className="service-list">
-                  {visibleServices.map((service) => (
+            ) : null}
+            {loading ? (
+              <LoadingRows rows={5} />
+            ) : filteredServices.length === 0 ? (
+              <EmptyState
+                title="No matching services"
+                description="No catalog services match the current search, health, and tag filters."
+              />
+            ) : (
+              <div className="service-list">
+                {visibleServices.map((service) => {
+                  const serviceDeployments = deployments.filter(
+                    (deployment) => deployment.serviceId === service.id,
+                  );
+                  const deploymentIds = new Set(
+                    serviceDeployments.map((deployment) => deployment.id),
+                  );
+                  const serviceInstanceCount = instances.filter((instance) =>
+                    deploymentIds.has(instance.deploymentId),
+                  ).length;
+                  const serviceStatus = serviceOperationalStatus(
+                    service,
+                    incidents,
+                  );
+
+                  return (
                     <div
                       className={
                         service.id === selectedServiceId
-                          ? "row selected"
-                          : "row"
+                          ? "service-row selected"
+                          : "service-row"
                       }
                       key={service.id}
                     >
-                      <label className="inline-check">
+                      <label className="inline-check service-row-check">
                         <input
-                          aria-label={`Select ${service.name}`}
+                          aria-label={`Select ${service.displayName || service.name}`}
                           checked={selectedBulkServiceIds.includes(service.id)}
                           type="checkbox"
                           onChange={() => toggleBulkService(service.id)}
                         />
-                        <strong>{service.displayName || service.name}</strong>
                       </label>
-                      <span>{service.name}</span>
-                      <StatusBadge
-                        status={serviceOperationalStatus(service, incidents)}
-                      />
                       <button
+                        aria-pressed={service.id === selectedServiceId}
                         type="button"
-                        onClick={() => {
-                          setSelectedServiceId(service.id);
-                          setServiceTab("overview");
-                        }}
+                        onClick={() => setSelectedServiceId(service.id)}
                       >
-                        Inspect
+                        <span className="service-row-title">
+                          <strong>{service.displayName || service.name}</strong>
+                          <StatusBadge status={serviceStatus} />
+                        </span>
+                        <span>{service.name}</span>
+                        <span>
+                          {pluralize(serviceInstanceCount, "instance")}
+                        </span>
                       </button>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="pagination-bar">
+              <button
+                disabled={servicePage <= 1}
+                onClick={() => setServicePage((page) => page - 1)}
+                type="button"
+              >
+                Previous
+              </button>
+              <span>
+                Page {servicePage} of {servicePageCount}
+              </span>
+              <button
+                disabled={servicePage >= servicePageCount}
+                onClick={() => setServicePage((page) => page + 1)}
+                type="button"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
+          <div className="panel service-workspace">
+            {selectedService ? (
+              <>
+                <div className="service-workspace-header">
+                  <div>
+                    <div className="breadcrumb">
+                      Services /{" "}
+                      {selectedService.displayName || selectedService.name}
+                    </div>
+                    <div className="service-title-line">
+                      <h2>
+                        {selectedService.displayName || selectedService.name}
+                      </h2>
+                      <StatusBadge
+                        status={serviceOperationalStatus(
+                          selectedService,
+                          incidents,
+                        )}
+                      />
+                    </div>
+                    {selectedService.description ? (
+                      <p>{selectedService.description}</p>
+                    ) : null}
+                    <span>
+                      {selectedService.name} · {selectedServiceRuntimeSummary}
+                    </span>
+                  </div>
+                  <div className="workspace-actions">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddRuntime(true)}
+                    >
+                      {selectedEnvironmentDeployment
+                        ? "Add instance"
+                        : "Add runtime"}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  className="service-tabs"
+                  role="tablist"
+                  aria-label="Service sections"
+                >
+                  {(
+                    [
+                      "overview",
+                      "runtime",
+                      "health",
+                      "incidents",
+                      "events",
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      aria-selected={serviceTab === tab}
+                      className={serviceTab === tab ? "active" : ""}
+                      key={tab}
+                      onClick={() => setServiceTab(tab)}
+                      role="tab"
+                      type="button"
+                    >
+                      {tab[0].toUpperCase() + tab.slice(1)}
+                    </button>
                   ))}
                 </div>
-              )}
-              <div className="pagination-bar">
-                <button
-                  disabled={servicePage <= 1}
-                  onClick={() => setServicePage((page) => page - 1)}
-                  type="button"
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {servicePage} of {servicePageCount}
-                </span>
-                <button
-                  disabled={servicePage >= servicePageCount}
-                  onClick={() => setServicePage((page) => page + 1)}
-                  type="button"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
 
-            <div className="panel service-workspace">
-              {selectedService ? (
-                <>
-                  <div className="service-workspace-header">
-                    <div>
-                      <div className="breadcrumb">
-                        Services / {selectedService.displayName || selectedService.name}
+                {serviceTab === "overview" ? (
+                  <div className="service-tab-panel">
+                    <div className="summary-strip">
+                      <div>
+                        <span>Runtime</span>
+                        <strong>{selectedServiceRuntimeSummary}</strong>
                       </div>
-                      <h2>{selectedService.displayName || selectedService.name}</h2>
-                      <p>{selectedService.description || "No description"}</p>
-                      <span>
-                        {selectedServiceDeployments.length} environment(s) /{" "}
-                        {selectedServiceInstances.length} instance(s) /{" "}
-                        {selectedServiceEndpoints.length} endpoint(s)
-                      </span>
+                      <div>
+                        <span>Catalog key</span>
+                        <strong>{selectedService.name}</strong>
+                      </div>
+                      <div>
+                        <span>Last activity</span>
+                        <strong>{selectedServiceLastActivity}</strong>
+                      </div>
                     </div>
-                    <div className="workspace-actions">
-                      <StatusBadge
-                        status={serviceOperationalStatus(selectedService, incidents)}
-                      />
-                      <button type="button" onClick={() => setShowAddRuntime(true)}>
-                        {selectedEnvironmentDeployment ? "Add instance" : "Add runtime"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="service-tabs" role="tablist" aria-label="Service sections">
-                    {(["overview", "runtime", "health", "incidents", "events"] as const).map((tab) => (
-                      <button
-                        aria-selected={serviceTab === tab}
-                        className={serviceTab === tab ? "active" : ""}
-                        key={tab}
-                        onClick={() => setServiceTab(tab)}
-                        role="tab"
-                        type="button"
-                      >
-                        {tab[0].toUpperCase() + tab.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-
-                  {serviceTab === "overview" ? (
-                    <div className="service-tab-panel">
-                      <div className="summary-grid">
-                        <div>
-                          <span>Status</span>
-                          <StatusBadge
-                            status={serviceOperationalStatus(selectedService, incidents)}
-                          />
-                        </div>
-                        <div>
-                          <span>Runtime</span>
-                          <strong>
-                            {selectedServiceDeployments.length} env /{" "}
-                            {selectedServiceInstances.length} inst /{" "}
-                            {selectedServiceEndpoints.length} endpoint
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Catalog key</span>
-                          <strong>{selectedService.name}</strong>
-                        </div>
+                    <section className="overview-section">
+                      <div className="tab-toolbar">
+                        <h3>Availability</h3>
                       </div>
                       <div className="availability-grid">
                         <AvailabilityCard
-                          label="24h"
+                          label="24 hours"
                           summary={serviceAvailability.availability24h}
                         />
                         <AvailabilityCard
-                          label="7d"
+                          label="7 days"
                           summary={serviceAvailability.availability7d}
                         />
                         <AvailabilityCard
-                          label="30d"
+                          label="30 days"
                           summary={serviceAvailability.availability30d}
                         />
                       </div>
-                      <div className="scoped-list">
-                        <h3>Recent activity</h3>
-                        {selectedServiceEvents.length === 0 ? (
-                          <EmptyState
-                            title="No recent activity"
-                            description="No events have been recorded for this service in the selected scope."
-                          />
-                        ) : (
-                          selectedServiceEvents.slice(0, 5).map((event) => (
-                            <div className="timeline-row" key={event.id}>
-                              <time>{formatTimestamp(event.timestamp)}</time>
-                              <strong>{event.type}</strong>
-                              <span>{event.message}</span>
-                              <small>{event.resourceType}</small>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {serviceTab === "runtime" ? (
-                    <div className="service-tab-panel">
-                      <div className="tab-toolbar">
-                        <div>
-                          <h3>Runtime</h3>
-                          <span>{selectedEnvironmentId ? currentEnvironmentName : "Grouped by environment"}</span>
-                        </div>
-                        <button type="button" onClick={() => setShowAddRuntime(true)}>
-                          {selectedEnvironmentDeployment ? "Add instance" : "Add runtime"}
-                        </button>
-                      </div>
-                      {selectedServiceDeployments.length === 0 ? (
-                        <EmptyState
-                          title="No runtime registered"
-                          description={`${selectedService.displayName || selectedService.name} exists in the catalog but has no runtime instance in this scope.`}
-                          action={
-                            <button type="button" onClick={() => setShowAddRuntime(true)}>
-                              Add runtime
-                            </button>
-                          }
-                        />
-                      ) : (
-                        selectedServiceDeployments.map((deployment) => {
-                          const deploymentInstances = selectedServiceInstances.filter(
-                            (instance) => instance.deploymentId === deployment.id,
-                          );
-                          const deploymentIncident = incidents.some(
-                            (incident) =>
-                              incident.deploymentId === deployment.id &&
-                              incident.state === "INCIDENT_STATE_OPEN",
-                          );
-                          return (
-                            <section className="runtime-environment" key={deployment.id}>
-                              <div className="runtime-environment-heading">
-                                <div>
-                                  <h3>{environmentName(environments, deployment.environmentId)}</h3>
-                                  <span>{deploymentInstances.length} instance(s)</span>
-                                </div>
-                                <StatusBadge status={deploymentIncident ? "degraded" : "healthy"} />
-                              </div>
-                              {deploymentInstances.length === 0 ? (
-                                <EmptyState
-                                  title="No instances"
-                                  description="This deployment has no runtime targets yet."
-                                  action={
-                                    <button type="button" onClick={() => setShowAddRuntime(true)}>
-                                      Add instance
-                                    </button>
-                                  }
-                                />
-                              ) : (
-                                deploymentInstances.map((instance) => {
-                                  const instanceEndpoints = selectedServiceEndpoints.filter(
-                                    (endpoint) => endpoint.instanceId === instance.id,
-                                  );
-                                  const instanceChecks = selectedServiceHealthChecks.filter(
-                                    (check) => check.instanceId === instance.id,
-                                  );
-                                  const state = healthStateByInstanceId.get(instance.id);
-                                  return (
-                                    <article className="runtime-instance" key={instance.id}>
-                                      <div className="runtime-instance-header">
-                                        <div>
-                                          <strong>
-                                            {instance.address}:
-                                            {instance.port ||
-                                              primaryEndpointForInstance(
-                                                instanceEndpoints,
-                                                instance.id,
-                                              )?.port ||
-                                              "dynamic"}
-                                          </strong>
-                                          <span>{instance.name}</span>
-                                        </div>
-                                        <StatusBadge
-                                          status={
-                                            state?.currentState
-                                              ? formatHealthState(state.currentState)
-                                              : instance.enabled
-                                                ? "enabled"
-                                                : "disabled"
-                                          }
-                                        />
-                                      </div>
-                                      <div className="runtime-nested">
-                                        <h4>Endpoints</h4>
-                                        {instanceEndpoints.length === 0 ? (
-                                          <p>No endpoints attached.</p>
-                                        ) : (
-                                          instanceEndpoints.map((endpoint) => (
-                                            <div className="runtime-child-row" key={endpoint.id}>
-                                              <span>{formatProtocol(endpoint.protocol).toUpperCase()}</span>
-                                              <strong>:{endpoint.port}{endpoint.path || ""}</strong>
-                                              <StatusBadge status={endpoint.enabled ? "enabled" : "disabled"} />
-                                            </div>
-                                          ))
-                                        )}
-                                        <h4>Health</h4>
-                                        {instanceChecks.length === 0 ? (
-                                          <p>No health check configured.</p>
-                                        ) : (
-                                          instanceChecks.map((check) => (
-                                            <div className="runtime-child-row" key={check.id}>
-                                              <span>{formatCheckType(check.type)}</span>
-                                              <strong>{check.name} / every {check.intervalSeconds}s</strong>
-                                              <button type="button" onClick={() => handleRunHealthCheck(check.id)}>
-                                                Run check
-                                              </button>
-                                            </div>
-                                          ))
-                                        )}
-                                      </div>
-                                    </article>
-                                  );
-                                })
-                              )}
-                            </section>
-                          );
-                        })
-                      )}
-                    </div>
-                  ) : null}
-
-                  {serviceTab === "health" ? (
-                    <div className="service-tab-panel">
-                      <div className="availability-grid">
-                        <AvailabilityCard label="24h" summary={serviceAvailability.availability24h} />
-                        <AvailabilityCard label="7d" summary={serviceAvailability.availability7d} />
-                        <AvailabilityCard label="30d" summary={serviceAvailability.availability30d} />
-                      </div>
-                      <div className="scoped-list">
-                        <h3>Health checks</h3>
-                        {selectedServiceHealthChecks.length === 0 ? (
-                          <EmptyState
-                            title="No health checks"
-                            description="No monitoring configuration is attached to this service runtime yet."
-                          />
-                        ) : (
-                          selectedServiceHealthChecks.map((check) => (
-                            <div className="health-result-row" key={check.id}>
-                              <strong>{check.name}</strong>
-                              <span>{formatCheckType(check.type)}</span>
-                              <span>{check.intervalSeconds}s</span>
-                              <StatusBadge status={check.enabled ? "enabled" : "disabled"} />
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {serviceTab === "incidents" ? (
-                    <div className="service-tab-panel scoped-list">
-                      {filteredIncidents.filter((incident) => incident.serviceId === selectedService.id).length === 0 ? (
-                        <EmptyState
-                          title="No service incidents"
-                          description="No incidents match this service and the current incident filters."
-                        />
-                      ) : (
-                        filteredIncidents
-                          .filter((incident) => incident.serviceId === selectedService.id)
-                          .map((incident) => (
-                            <div className="incident-row" key={incident.id}>
-                              <div>
-                                <StatusBadge status={formatIncidentState(incident.state)} />
-                                <span>{incident.reason || "No reason recorded"}</span>
-                              </div>
-                              <span>{incident.instanceId}</span>
-                              <span>{formatTimestamp(incident.openedAt)}</span>
-                              <span>{incident.resolvedAt ? formatDuration(incident.durationSeconds) : "Open"}</span>
-                              <button
-                                disabled={incident.state !== "INCIDENT_STATE_OPEN" || resolvingIncidentId === incident.id}
-                                onClick={() => handleResolveIncident(incident.id)}
-                                type="button"
-                              >
-                                {resolvingIncidentId === incident.id ? "Resolving" : "Resolve"}
-                              </button>
-                              <button onClick={() => setSelectedIncidentId(incident.id)} type="button">
-                                Details
-                              </button>
-                            </div>
-                          ))
-                      )}
-                    </div>
-                  ) : null}
-
-                  {serviceTab === "events" ? (
-                    <div className="service-tab-panel scoped-list">
+                    </section>
+                    <div className="scoped-list">
+                      <h3>Recent activity</h3>
                       {selectedServiceEvents.length === 0 ? (
                         <EmptyState
-                          title="No service events"
-                          description="No recent changes have been recorded for this service in the selected scope."
+                          title="No recent activity"
+                          description="No events have been recorded for this service in the selected scope."
                         />
                       ) : (
-                        selectedServiceEvents.map((event) => (
-                          <div className="event-row timeline-row" key={event.id}>
-                            <time>{formatTimestamp(event.timestamp)}</time>
-                            <strong>{event.type}</strong>
-                            <span>{event.message}</span>
-                            <span>{event.resourceType}:{event.resourceId}</span>
-                            <span>{event.actor}</span>
+                        selectedServiceEvents.slice(0, 5).map((event) => (
+                          <div className="activity-row" key={event.id}>
+                            <time title={formatTimestamp(event.timestamp)}>
+                              {formatActivityTimestamp(event.timestamp)}
+                            </time>
+                            <div>
+                              <strong>{formatEventType(event.type)}</strong>
+                              <span>{event.message}</span>
+                            </div>
+                            <small>{event.resourceType}</small>
                           </div>
                         ))
                       )}
                     </div>
-                  ) : null}
-                </>
-              ) : (
-                <EmptyState
-                  title="Select a service"
-                  description="Choose a service from the catalog to inspect runtime, health, incidents, and events in one workspace."
-                />
-              )}
-            </div>
+                  </div>
+                ) : null}
 
-            {/*
+                {serviceTab === "runtime" ? (
+                  <div className="service-tab-panel">
+                    <div className="tab-toolbar">
+                      <div>
+                        <h3>Runtime</h3>
+                        <span>
+                          {selectedEnvironmentId
+                            ? currentEnvironmentName
+                            : "Grouped by environment"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddRuntime(true)}
+                      >
+                        {selectedEnvironmentDeployment
+                          ? "Add instance"
+                          : "Add runtime"}
+                      </button>
+                    </div>
+                    {selectedServiceDeployments.length === 0 ? (
+                      <EmptyState
+                        title="No runtime registered"
+                        description={`${selectedService.displayName || selectedService.name} exists in the catalog but has no runtime instance in this scope.`}
+                        action={
+                          <button
+                            type="button"
+                            onClick={() => setShowAddRuntime(true)}
+                          >
+                            Add runtime
+                          </button>
+                        }
+                      />
+                    ) : (
+                      selectedServiceDeployments.map((deployment) => {
+                        const deploymentInstances =
+                          selectedServiceInstances.filter(
+                            (instance) =>
+                              instance.deploymentId === deployment.id,
+                          );
+                        const deploymentIncident = incidents.some(
+                          (incident) =>
+                            incident.deploymentId === deployment.id &&
+                            incident.state === "INCIDENT_STATE_OPEN",
+                        );
+                        return (
+                          <section
+                            className="runtime-environment"
+                            key={deployment.id}
+                          >
+                            <div className="runtime-environment-heading">
+                              <div>
+                                <h3>
+                                  {environmentName(
+                                    environments,
+                                    deployment.environmentId,
+                                  )}
+                                </h3>
+                                <span>
+                                  {pluralize(
+                                    deploymentInstances.length,
+                                    "instance",
+                                  )}
+                                </span>
+                              </div>
+                              <StatusBadge
+                                status={
+                                  deploymentIncident ? "degraded" : "healthy"
+                                }
+                              />
+                            </div>
+                            {deploymentInstances.length === 0 ? (
+                              <EmptyState
+                                title="No instances"
+                                description="This deployment has no runtime targets yet."
+                                action={
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAddRuntime(true)}
+                                  >
+                                    Add instance
+                                  </button>
+                                }
+                              />
+                            ) : (
+                              deploymentInstances.map((instance) => {
+                                const instanceEndpoints =
+                                  selectedServiceEndpoints.filter(
+                                    (endpoint) =>
+                                      endpoint.instanceId === instance.id,
+                                  );
+                                const instanceChecks =
+                                  selectedServiceHealthChecks.filter(
+                                    (check) => check.instanceId === instance.id,
+                                  );
+                                const state = healthStateByInstanceId.get(
+                                  instance.id,
+                                );
+                                return (
+                                  <article
+                                    className="runtime-instance"
+                                    key={instance.id}
+                                  >
+                                    <div className="runtime-instance-header">
+                                      <div>
+                                        <strong>
+                                          {instance.address}:
+                                          {instance.port ||
+                                            primaryEndpointForInstance(
+                                              instanceEndpoints,
+                                              instance.id,
+                                            )?.port ||
+                                            "dynamic"}
+                                        </strong>
+                                        <span>{instance.name}</span>
+                                      </div>
+                                      <StatusBadge
+                                        status={
+                                          state?.currentState
+                                            ? formatHealthState(
+                                                state.currentState,
+                                              )
+                                            : instance.enabled
+                                              ? "enabled"
+                                              : "disabled"
+                                        }
+                                      />
+                                    </div>
+                                    <div className="runtime-nested">
+                                      <h4>Endpoints</h4>
+                                      {instanceEndpoints.length === 0 ? (
+                                        <p>No endpoints attached.</p>
+                                      ) : (
+                                        instanceEndpoints.map((endpoint) => (
+                                          <div
+                                            className="runtime-child-row"
+                                            key={endpoint.id}
+                                          >
+                                            <span>
+                                              {formatProtocol(
+                                                endpoint.protocol,
+                                              ).toUpperCase()}
+                                            </span>
+                                            <strong>
+                                              :{endpoint.port}
+                                              {endpoint.path || ""}
+                                            </strong>
+                                            <StatusBadge
+                                              status={
+                                                endpoint.enabled
+                                                  ? "enabled"
+                                                  : "disabled"
+                                              }
+                                            />
+                                          </div>
+                                        ))
+                                      )}
+                                      <h4>Health</h4>
+                                      {instanceChecks.length === 0 ? (
+                                        <p>No health check configured.</p>
+                                      ) : (
+                                        instanceChecks.map((check) => (
+                                          <div
+                                            className="runtime-child-row"
+                                            key={check.id}
+                                          >
+                                            <span>
+                                              {formatCheckType(check.type)}
+                                            </span>
+                                            <strong>
+                                              {check.name} / every{" "}
+                                              {check.intervalSeconds}s
+                                            </strong>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleRunHealthCheck(check.id)
+                                              }
+                                            >
+                                              Run check
+                                            </button>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </article>
+                                );
+                              })
+                            )}
+                          </section>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : null}
+
+                {serviceTab === "health" ? (
+                  <div className="service-tab-panel">
+                    <div className="availability-grid">
+                      <AvailabilityCard
+                        label="24 hours"
+                        summary={serviceAvailability.availability24h}
+                      />
+                      <AvailabilityCard
+                        label="7 days"
+                        summary={serviceAvailability.availability7d}
+                      />
+                      <AvailabilityCard
+                        label="30 days"
+                        summary={serviceAvailability.availability30d}
+                      />
+                    </div>
+                    <div className="scoped-list">
+                      <h3>Health checks</h3>
+                      {selectedServiceHealthChecks.length === 0 ? (
+                        <EmptyState
+                          title="No health checks"
+                          description="No monitoring configuration is attached to this service runtime yet."
+                        />
+                      ) : (
+                        selectedServiceHealthChecks.map((check) => (
+                          <div className="health-result-row" key={check.id}>
+                            <strong>{check.name}</strong>
+                            <span>{formatCheckType(check.type)}</span>
+                            <span>{check.intervalSeconds}s</span>
+                            <StatusBadge
+                              status={check.enabled ? "enabled" : "disabled"}
+                            />
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {serviceTab === "incidents" ? (
+                  <div className="service-tab-panel scoped-list">
+                    {filteredIncidents.filter(
+                      (incident) => incident.serviceId === selectedService.id,
+                    ).length === 0 ? (
+                      <EmptyState
+                        title="No service incidents"
+                        description="No incidents match this service and the current incident filters."
+                      />
+                    ) : (
+                      filteredIncidents
+                        .filter(
+                          (incident) =>
+                            incident.serviceId === selectedService.id,
+                        )
+                        .map((incident) => (
+                          <div className="incident-row" key={incident.id}>
+                            <div>
+                              <StatusBadge
+                                status={formatIncidentState(incident.state)}
+                              />
+                              <span>
+                                {incident.reason || "No reason recorded"}
+                              </span>
+                            </div>
+                            <span>{incident.instanceId}</span>
+                            <span>{formatTimestamp(incident.openedAt)}</span>
+                            <span>
+                              {incident.resolvedAt
+                                ? formatDuration(incident.durationSeconds)
+                                : "Open"}
+                            </span>
+                            <button
+                              disabled={
+                                incident.state !== "INCIDENT_STATE_OPEN" ||
+                                resolvingIncidentId === incident.id
+                              }
+                              onClick={() => handleResolveIncident(incident.id)}
+                              type="button"
+                            >
+                              {resolvingIncidentId === incident.id
+                                ? "Resolving"
+                                : "Resolve"}
+                            </button>
+                            <button
+                              onClick={() => setSelectedIncidentId(incident.id)}
+                              type="button"
+                            >
+                              Details
+                            </button>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                ) : null}
+
+                {serviceTab === "events" ? (
+                  <div className="service-tab-panel scoped-list">
+                    {selectedServiceEvents.length === 0 ? (
+                      <EmptyState
+                        title="No service events"
+                        description="No recent changes have been recorded for this service in the selected scope."
+                      />
+                    ) : (
+                      selectedServiceEvents.map((event) => (
+                        <div className="event-row timeline-row" key={event.id}>
+                          <time title={formatTimestamp(event.timestamp)}>
+                            {formatActivityTimestamp(event.timestamp)}
+                          </time>
+                          <strong>{formatEventType(event.type)}</strong>
+                          <span>{event.message}</span>
+                          <span>
+                            {event.resourceType}:{event.resourceId}
+                          </span>
+                          <span>{event.actor}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <EmptyState
+                title="Select a service"
+                description="Choose a service from the catalog to inspect runtime, health, incidents, and events in one workspace."
+              />
+            )}
+          </div>
+
+          {/*
             <div className="legacy-service-stack" aria-hidden="true">
 
             <div className="panel detail-panel">
@@ -1969,7 +2168,9 @@ function App() {
                             deployment.environmentId,
                           )}
                         </strong>
-                        <span>{deploymentInstances.length} instance(s)</span>
+                        <span>
+                          {pluralize(deploymentInstances.length, "instance")}
+                        </span>
                         <StatusBadge status={hasIncident ? "degraded" : "healthy"} />
                         <span>{deployment.tags?.version ?? "n/a"}</span>
                       </div>
@@ -2358,8 +2559,10 @@ function App() {
                 ) : (
                   selectedServiceEvents.slice(0, 8).map((event) => (
                     <div className="timeline-row" key={event.id}>
-                      <time>{formatTimestamp(event.timestamp)}</time>
-                      <strong>{event.type}</strong>
+                      <time title={formatTimestamp(event.timestamp)}>
+                        {formatActivityTimestamp(event.timestamp)}
+                      </time>
+                      <strong>{formatEventType(event.type)}</strong>
                       <span>{event.message}</span>
                       <small>{event.resourceType}</small>
                     </div>
@@ -2417,1525 +2620,1568 @@ function App() {
             </div>
             */}
 
-            {showCreateService ? (
-              <div aria-modal="true" className="modal-backdrop" role="dialog">
-                <form className="modal form-panel drawer-form" onSubmit={handleCreateService}>
-                  <div className="panel-heading">
-                    <h2>Create service</h2>
-                    <button type="button" onClick={() => setShowCreateService(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                  <label>
-                    Name
-                    <input
-                      required
-                      value={serviceForm.name}
-                      onChange={(event) =>
-                        setServiceForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Display name
-                    <input
-                      required
-                      value={serviceForm.displayName}
-                      onChange={(event) =>
-                        setServiceForm((current) => ({
-                          ...current,
-                          displayName: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Description
-                    <textarea
-                      value={serviceForm.description}
-                      onChange={(event) =>
-                        setServiceForm((current) => ({
-                          ...current,
-                          description: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <div className="drawer-actions">
-                    <button type="button" onClick={() => setShowCreateService(false)}>
-                      Cancel
-                    </button>
-                    <button disabled={savingService} type="submit">
-                      {savingService ? "Creating" : "Create service"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : null}
-
-            {showAddRuntime && selectedService ? (
-              <div aria-modal="true" className="modal-backdrop" role="dialog">
-                <form className="modal form-panel drawer-form" onSubmit={handleRegisterInstance}>
-                  <div className="panel-heading">
-                    <div>
-                      <h2>{selectedEnvironmentDeployment ? "Add instance" : "Add runtime"}</h2>
-                      <span>{selectedService.displayName || selectedService.name}</span>
-                    </div>
-                    <button type="button" onClick={() => setShowAddRuntime(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                  <div className="context-strip">
-                    <span>Service</span>
-                    <strong>{selectedService.name}</strong>
-                  </div>
-                  <label>
-                    Environment
-                    <select
-                      required
-                      value={registrationForm.environmentId}
-                      onChange={(event) =>
-                        setRegistrationForm((current) => ({
-                          ...current,
-                          environmentId: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Select environment</option>
-                      {environments.map((environment) => (
-                        <option key={environment.id} value={environment.id}>
-                          {environment.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="form-fields-grid">
-                    <label>
-                      Instance name
-                      <input
-                        required
-                        data-registration-instance-name
-                        value={registrationForm.instanceName}
-                        onChange={(event) =>
-                          setRegistrationForm((current) => ({
-                            ...current,
-                            instanceName: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      Address
-                      <input
-                        required
-                        value={registrationForm.address}
-                        onChange={(event) =>
-                          setRegistrationForm((current) => ({
-                            ...current,
-                            address: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    Description
-                    <input
-                      value={registrationForm.description}
-                      onChange={(event) =>
-                        setRegistrationForm((current) => ({
-                          ...current,
-                          description: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <details open={showRuntimeEndpoint} onToggle={(event) => setShowRuntimeEndpoint(event.currentTarget.open)}>
-                    <summary>Endpoint <span>Required by current registration API</span></summary>
-                    <div className="form-fields-grid">
-                      <label>
-                        Name
-                        <input
-                          required
-                          value={registrationForm.endpoints[0]?.name ?? ""}
-                          onChange={(event) => updateRegistrationEndpoint(0, { name: event.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Protocol
-                        <select
-                          value={registrationForm.endpoints[0]?.protocol ?? "PROTOCOL_HTTP"}
-                          onChange={(event) => updateRegistrationEndpoint(0, { protocol: event.target.value })}
-                        >
-                          <option value="PROTOCOL_HTTP">HTTP</option>
-                          <option value="PROTOCOL_HTTPS">HTTPS</option>
-                          <option value="PROTOCOL_GRPC">gRPC</option>
-                          <option value="PROTOCOL_TCP">TCP</option>
-                          <option value="PROTOCOL_UDP">UDP</option>
-                        </select>
-                      </label>
-                      <label>
-                        Port
-                        <input
-                          max="65535"
-                          min="1"
-                          required
-                          type="number"
-                          value={registrationForm.endpoints[0]?.port ?? 8080}
-                          onChange={(event) => updateRegistrationEndpoint(0, { port: Number(event.target.value) })}
-                        />
-                      </label>
-                      <label>
-                        Path
-                        <input
-                          value={registrationForm.endpoints[0]?.path ?? "/"}
-                          onChange={(event) => updateRegistrationEndpoint(0, { path: event.target.value })}
-                        />
-                      </label>
-                    </div>
-                  </details>
-                  <details
-                    open={showRuntimeHealth}
-                    onToggle={(event) => {
-                      setShowRuntimeHealth(event.currentTarget.open);
-                      setRegistrationForm((current) => ({
-                        ...current,
-                        configureHealth: event.currentTarget.open,
-                      }));
-                    }}
+          {showCreateService ? (
+            <div aria-modal="true" className="modal-backdrop" role="dialog">
+              <form
+                className="modal form-panel drawer-form"
+                onSubmit={handleCreateService}
+              >
+                <div className="panel-heading">
+                  <h2>Create service</h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateService(false)}
                   >
-                    <summary>Health monitoring <span>Optional</span></summary>
-                    <div className="form-fields-grid">
-                      <label>
-                        Check name
-                        <input
-                          value={registrationForm.healthName}
-                          onChange={(event) =>
-                            setRegistrationForm((current) => ({
-                              ...current,
-                              healthName: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      <label>
-                        Type
-                        <select
-                          value={registrationForm.healthType}
-                          onChange={(event) =>
-                            setRegistrationForm((current) => ({
-                              ...current,
-                              healthType: event.target.value,
-                            }))
-                          }
-                        >
-                          <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
-                          <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
-                          <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
-                          <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
-                          <option value="HEALTH_CHECK_TYPE_UDP">UDP</option>
-                        </select>
-                      </label>
-                      <label>
-                        Interval seconds
-                        <input
-                          min="1"
-                          type="number"
-                          value={registrationForm.healthIntervalSeconds}
-                          onChange={(event) =>
-                            setRegistrationForm((current) => ({
-                              ...current,
-                              healthIntervalSeconds: Number(event.target.value),
-                            }))
-                          }
-                        />
-                      </label>
-                      <label>
-                        Timeout seconds
-                        <input
-                          min="1"
-                          type="number"
-                          value={registrationForm.healthTimeoutSeconds}
-                          onChange={(event) =>
-                            setRegistrationForm((current) => ({
-                              ...current,
-                              healthTimeoutSeconds: Number(event.target.value),
-                            }))
-                          }
-                        />
-                      </label>
-                    </div>
-                  </details>
-                  <div className="drawer-actions">
-                    <button type="button" onClick={() => setShowAddRuntime(false)}>
-                      Cancel
-                    </button>
-                    <button disabled={savingRegistration} type="submit">
-                      {savingRegistration
-                        ? "Adding"
-                        : selectedEnvironmentDeployment
-                          ? "Add instance"
-                          : "Add runtime"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : null}
-          </section>
-        ) : activeView === "environments" ? (
-          <section className="content-grid environments-grid">
-            <PageHeader
-              title="Environments"
-              context={`${environments.length} environments`}
-              description="Runtime scopes used to filter services, deployments, incidents, alerts, and events."
-            />
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Environments</h2>
-                <span>
-                  {loading ? "Loading" : `${environments.length} total`}
-                </span>
-              </div>
-              <div className="table">
-                {environments.map((environment) => (
-                  <div className="table-row" key={environment.id}>
-                    <strong>{environment.name}</strong>
-                    <span>{environment.key}</span>
-                    <span>{environment.tier || "untiered"}</span>
-                    <StatusBadge
-                      status={environment.enabled ? "enabled" : "disabled"}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <form
-              className="panel form-panel"
-              onSubmit={handleCreateEnvironment}
-            >
-              <div className="panel-heading">
-                <h2>Create Environment</h2>
-              </div>
-              <label>
-                Key
-                <input
-                  required
-                  value={environmentForm.key}
-                  onChange={(event) =>
-                    setEnvironmentForm((current) => ({
-                      ...current,
-                      key: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Name
-                <input
-                  required
-                  value={environmentForm.name}
-                  onChange={(event) =>
-                    setEnvironmentForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Tier
-                <input
-                  value={environmentForm.tier}
-                  onChange={(event) =>
-                    setEnvironmentForm((current) => ({
-                      ...current,
-                      tier: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  value={environmentForm.description}
-                  onChange={(event) =>
-                    setEnvironmentForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <button disabled={savingEnvironment} type="submit">
-                {savingEnvironment ? "Creating" : "Create environment"}
-              </button>
-            </form>
-          </section>
-        ) : activeView === "health" ? (
-          <section className="content-grid">
-            <PageHeader
-              title="Health"
-              context={`${filteredHealthInstances.length} instances · ${healthChecks.filter((check) => check.enabled).length} enabled checks`}
-              description="Monitor unhealthy instances, recent check results, and manual execution from the current environment scope."
-            />
-            <div className="panel service-wide-panel">
-              <div className="panel-heading">
-                <h2>Global Health</h2>
-                <span>{selectedEnvironmentId ? "Filtered" : "Global"}</span>
-              </div>
-              <div className="metrics-grid">
-                <MetricCard
-                  label="Healthy"
-                  value={
-                    healthStates.filter(
-                      (state) => state.currentState === "HEALTH_STATE_HEALTHY",
-                    ).length
-                  }
-                  detail={`${healthStates.length} states loaded`}
-                />
-                <MetricCard
-                  label="Unhealthy"
-                  value={
-                    healthStates.filter(
-                      (state) =>
-                        state.currentState === "HEALTH_STATE_UNHEALTHY",
-                    ).length
-                  }
-                  detail={`${incidents.filter((incident) => incident.state === "INCIDENT_STATE_OPEN").length} open incidents`}
-                />
-                <MetricCard
-                  label="Unknown"
-                  value={Math.max(instances.length - healthStates.length, 0)}
-                  detail={`${instances.length} instances`}
-                />
-                <MetricCard
-                  label="Checks"
-                  value={healthChecks.length}
-                  detail={`${healthChecks.filter((check) => check.enabled).length} enabled`}
-                />
-              </div>
-            </div>
-
-            <div className="panel service-wide-panel">
-              <div className="panel-heading">
-                <h2>Instance Health</h2>
-                <span>{filteredHealthInstances.length} shown</span>
-              </div>
-              <div className="filter-bar">
-                <label>
-                  Status
-                  <select
-                    value={healthStatusFilter}
-                    onChange={(event) =>
-                      setHealthStatusFilter(event.target.value)
-                    }
-                  >
-                    <option value="all">All statuses</option>
-                    <option value="healthy">Healthy</option>
-                    <option value="unhealthy">Unhealthy</option>
-                    <option value="unknown">Unknown</option>
-                  </select>
-                </label>
-              </div>
-              <div className="table">
-                {filteredHealthInstances.length === 0 ? (
-                  <EmptyState
-                    title="No health targets"
-                    description="No runtime instances match the selected health filter."
-                  />
-                ) : (
-                  filteredHealthInstances.map((instance) => {
-                    const state = healthStateByInstanceId.get(instance.id);
-                    return (
-                      <div className="instance-row" key={instance.id}>
-                        <div>
-                          <strong>{instance.name}</strong>
-                          <span>{instance.id}</span>
-                        </div>
-                        <span>
-                          {state?.currentState
-                            ? (
-                                <StatusBadge
-                                  status={formatHealthState(state.currentState)}
-                                />
-                              )
-                            : "unknown"}
-                        </span>
-                        <span>
-                          {state
-                            ? `${state.consecutiveSuccesses} ok / ${state.consecutiveFailures} fail`
-                            : "No checks"}
-                        </span>
-                        <span>{formatTimestamp(state?.lastCheckTime)}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Health Checks</h2>
-                <span>
-                  {loading ? "Loading" : `${healthChecks.length} total`}
-                </span>
-              </div>
-              {healthChecks.length === 0 && !loading ? (
-                <EmptyState
-                  title="No health checks"
-                  description="Create a health check or register runtime with monitoring enabled to start tracking state."
-                />
-              ) : (
-                <div className="service-list">
-                  {healthChecks.map((check) => (
-                    <button
-                      className={
-                        check.id === selectedHealthCheckId
-                          ? "row selected"
-                          : "row"
-                      }
-                      key={check.id}
-                      onClick={() => handleSelectHealthCheck(check.id)}
-                      type="button"
-                    >
-                      <strong>{check.name}</strong>
-                      <span>
-                        {formatCheckType(check.type)} / {check.instanceId}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="panel detail-panel">
-              <div className="panel-heading">
-                <h2>Health Status</h2>
-                <button
-                  disabled={!selectedHealthCheck || runningHealthCheck}
-                  onClick={() => handleRunHealthCheck()}
-                  type="button"
-                >
-                  {runningHealthCheck ? "Running" : "Run check"}
-                </button>
-              </div>
-              {selectedHealthCheck ? (
-                <dl className="detail-list">
-                  <dt>ID</dt>
-                  <dd>{selectedHealthCheck.id}</dd>
-                  <dt>Type</dt>
-                  <dd>{formatCheckType(selectedHealthCheck.type)}</dd>
-                  <dt>Interval</dt>
-                  <dd>{selectedHealthCheck.intervalSeconds}s</dd>
-                  <dt>Timeout</dt>
-                  <dd>{selectedHealthCheck.timeoutSeconds}s</dd>
-                  <dt>State</dt>
-                  <dd>{latestState?.currentState ?? "Not loaded"}</dd>
-                  <dt>Counters</dt>
-                  <dd>
-                    {latestState
-                      ? `${latestState.consecutiveSuccesses} success / ${latestState.consecutiveFailures} failure`
-                      : "Not loaded"}
-                  </dd>
-                </dl>
-              ) : (
-                  <EmptyState
-                    title="Select a health check"
-                    description="Pick a check to inspect its configuration, counters, and recent execution results."
-                  />
-              )}
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Recent Results</h2>
-                <span>{healthResults.length} shown</span>
-              </div>
-              <div className="table">
-                {healthResults.length === 0 ? (
-                  <EmptyState
-                    title="No health results"
-                    description="Run this check manually or wait for scheduled execution to record a result."
-                  />
-                ) : (
-                  healthResults.map((result) => (
-                    <div className="health-result-row" key={result.id}>
-                      <strong>
-                        <StatusBadge
-                          status={result.success ? "healthy" : "failed"}
-                        />
-                      </strong>
-                      <span>
-                        {result.statusCode || result.errorType || "n/a"}
-                      </span>
-                      <span>{result.latencyMs ?? 0}ms</span>
-                      <span>{formatTimestamp(result.timestamp)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <form
-              className="panel form-panel"
-              onSubmit={handleCreateHealthCheck}
-            >
-              <div className="panel-heading">
-                <h2>Create Health Check</h2>
-              </div>
-              <label>
-                Instance ID
-                <input
-                  required
-                  value={healthForm.instanceId}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      instanceId: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Endpoint ID
-                <input
-                  value={healthForm.endpointId}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      endpointId: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Name
-                <input
-                  required
-                  value={healthForm.name}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Type
-                <select
-                  value={healthForm.type}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      type: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
-                  <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
-                  <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
-                  <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
-                </select>
-              </label>
-              <label>
-                Path
-                <input
-                  value={healthForm.path}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      path: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Expected status
-                <input
-                  value={healthForm.expectedStatus}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      expectedStatus: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Interval seconds
-                <input
-                  min="1"
-                  type="number"
-                  value={healthForm.intervalSeconds}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      intervalSeconds: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Timeout seconds
-                <input
-                  min="1"
-                  type="number"
-                  value={healthForm.timeoutSeconds}
-                  onChange={(event) =>
-                    setHealthForm((current) => ({
-                      ...current,
-                      timeoutSeconds: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <button disabled={savingHealthCheck} type="submit">
-                {savingHealthCheck ? "Creating" : "Create health check"}
-              </button>
-            </form>
-          </section>
-        ) : activeView === "incidents" ? (
-          <section className="content-grid incidents-grid">
-            <PageHeader
-              title="Incidents"
-              context={`${filteredIncidents.length} incidents · ${openIncidentCount} open`}
-              description="Triage active breakage, inspect impact, and resolve incidents without losing service context."
-            />
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Availability</h2>
-                <span>{selectedEnvironmentId ? "Filtered" : "Global"}</span>
-              </div>
-              <div className="availability-grid">
-                <AvailabilityCard
-                  label="24h"
-                  summary={availability.availability24h}
-                />
-                <AvailabilityCard
-                  label="7d"
-                  summary={availability.availability7d}
-                />
-                <AvailabilityCard
-                  label="30d"
-                  summary={availability.availability30d}
-                />
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Incidents</h2>
-                <span>{filteredIncidents.length} shown</span>
-              </div>
-              <div className="metrics-grid compact-metrics">
-                <MetricCard
-                  label="Open"
-                  value={
-                    incidents.filter(
-                      (incident) => incident.state === "INCIDENT_STATE_OPEN",
-                    ).length
-                  }
-                  detail="active incidents"
-                />
-                <MetricCard
-                  label="Resolved"
-                  value={
-                    incidents.filter(
-                      (incident) =>
-                        incident.state === "INCIDENT_STATE_RESOLVED",
-                    ).length
-                  }
-                  detail="history"
-                />
-              </div>
-              <div className="filter-bar">
-                <label>
-                  State
-                  <select
-                    value={incidentStateFilter}
-                    onChange={(event) =>
-                      setIncidentStateFilter(event.target.value)
-                    }
-                  >
-                    <option value="all">All incidents</option>
-                    <option value="open">Open</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </label>
-                <label>
-                  Search
-                  <input
-                    value={incidentSearch}
-                    onChange={(event) => setIncidentSearch(event.target.value)}
-                  />
-                </label>
-              </div>
-              <div className="table">
-                {filteredIncidents.length === 0 ? (
-                  <EmptyState
-                    title="No incidents match"
-                    description="No incidents match the current state and search filters."
-                  />
-                ) : (
-                  filteredIncidents.map((incident) => (
-                    <div className="incident-row" key={incident.id}>
-                      <div>
-                        <StatusBadge status={formatIncidentState(incident.state)} />
-                        <span>{incident.reason || "No reason recorded"}</span>
-                      </div>
-                      <ResourceLink
-                        onClick={() => {
-                          setSelectedServiceId(incident.serviceId);
-                          setActiveView("services");
-                        }}
-                      >
-                        {incident.serviceId || incident.instanceId}
-                      </ResourceLink>
-                      <span>{formatTimestamp(incident.openedAt)}</span>
-                      <span>
-                        {incident.resolvedAt
-                          ? formatDuration(incident.durationSeconds)
-                          : "Open"}
-                      </span>
-                      <button
-                        disabled={
-                          incident.state !== "INCIDENT_STATE_OPEN" ||
-                          resolvingIncidentId === incident.id
-                        }
-                        onClick={() => handleResolveIncident(incident.id)}
-                        type="button"
-                      >
-                        {resolvingIncidentId === incident.id
-                          ? "Resolving"
-                          : "Resolve"}
-                      </button>
-                      <button
-                        onClick={() => setSelectedIncidentId(incident.id)}
-                        type="button"
-                      >
-                        Details
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            {selectedIncident ? (
-              <div aria-modal="true" className="modal-backdrop" role="dialog">
-                <div className="modal">
-                  <div className="panel-heading">
-                    <h2>Incident Detail</h2>
-                    <button
-                      onClick={() => setSelectedIncidentId("")}
-                      type="button"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <dl className="detail-list">
-                    <dt>ID</dt>
-                    <dd>{selectedIncident.id}</dd>
-                    <dt>State</dt>
-                    <dd>
-                      <StatusBadge
-                        status={formatIncidentState(selectedIncident.state)}
-                      />
-                    </dd>
-                    <dt>Reason</dt>
-                    <dd>{selectedIncident.reason || "None"}</dd>
-                    <dt>Impact</dt>
-                    <dd>{selectedIncident.impactSummary || "None"}</dd>
-                    <dt>Service</dt>
-                    <dd>
-                      <ResourceLink
-                        onClick={() => {
-                          setSelectedServiceId(selectedIncident.serviceId);
-                          setSelectedIncidentId("");
-                          setActiveView("services");
-                        }}
-                      >
-                        {selectedIncident.serviceId}
-                      </ResourceLink>
-                    </dd>
-                    <dt>Instance</dt>
-                    <dd>{selectedIncident.instanceId}</dd>
-                    <dt>Opened</dt>
-                    <dd>{formatTimestamp(selectedIncident.openedAt)}</dd>
-                    <dt>Resolved</dt>
-                    <dd>{formatTimestamp(selectedIncident.resolvedAt)}</dd>
-                    <dt>Duration</dt>
-                    <dd>{formatDuration(selectedIncident.durationSeconds)}</dd>
-                    <dt>Metadata</dt>
-                    <dd>{formatMap(selectedIncident.metadata)}</dd>
-                  </dl>
-                </div>
-              </div>
-            ) : null}
-          </section>
-        ) : activeView === "alerts" ? (
-          <section className="content-grid alerts-grid">
-            <PageHeader
-              title="Alerts"
-              context={`${alertPolicies.length} policies · ${notificationChannels.length} channels`}
-              description="Keep notification channels separate from policies so routing and triggers stay clear."
-            />
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Alert Policies</h2>
-                <span>{alertPolicies.length} total</span>
-              </div>
-              <div className="table">
-                {alertPolicies.length === 0 ? (
-                  <EmptyState
-                    title="No alert policies"
-                    description="Create a policy to route health transitions or incident changes to a notification channel."
-                  />
-                ) : (
-                  alertPolicies.map((policy) => (
-                    <div className="policy-row" key={policy.id}>
-                      <div>
-                        <StatusBadge
-                          status={policy.enabled ? "enabled" : "disabled"}
-                        />
-                        <span>{formatPolicyScope(policy)}</span>
-                      </div>
-                      <span>
-                        {policy.notifyOn?.join(", ") || "No triggers"}
-                      </span>
-                      <span>{policy.cooldownMinutes}m cooldown</span>
-                      <span>{policy.channelIds?.length ?? 0} channels</span>
-                      <button onClick={() => editPolicy(policy)} type="button">
-                        Edit
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Notification Channels</h2>
-                <span>{notificationChannels.length} total</span>
-              </div>
-              <div className="table">
-                {notificationChannels.length === 0 ? (
-                  <EmptyState
-                    title="No notification channels"
-                    description="Add a webhook or email destination before assigning policies."
-                  />
-                ) : (
-                  notificationChannels.map((channel) => (
-                    <div className="channel-row" key={channel.id}>
-                      <div>
-                        <strong>{channel.name}</strong>
-                        <span>{channel.type}</span>
-                      </div>
-                      <span>{channel.description || "No description"}</span>
-                      <StatusBadge
-                        status={channel.enabled ? "enabled" : "disabled"}
-                      />
-                      <button
-                        disabled={
-                          !channel.enabled || testingChannelId === channel.id
-                        }
-                        onClick={() => handleTestChannel(channel.id)}
-                        type="button"
-                      >
-                        {testingChannelId === channel.id ? "Testing" : "Test"}
-                      </button>
-                      <button
-                        onClick={() => editChannel(channel)}
-                        type="button"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <form className="panel form-panel" onSubmit={handleCreatePolicy}>
-              <div className="panel-heading">
-                <h2>
-                  {editingPolicyId
-                    ? "Edit Alert Policy"
-                    : "Create Alert Policy"}
-                </h2>
-                {editingPolicyId ? (
-                  <button onClick={cancelPolicyEdit} type="button">
                     Cancel
                   </button>
-                ) : null}
-              </div>
-              <label>
-                Environment
-                <select
-                  value={policyForm.environmentId || selectedEnvironmentId}
-                  onChange={(event) =>
-                    setPolicyForm((current) => ({
-                      ...current,
-                      environmentId: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Select environment</option>
-                  {environments.map((environment) => (
-                    <option key={environment.id} value={environment.id}>
-                      {environment.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Deployment ID
-                <input
-                  value={policyForm.deploymentId}
-                  onChange={(event) =>
-                    setPolicyForm((current) => ({
-                      ...current,
-                      deploymentId: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Notify on
-                <input
-                  required
-                  value={policyForm.notifyOn}
-                  onChange={(event) =>
-                    setPolicyForm((current) => ({
-                      ...current,
-                      notifyOn: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Channel IDs
-                <input
-                  required
-                  value={policyForm.channelIds}
-                  onChange={(event) =>
-                    setPolicyForm((current) => ({
-                      ...current,
-                      channelIds: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Cooldown minutes
-                <input
-                  min="0"
-                  type="number"
-                  value={policyForm.cooldownMinutes}
-                  onChange={(event) =>
-                    setPolicyForm((current) => ({
-                      ...current,
-                      cooldownMinutes: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <label className="checkbox-label">
-                <input
-                  checked={policyForm.sendRecoveryNotification}
-                  type="checkbox"
-                  onChange={(event) =>
-                    setPolicyForm((current) => ({
-                      ...current,
-                      sendRecoveryNotification: event.target.checked,
-                    }))
-                  }
-                />
-                Send recovery notification
-              </label>
-              <button disabled={savingPolicy} type="submit">
-                {savingPolicy
-                  ? "Saving"
-                  : editingPolicyId
-                    ? "Save policy"
-                    : "Create policy"}
-              </button>
-            </form>
-
-            <form className="panel form-panel" onSubmit={handleCreateChannel}>
-              <div className="panel-heading">
-                <h2>
-                  {editingChannelId
-                    ? "Edit Notification Channel"
-                    : "Create Notification Channel"}
-                </h2>
-                {editingChannelId ? (
-                  <button onClick={cancelChannelEdit} type="button">
-                    Cancel
-                  </button>
-                ) : null}
-              </div>
-              <label>
-                Type
-                <select
-                  value={channelForm.type}
-                  onChange={(event) =>
-                    setChannelForm((current) => ({
-                      ...current,
-                      type: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="webhook">Webhook</option>
-                  <option value="email">Email</option>
-                </select>
-              </label>
-              <label>
-                Name
-                <input
-                  required
-                  value={channelForm.name}
-                  onChange={(event) =>
-                    setChannelForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  value={channelForm.description}
-                  onChange={(event) =>
-                    setChannelForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              {channelForm.type === "webhook" ? (
+                </div>
                 <label>
-                  Webhook URL
+                  Name
                   <input
                     required
-                    value={channelForm.url}
+                    value={serviceForm.name}
                     onChange={(event) =>
-                      setChannelForm((current) => ({
+                      setServiceForm((current) => ({
                         ...current,
-                        url: event.target.value,
+                        name: event.target.value,
                       }))
                     }
                   />
                 </label>
-              ) : (
+                <label>
+                  Display name
+                  <input
+                    required
+                    value={serviceForm.displayName}
+                    onChange={(event) =>
+                      setServiceForm((current) => ({
+                        ...current,
+                        displayName: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    value={serviceForm.description}
+                    onChange={(event) =>
+                      setServiceForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <div className="drawer-actions">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateService(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button disabled={savingService} type="submit">
+                    {savingService ? "Creating" : "Create service"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+
+          {showAddRuntime && selectedService ? (
+            <div aria-modal="true" className="modal-backdrop" role="dialog">
+              <form
+                className="modal form-panel drawer-form"
+                onSubmit={handleRegisterInstance}
+              >
+                <div className="panel-heading">
+                  <div>
+                    <h2>
+                      {selectedEnvironmentDeployment
+                        ? "Add instance"
+                        : "Add runtime"}
+                    </h2>
+                    <span>
+                      {selectedService.displayName || selectedService.name}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRuntime(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="context-strip">
+                  <span>Service</span>
+                  <strong>{selectedService.name}</strong>
+                </div>
+                <label>
+                  Environment
+                  <select
+                    required
+                    value={registrationForm.environmentId}
+                    onChange={(event) =>
+                      setRegistrationForm((current) => ({
+                        ...current,
+                        environmentId: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Select environment</option>
+                    {environments.map((environment) => (
+                      <option key={environment.id} value={environment.id}>
+                        {environment.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <div className="form-fields-grid">
                   <label>
-                    SMTP host
+                    Instance name
                     <input
                       required
-                      value={channelForm.smtpHost}
+                      data-registration-instance-name
+                      value={registrationForm.instanceName}
                       onChange={(event) =>
-                        setChannelForm((current) => ({
+                        setRegistrationForm((current) => ({
                           ...current,
-                          smtpHost: event.target.value,
+                          instanceName: event.target.value,
                         }))
                       }
                     />
                   </label>
                   <label>
-                    SMTP port
+                    Address
                     <input
                       required
-                      value={channelForm.smtpPort}
+                      value={registrationForm.address}
                       onChange={(event) =>
-                        setChannelForm((current) => ({
+                        setRegistrationForm((current) => ({
                           ...current,
-                          smtpPort: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    From
-                    <input
-                      required
-                      value={channelForm.from}
-                      onChange={(event) =>
-                        setChannelForm((current) => ({
-                          ...current,
-                          from: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    To
-                    <input
-                      required
-                      value={channelForm.to}
-                      onChange={(event) =>
-                        setChannelForm((current) => ({
-                          ...current,
-                          to: event.target.value,
+                          address: event.target.value,
                         }))
                       }
                     />
                   </label>
                 </div>
-              )}
-              <button disabled={savingChannel} type="submit">
-                {savingChannel
-                  ? "Saving"
-                  : editingChannelId
-                    ? "Save channel"
-                    : "Create channel"}
-              </button>
-            </form>
-          </section>
-        ) : activeView === "security" ? (
-          <section className="content-grid alerts-grid">
-            <PageHeader
-              title="Security"
-              context={authToken ? "Authenticated session" : "No active token"}
-              description="Manage users, API tokens, and session access without exposing secrets in normal lists."
-            />
-            <form className="panel form-panel" onSubmit={handleLogin}>
-              <div className="panel-heading">
-                <h2>Session</h2>
-                <span>{authToken ? "Token active" : "Not signed in"}</span>
-              </div>
-              <label>
-                Username
-                <input
-                  value={loginForm.username}
-                  onChange={(event) =>
-                    setLoginForm((current) => ({
-                      ...current,
-                      username: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={loginForm.password}
-                  onChange={(event) =>
-                    setLoginForm((current) => ({
-                      ...current,
-                      password: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <div className="button-row">
-                <button type="submit">Sign in</button>
-                <button type="button" onClick={handleLogout}>
-                  Sign out
-                </button>
-              </div>
-            </form>
-
-            <form className="panel form-panel" onSubmit={handleCreateUser}>
-              <div className="panel-heading">
-                <h2>Users</h2>
-                <button
-                  type="button"
-                  onClick={() =>
-                    loadSecurityData().catch((err: unknown) =>
-                      setError(
-                        err instanceof Error
-                          ? err.message
-                          : "Failed to load users",
-                      ),
-                    )
-                  }
-                >
-                  Refresh
-                </button>
-              </div>
-              <div className="table compact-table">
-                {users.length === 0 ? (
-                  <EmptyState
-                    title="No users loaded"
-                    description="Refresh security data or sign in with an account that can list users."
+                <label>
+                  Description
+                  <input
+                    value={registrationForm.description}
+                    onChange={(event) =>
+                      setRegistrationForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
                   />
-                ) : (
-                  users.map((user) => (
-                    <div className="table-row" key={user.id}>
-                      <strong>{user.username}</strong>
-                      <span>{user.role}</span>
-                      <span>{user.email}</span>
-                      <StatusBadge
-                        status={user.enabled ? "enabled" : "disabled"}
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-              <label>
-                Username
-                <input
-                  required
-                  value={userForm.username}
-                  onChange={(event) =>
-                    setUserForm((current) => ({
-                      ...current,
-                      username: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Email
-                <input
-                  required
-                  type="email"
-                  value={userForm.email}
-                  onChange={(event) =>
-                    setUserForm((current) => ({
-                      ...current,
-                      email: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Display name
-                <input
-                  required
-                  value={userForm.displayName}
-                  onChange={(event) =>
-                    setUserForm((current) => ({
-                      ...current,
-                      displayName: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  required
-                  type="password"
-                  value={userForm.password}
-                  onChange={(event) =>
-                    setUserForm((current) => ({
-                      ...current,
-                      password: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Role
-                <select
-                  value={userForm.role}
-                  onChange={(event) =>
-                    setUserForm((current) => ({
-                      ...current,
-                      role: event.target.value,
-                    }))
+                </label>
+                <details
+                  open={showRuntimeEndpoint}
+                  onToggle={(event) =>
+                    setShowRuntimeEndpoint(event.currentTarget.open)
                   }
                 >
-                  <option value="Administrator">Administrator</option>
-                  <option value="Operator">Operator</option>
-                  <option value="Viewer">Viewer</option>
-                  <option value="Automation">Automation</option>
-                </select>
-              </label>
-              <button type="submit">Create user</button>
-            </form>
-
-            <form className="panel form-panel" onSubmit={handleCreateApiToken}>
-              <div className="panel-heading">
-                <h2>API Tokens</h2>
-                <span>{apiTokens.length} loaded</span>
-              </div>
-              <label>
-                User
-                <select
-                  required
-                  value={tokenForm.userId}
-                  onChange={(event) => {
-                    const userId = event.target.value;
-                    setTokenForm((current) => ({ ...current, userId }));
-                    loadSecurityData(userId).catch((err: unknown) =>
-                      setError(
-                        err instanceof Error
-                          ? err.message
-                          : "Failed to load tokens",
-                      ),
-                    );
+                  <summary>
+                    Endpoint <span>Required by current registration API</span>
+                  </summary>
+                  <div className="form-fields-grid">
+                    <label>
+                      Name
+                      <input
+                        required
+                        value={registrationForm.endpoints[0]?.name ?? ""}
+                        onChange={(event) =>
+                          updateRegistrationEndpoint(0, {
+                            name: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Protocol
+                      <select
+                        value={
+                          registrationForm.endpoints[0]?.protocol ??
+                          "PROTOCOL_HTTP"
+                        }
+                        onChange={(event) =>
+                          updateRegistrationEndpoint(0, {
+                            protocol: event.target.value,
+                          })
+                        }
+                      >
+                        <option value="PROTOCOL_HTTP">HTTP</option>
+                        <option value="PROTOCOL_HTTPS">HTTPS</option>
+                        <option value="PROTOCOL_GRPC">gRPC</option>
+                        <option value="PROTOCOL_TCP">TCP</option>
+                        <option value="PROTOCOL_UDP">UDP</option>
+                      </select>
+                    </label>
+                    <label>
+                      Port
+                      <input
+                        max="65535"
+                        min="1"
+                        required
+                        type="number"
+                        value={registrationForm.endpoints[0]?.port ?? 8080}
+                        onChange={(event) =>
+                          updateRegistrationEndpoint(0, {
+                            port: Number(event.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Path
+                      <input
+                        value={registrationForm.endpoints[0]?.path ?? "/"}
+                        onChange={(event) =>
+                          updateRegistrationEndpoint(0, {
+                            path: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                </details>
+                <details
+                  open={showRuntimeHealth}
+                  onToggle={(event) => {
+                    setShowRuntimeHealth(event.currentTarget.open);
+                    setRegistrationForm((current) => ({
+                      ...current,
+                      configureHealth: event.currentTarget.open,
+                    }));
                   }}
                 >
-                  <option value="">Select user</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.username}
+                  <summary>
+                    Health monitoring <span>Optional</span>
+                  </summary>
+                  <div className="form-fields-grid">
+                    <label>
+                      Check name
+                      <input
+                        value={registrationForm.healthName}
+                        onChange={(event) =>
+                          setRegistrationForm((current) => ({
+                            ...current,
+                            healthName: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Type
+                      <select
+                        value={registrationForm.healthType}
+                        onChange={(event) =>
+                          setRegistrationForm((current) => ({
+                            ...current,
+                            healthType: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
+                        <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
+                        <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
+                        <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
+                        <option value="HEALTH_CHECK_TYPE_UDP">UDP</option>
+                      </select>
+                    </label>
+                    <label>
+                      Interval seconds
+                      <input
+                        min="1"
+                        type="number"
+                        value={registrationForm.healthIntervalSeconds}
+                        onChange={(event) =>
+                          setRegistrationForm((current) => ({
+                            ...current,
+                            healthIntervalSeconds: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Timeout seconds
+                      <input
+                        min="1"
+                        type="number"
+                        value={registrationForm.healthTimeoutSeconds}
+                        onChange={(event) =>
+                          setRegistrationForm((current) => ({
+                            ...current,
+                            healthTimeoutSeconds: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </details>
+                <div className="drawer-actions">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRuntime(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button disabled={savingRegistration} type="submit">
+                    {savingRegistration
+                      ? "Adding"
+                      : selectedEnvironmentDeployment
+                        ? "Add instance"
+                        : "Add runtime"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+        </section>
+      ) : activeView === "environments" ? (
+        <section className="content-grid environments-grid">
+          <PageHeader
+            title="Environments"
+            context={`${environments.length} environments`}
+            description="Runtime scopes used to filter services, deployments, incidents, alerts, and events."
+          />
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Environments</h2>
+              <span>
+                {loading ? "Loading" : `${environments.length} total`}
+              </span>
+            </div>
+            <div className="table">
+              {environments.map((environment) => (
+                <div className="table-row" key={environment.id}>
+                  <strong>{environment.name}</strong>
+                  <span>{environment.key}</span>
+                  <span>{environment.tier || "untiered"}</span>
+                  <StatusBadge
+                    status={environment.enabled ? "enabled" : "disabled"}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <form className="panel form-panel" onSubmit={handleCreateEnvironment}>
+            <div className="panel-heading">
+              <h2>Create Environment</h2>
+            </div>
+            <label>
+              Key
+              <input
+                required
+                value={environmentForm.key}
+                onChange={(event) =>
+                  setEnvironmentForm((current) => ({
+                    ...current,
+                    key: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Name
+              <input
+                required
+                value={environmentForm.name}
+                onChange={(event) =>
+                  setEnvironmentForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Tier
+              <input
+                value={environmentForm.tier}
+                onChange={(event) =>
+                  setEnvironmentForm((current) => ({
+                    ...current,
+                    tier: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Description
+              <textarea
+                value={environmentForm.description}
+                onChange={(event) =>
+                  setEnvironmentForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <button disabled={savingEnvironment} type="submit">
+              {savingEnvironment ? "Creating" : "Create environment"}
+            </button>
+          </form>
+        </section>
+      ) : activeView === "health" ? (
+        <section className="content-grid">
+          <PageHeader
+            title="Health"
+            context={`${filteredHealthInstances.length} instances · ${healthChecks.filter((check) => check.enabled).length} enabled checks`}
+            description="Monitor unhealthy instances, recent check results, and manual execution from the current environment scope."
+          />
+          <div className="panel service-wide-panel">
+            <div className="panel-heading">
+              <h2>Global Health</h2>
+              <span>{selectedEnvironmentId ? "Filtered" : "Global"}</span>
+            </div>
+            <div className="metrics-grid">
+              <MetricCard
+                label="Healthy"
+                value={
+                  healthStates.filter(
+                    (state) => state.currentState === "HEALTH_STATE_HEALTHY",
+                  ).length
+                }
+                detail={`${healthStates.length} states loaded`}
+              />
+              <MetricCard
+                label="Unhealthy"
+                value={
+                  healthStates.filter(
+                    (state) => state.currentState === "HEALTH_STATE_UNHEALTHY",
+                  ).length
+                }
+                detail={`${incidents.filter((incident) => incident.state === "INCIDENT_STATE_OPEN").length} open incidents`}
+              />
+              <MetricCard
+                label="Unknown"
+                value={Math.max(instances.length - healthStates.length, 0)}
+                detail={`${instances.length} instances`}
+              />
+              <MetricCard
+                label="Checks"
+                value={healthChecks.length}
+                detail={`${healthChecks.filter((check) => check.enabled).length} enabled`}
+              />
+            </div>
+          </div>
+
+          <div className="panel service-wide-panel">
+            <div className="panel-heading">
+              <h2>Instance Health</h2>
+              <span>{filteredHealthInstances.length} shown</span>
+            </div>
+            <div className="filter-bar">
+              <label>
+                Status
+                <select
+                  value={healthStatusFilter}
+                  onChange={(event) =>
+                    setHealthStatusFilter(event.target.value)
+                  }
+                >
+                  <option value="all">All statuses</option>
+                  <option value="healthy">Healthy</option>
+                  <option value="unhealthy">Unhealthy</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+              </label>
+            </div>
+            <div className="table">
+              {filteredHealthInstances.length === 0 ? (
+                <EmptyState
+                  title="No health targets"
+                  description="No runtime instances match the selected health filter."
+                />
+              ) : (
+                filteredHealthInstances.map((instance) => {
+                  const state = healthStateByInstanceId.get(instance.id);
+                  return (
+                    <div className="instance-row" key={instance.id}>
+                      <div>
+                        <strong>{instance.name}</strong>
+                        <span>{instance.id}</span>
+                      </div>
+                      <span>
+                        {state?.currentState ? (
+                          <StatusBadge
+                            status={formatHealthState(state.currentState)}
+                          />
+                        ) : (
+                          "unknown"
+                        )}
+                      </span>
+                      <span>
+                        {state
+                          ? `${state.consecutiveSuccesses} ok / ${state.consecutiveFailures} fail`
+                          : "No checks"}
+                      </span>
+                      <span>{formatTimestamp(state?.lastCheckTime)}</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Health Checks</h2>
+              <span>
+                {loading ? "Loading" : `${healthChecks.length} total`}
+              </span>
+            </div>
+            {healthChecks.length === 0 && !loading ? (
+              <EmptyState
+                title="No health checks"
+                description="Create a health check or register runtime with monitoring enabled to start tracking state."
+              />
+            ) : (
+              <div className="service-list">
+                {healthChecks.map((check) => (
+                  <button
+                    className={
+                      check.id === selectedHealthCheckId
+                        ? "row selected"
+                        : "row"
+                    }
+                    key={check.id}
+                    onClick={() => handleSelectHealthCheck(check.id)}
+                    type="button"
+                  >
+                    <strong>{check.name}</strong>
+                    <span>
+                      {formatCheckType(check.type)} / {check.instanceId}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="panel detail-panel">
+            <div className="panel-heading">
+              <h2>Health Status</h2>
+              <button
+                disabled={!selectedHealthCheck || runningHealthCheck}
+                onClick={() => handleRunHealthCheck()}
+                type="button"
+              >
+                {runningHealthCheck ? "Running" : "Run check"}
+              </button>
+            </div>
+            {selectedHealthCheck ? (
+              <dl className="detail-list">
+                <dt>ID</dt>
+                <dd>{selectedHealthCheck.id}</dd>
+                <dt>Type</dt>
+                <dd>{formatCheckType(selectedHealthCheck.type)}</dd>
+                <dt>Interval</dt>
+                <dd>{selectedHealthCheck.intervalSeconds}s</dd>
+                <dt>Timeout</dt>
+                <dd>{selectedHealthCheck.timeoutSeconds}s</dd>
+                <dt>State</dt>
+                <dd>{latestState?.currentState ?? "Not loaded"}</dd>
+                <dt>Counters</dt>
+                <dd>
+                  {latestState
+                    ? `${latestState.consecutiveSuccesses} success / ${latestState.consecutiveFailures} failure`
+                    : "Not loaded"}
+                </dd>
+              </dl>
+            ) : (
+              <EmptyState
+                title="Select a health check"
+                description="Pick a check to inspect its configuration, counters, and recent execution results."
+              />
+            )}
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Recent Results</h2>
+              <span>{healthResults.length} shown</span>
+            </div>
+            <div className="table">
+              {healthResults.length === 0 ? (
+                <EmptyState
+                  title="No health results"
+                  description="Run this check manually or wait for scheduled execution to record a result."
+                />
+              ) : (
+                healthResults.map((result) => (
+                  <div className="health-result-row" key={result.id}>
+                    <strong>
+                      <StatusBadge
+                        status={result.success ? "healthy" : "failed"}
+                      />
+                    </strong>
+                    <span>
+                      {result.statusCode || result.errorType || "n/a"}
+                    </span>
+                    <span>{result.latencyMs ?? 0}ms</span>
+                    <span>{formatTimestamp(result.timestamp)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <form className="panel form-panel" onSubmit={handleCreateHealthCheck}>
+            <div className="panel-heading">
+              <h2>Create Health Check</h2>
+            </div>
+            <label>
+              Instance ID
+              <input
+                required
+                value={healthForm.instanceId}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    instanceId: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Endpoint ID
+              <input
+                value={healthForm.endpointId}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    endpointId: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Name
+              <input
+                required
+                value={healthForm.name}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Type
+              <select
+                value={healthForm.type}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    type: event.target.value,
+                  }))
+                }
+              >
+                <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
+                <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
+                <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
+                <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
+              </select>
+            </label>
+            <label>
+              Path
+              <input
+                value={healthForm.path}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    path: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Expected status
+              <input
+                value={healthForm.expectedStatus}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    expectedStatus: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Interval seconds
+              <input
+                min="1"
+                type="number"
+                value={healthForm.intervalSeconds}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    intervalSeconds: Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Timeout seconds
+              <input
+                min="1"
+                type="number"
+                value={healthForm.timeoutSeconds}
+                onChange={(event) =>
+                  setHealthForm((current) => ({
+                    ...current,
+                    timeoutSeconds: Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+            <button disabled={savingHealthCheck} type="submit">
+              {savingHealthCheck ? "Creating" : "Create health check"}
+            </button>
+          </form>
+        </section>
+      ) : activeView === "incidents" ? (
+        <section className="content-grid incidents-grid">
+          <PageHeader
+            title="Incidents"
+            context={`${filteredIncidents.length} incidents · ${openIncidentCount} open`}
+            description="Triage active breakage, inspect impact, and resolve incidents without losing service context."
+          />
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Availability</h2>
+              <span>{selectedEnvironmentId ? "Filtered" : "Global"}</span>
+            </div>
+            <div className="availability-grid">
+              <AvailabilityCard
+                label="24h"
+                summary={availability.availability24h}
+              />
+              <AvailabilityCard
+                label="7d"
+                summary={availability.availability7d}
+              />
+              <AvailabilityCard
+                label="30d"
+                summary={availability.availability30d}
+              />
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Incidents</h2>
+              <span>{filteredIncidents.length} shown</span>
+            </div>
+            <div className="metrics-grid compact-metrics">
+              <MetricCard
+                label="Open"
+                value={
+                  incidents.filter(
+                    (incident) => incident.state === "INCIDENT_STATE_OPEN",
+                  ).length
+                }
+                detail="active incidents"
+              />
+              <MetricCard
+                label="Resolved"
+                value={
+                  incidents.filter(
+                    (incident) => incident.state === "INCIDENT_STATE_RESOLVED",
+                  ).length
+                }
+                detail="history"
+              />
+            </div>
+            <div className="filter-bar">
+              <label>
+                State
+                <select
+                  value={incidentStateFilter}
+                  onChange={(event) =>
+                    setIncidentStateFilter(event.target.value)
+                  }
+                >
+                  <option value="all">All incidents</option>
+                  <option value="open">Open</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </label>
+              <label>
+                Search
+                <input
+                  value={incidentSearch}
+                  onChange={(event) => setIncidentSearch(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="table">
+              {filteredIncidents.length === 0 ? (
+                <EmptyState
+                  title="No incidents match"
+                  description="No incidents match the current state and search filters."
+                />
+              ) : (
+                filteredIncidents.map((incident) => (
+                  <div className="incident-row" key={incident.id}>
+                    <div>
+                      <StatusBadge
+                        status={formatIncidentState(incident.state)}
+                      />
+                      <span>{incident.reason || "No reason recorded"}</span>
+                    </div>
+                    <ResourceLink
+                      onClick={() => {
+                        setSelectedServiceId(incident.serviceId);
+                        setActiveView("services");
+                      }}
+                    >
+                      {incident.serviceId || incident.instanceId}
+                    </ResourceLink>
+                    <span>{formatTimestamp(incident.openedAt)}</span>
+                    <span>
+                      {incident.resolvedAt
+                        ? formatDuration(incident.durationSeconds)
+                        : "Open"}
+                    </span>
+                    <button
+                      disabled={
+                        incident.state !== "INCIDENT_STATE_OPEN" ||
+                        resolvingIncidentId === incident.id
+                      }
+                      onClick={() => handleResolveIncident(incident.id)}
+                      type="button"
+                    >
+                      {resolvingIncidentId === incident.id
+                        ? "Resolving"
+                        : "Resolve"}
+                    </button>
+                    <button
+                      onClick={() => setSelectedIncidentId(incident.id)}
+                      type="button"
+                    >
+                      Details
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          {selectedIncident ? (
+            <div aria-modal="true" className="modal-backdrop" role="dialog">
+              <div className="modal">
+                <div className="panel-heading">
+                  <h2>Incident Detail</h2>
+                  <button
+                    onClick={() => setSelectedIncidentId("")}
+                    type="button"
+                  >
+                    Close
+                  </button>
+                </div>
+                <dl className="detail-list">
+                  <dt>ID</dt>
+                  <dd>{selectedIncident.id}</dd>
+                  <dt>State</dt>
+                  <dd>
+                    <StatusBadge
+                      status={formatIncidentState(selectedIncident.state)}
+                    />
+                  </dd>
+                  <dt>Reason</dt>
+                  <dd>{selectedIncident.reason || "None"}</dd>
+                  <dt>Impact</dt>
+                  <dd>{selectedIncident.impactSummary || "None"}</dd>
+                  <dt>Service</dt>
+                  <dd>
+                    <ResourceLink
+                      onClick={() => {
+                        setSelectedServiceId(selectedIncident.serviceId);
+                        setSelectedIncidentId("");
+                        setActiveView("services");
+                      }}
+                    >
+                      {selectedIncident.serviceId}
+                    </ResourceLink>
+                  </dd>
+                  <dt>Instance</dt>
+                  <dd>{selectedIncident.instanceId}</dd>
+                  <dt>Opened</dt>
+                  <dd>{formatTimestamp(selectedIncident.openedAt)}</dd>
+                  <dt>Resolved</dt>
+                  <dd>{formatTimestamp(selectedIncident.resolvedAt)}</dd>
+                  <dt>Duration</dt>
+                  <dd>{formatDuration(selectedIncident.durationSeconds)}</dd>
+                  <dt>Metadata</dt>
+                  <dd>{formatMap(selectedIncident.metadata)}</dd>
+                </dl>
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : activeView === "alerts" ? (
+        <section className="content-grid alerts-grid">
+          <PageHeader
+            title="Alerts"
+            context={`${alertPolicies.length} policies · ${notificationChannels.length} channels`}
+            description="Keep notification channels separate from policies so routing and triggers stay clear."
+          />
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Alert Policies</h2>
+              <span>{alertPolicies.length} total</span>
+            </div>
+            <div className="table">
+              {alertPolicies.length === 0 ? (
+                <EmptyState
+                  title="No alert policies"
+                  description="Create a policy to route health transitions or incident changes to a notification channel."
+                />
+              ) : (
+                alertPolicies.map((policy) => (
+                  <div className="policy-row" key={policy.id}>
+                    <div>
+                      <StatusBadge
+                        status={policy.enabled ? "enabled" : "disabled"}
+                      />
+                      <span>{formatPolicyScope(policy)}</span>
+                    </div>
+                    <span>{policy.notifyOn?.join(", ") || "No triggers"}</span>
+                    <span>{policy.cooldownMinutes}m cooldown</span>
+                    <span>{policy.channelIds?.length ?? 0} channels</span>
+                    <button onClick={() => editPolicy(policy)} type="button">
+                      Edit
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Notification Channels</h2>
+              <span>{notificationChannels.length} total</span>
+            </div>
+            <div className="table">
+              {notificationChannels.length === 0 ? (
+                <EmptyState
+                  title="No notification channels"
+                  description="Add a webhook or email destination before assigning policies."
+                />
+              ) : (
+                notificationChannels.map((channel) => (
+                  <div className="channel-row" key={channel.id}>
+                    <div>
+                      <strong>{channel.name}</strong>
+                      <span>{channel.type}</span>
+                    </div>
+                    <span>
+                      {channel.description || "Description unavailable"}
+                    </span>
+                    <StatusBadge
+                      status={channel.enabled ? "enabled" : "disabled"}
+                    />
+                    <button
+                      disabled={
+                        !channel.enabled || testingChannelId === channel.id
+                      }
+                      onClick={() => handleTestChannel(channel.id)}
+                      type="button"
+                    >
+                      {testingChannelId === channel.id ? "Testing" : "Test"}
+                    </button>
+                    <button onClick={() => editChannel(channel)} type="button">
+                      Edit
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <form className="panel form-panel" onSubmit={handleCreatePolicy}>
+            <div className="panel-heading">
+              <h2>
+                {editingPolicyId ? "Edit Alert Policy" : "Create Alert Policy"}
+              </h2>
+              {editingPolicyId ? (
+                <button onClick={cancelPolicyEdit} type="button">
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+            <label>
+              Environment
+              <select
+                value={policyForm.environmentId || selectedEnvironmentId}
+                onChange={(event) =>
+                  setPolicyForm((current) => ({
+                    ...current,
+                    environmentId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Select environment</option>
+                {environments.map((environment) => (
+                  <option key={environment.id} value={environment.id}>
+                    {environment.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Deployment ID
+              <input
+                value={policyForm.deploymentId}
+                onChange={(event) =>
+                  setPolicyForm((current) => ({
+                    ...current,
+                    deploymentId: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Notify on
+              <input
+                required
+                value={policyForm.notifyOn}
+                onChange={(event) =>
+                  setPolicyForm((current) => ({
+                    ...current,
+                    notifyOn: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Channel IDs
+              <input
+                required
+                value={policyForm.channelIds}
+                onChange={(event) =>
+                  setPolicyForm((current) => ({
+                    ...current,
+                    channelIds: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Cooldown minutes
+              <input
+                min="0"
+                type="number"
+                value={policyForm.cooldownMinutes}
+                onChange={(event) =>
+                  setPolicyForm((current) => ({
+                    ...current,
+                    cooldownMinutes: Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+            <label className="checkbox-label">
+              <input
+                checked={policyForm.sendRecoveryNotification}
+                type="checkbox"
+                onChange={(event) =>
+                  setPolicyForm((current) => ({
+                    ...current,
+                    sendRecoveryNotification: event.target.checked,
+                  }))
+                }
+              />
+              Send recovery notification
+            </label>
+            <button disabled={savingPolicy} type="submit">
+              {savingPolicy
+                ? "Saving"
+                : editingPolicyId
+                  ? "Save policy"
+                  : "Create policy"}
+            </button>
+          </form>
+
+          <form className="panel form-panel" onSubmit={handleCreateChannel}>
+            <div className="panel-heading">
+              <h2>
+                {editingChannelId
+                  ? "Edit Notification Channel"
+                  : "Create Notification Channel"}
+              </h2>
+              {editingChannelId ? (
+                <button onClick={cancelChannelEdit} type="button">
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+            <label>
+              Type
+              <select
+                value={channelForm.type}
+                onChange={(event) =>
+                  setChannelForm((current) => ({
+                    ...current,
+                    type: event.target.value,
+                  }))
+                }
+              >
+                <option value="webhook">Webhook</option>
+                <option value="email">Email</option>
+              </select>
+            </label>
+            <label>
+              Name
+              <input
+                required
+                value={channelForm.name}
+                onChange={(event) =>
+                  setChannelForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Description
+              <textarea
+                value={channelForm.description}
+                onChange={(event) =>
+                  setChannelForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            {channelForm.type === "webhook" ? (
+              <label>
+                Webhook URL
+                <input
+                  required
+                  value={channelForm.url}
+                  onChange={(event) =>
+                    setChannelForm((current) => ({
+                      ...current,
+                      url: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            ) : (
+              <div className="form-fields-grid">
+                <label>
+                  SMTP host
+                  <input
+                    required
+                    value={channelForm.smtpHost}
+                    onChange={(event) =>
+                      setChannelForm((current) => ({
+                        ...current,
+                        smtpHost: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  SMTP port
+                  <input
+                    required
+                    value={channelForm.smtpPort}
+                    onChange={(event) =>
+                      setChannelForm((current) => ({
+                        ...current,
+                        smtpPort: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  From
+                  <input
+                    required
+                    value={channelForm.from}
+                    onChange={(event) =>
+                      setChannelForm((current) => ({
+                        ...current,
+                        from: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  To
+                  <input
+                    required
+                    value={channelForm.to}
+                    onChange={(event) =>
+                      setChannelForm((current) => ({
+                        ...current,
+                        to: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+            )}
+            <button disabled={savingChannel} type="submit">
+              {savingChannel
+                ? "Saving"
+                : editingChannelId
+                  ? "Save channel"
+                  : "Create channel"}
+            </button>
+          </form>
+        </section>
+      ) : activeView === "security" ? (
+        <section className="content-grid alerts-grid">
+          <PageHeader
+            title="Security"
+            context={authToken ? "Authenticated session" : "No active token"}
+            description="Manage users, API tokens, and session access without exposing secrets in normal lists."
+          />
+          <form className="panel form-panel" onSubmit={handleLogin}>
+            <div className="panel-heading">
+              <h2>Session</h2>
+              <span>{authToken ? "Token active" : "Not signed in"}</span>
+            </div>
+            <label>
+              Username
+              <input
+                value={loginForm.username}
+                onChange={(event) =>
+                  setLoginForm((current) => ({
+                    ...current,
+                    username: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={loginForm.password}
+                onChange={(event) =>
+                  setLoginForm((current) => ({
+                    ...current,
+                    password: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <div className="button-row">
+              <button type="submit">Sign in</button>
+              <button type="button" onClick={handleLogout}>
+                Sign out
+              </button>
+            </div>
+          </form>
+
+          <form className="panel form-panel" onSubmit={handleCreateUser}>
+            <div className="panel-heading">
+              <h2>Users</h2>
+              <button
+                type="button"
+                onClick={() =>
+                  loadSecurityData().catch((err: unknown) =>
+                    setError(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to load users",
+                    ),
+                  )
+                }
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="table compact-table">
+              {users.length === 0 ? (
+                <EmptyState
+                  title="No users loaded"
+                  description="Refresh security data or sign in with an account that can list users."
+                />
+              ) : (
+                users.map((user) => (
+                  <div className="table-row" key={user.id}>
+                    <strong>{user.username}</strong>
+                    <span>{user.role}</span>
+                    <span>{user.email}</span>
+                    <StatusBadge
+                      status={user.enabled ? "enabled" : "disabled"}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+            <label>
+              Username
+              <input
+                required
+                value={userForm.username}
+                onChange={(event) =>
+                  setUserForm((current) => ({
+                    ...current,
+                    username: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Email
+              <input
+                required
+                type="email"
+                value={userForm.email}
+                onChange={(event) =>
+                  setUserForm((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Display name
+              <input
+                required
+                value={userForm.displayName}
+                onChange={(event) =>
+                  setUserForm((current) => ({
+                    ...current,
+                    displayName: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Password
+              <input
+                required
+                type="password"
+                value={userForm.password}
+                onChange={(event) =>
+                  setUserForm((current) => ({
+                    ...current,
+                    password: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Role
+              <select
+                value={userForm.role}
+                onChange={(event) =>
+                  setUserForm((current) => ({
+                    ...current,
+                    role: event.target.value,
+                  }))
+                }
+              >
+                <option value="Administrator">Administrator</option>
+                <option value="Operator">Operator</option>
+                <option value="Viewer">Viewer</option>
+                <option value="Automation">Automation</option>
+              </select>
+            </label>
+            <button type="submit">Create user</button>
+          </form>
+
+          <form className="panel form-panel" onSubmit={handleCreateApiToken}>
+            <div className="panel-heading">
+              <h2>API Tokens</h2>
+              <span>{apiTokens.length} loaded</span>
+            </div>
+            <label>
+              User
+              <select
+                required
+                value={tokenForm.userId}
+                onChange={(event) => {
+                  const userId = event.target.value;
+                  setTokenForm((current) => ({ ...current, userId }));
+                  loadSecurityData(userId).catch((err: unknown) =>
+                    setError(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to load tokens",
+                    ),
+                  );
+                }}
+              >
+                <option value="">Select user</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.username}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Token name
+              <input
+                required
+                value={tokenForm.name}
+                onChange={(event) =>
+                  setTokenForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Scopes
+              <input
+                value={tokenForm.scopes}
+                onChange={(event) =>
+                  setTokenForm((current) => ({
+                    ...current,
+                    scopes: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Expires in hours
+              <input
+                type="number"
+                min="1"
+                value={tokenForm.expiresInHours}
+                onChange={(event) =>
+                  setTokenForm((current) => ({
+                    ...current,
+                    expiresInHours: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <button type="submit">Create token</button>
+            <div className="table compact-table">
+              {apiTokens.length === 0 ? (
+                <EmptyState
+                  title="No API tokens loaded"
+                  description="Select a user to inspect existing tokens or create a new scoped token."
+                />
+              ) : (
+                apiTokens.map((token) => (
+                  <div className="table-row" key={token.id}>
+                    <strong>{token.name}</strong>
+                    <span>{token.scopes.join(", ")}</span>
+                    <StatusBadge
+                      status={token.enabled ? "enabled" : "disabled"}
+                      label={token.enabled ? "Enabled" : "Revoked"}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRevokeApiToken(token.id)}
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </form>
+        </section>
+      ) : (
+        <section className="content-grid events-grid">
+          <PageHeader
+            title="Events"
+            context={`${filteredEvents.length} events · live stream enabled`}
+            description="Chronological registry activity with resource references for the selected environment scope."
+          />
+          <div className="panel">
+            <div className="panel-heading">
+              <h2>Events Timeline</h2>
+              <span>Live / {filteredEvents.length} shown</span>
+            </div>
+            <div className="filter-bar">
+              <label>
+                Type
+                <select
+                  value={eventTypeFilter}
+                  onChange={(event) => setEventTypeFilter(event.target.value)}
+                >
+                  <option value="">All event types</option>
+                  {eventTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                Token name
-                <input
-                  required
-                  value={tokenForm.name}
+                Resource
+                <select
+                  value={eventResourceFilter}
                   onChange={(event) =>
-                    setTokenForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
+                    setEventResourceFilter(event.target.value)
                   }
-                />
+                >
+                  <option value="all">All resources</option>
+                  {eventResourceTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
-                Scopes
+                Search
                 <input
-                  value={tokenForm.scopes}
-                  onChange={(event) =>
-                    setTokenForm((current) => ({
-                      ...current,
-                      scopes: event.target.value,
-                    }))
-                  }
+                  value={eventSearch}
+                  onChange={(event) => setEventSearch(event.target.value)}
                 />
               </label>
-              <label>
-                Expires in hours
-                <input
-                  type="number"
-                  min="1"
-                  value={tokenForm.expiresInHours}
-                  onChange={(event) =>
-                    setTokenForm((current) => ({
-                      ...current,
-                      expiresInHours: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <button type="submit">Create token</button>
-              <div className="table compact-table">
-                {apiTokens.length === 0 ? (
-                  <EmptyState
-                    title="No API tokens loaded"
-                    description="Select a user to inspect existing tokens or create a new scoped token."
-                  />
-                ) : (
-                  apiTokens.map((token) => (
-                    <div className="table-row" key={token.id}>
-                      <strong>{token.name}</strong>
-                      <span>{token.scopes.join(", ")}</span>
-                      <StatusBadge
-                        status={token.enabled ? "enabled" : "disabled"}
-                        label={token.enabled ? "Enabled" : "Revoked"}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRevokeApiToken(token.id)}
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </form>
-          </section>
-        ) : (
-          <section className="content-grid events-grid">
-            <PageHeader
-              title="Events"
-              context={`${filteredEvents.length} events · live stream enabled`}
-              description="Chronological registry activity with resource references for the selected environment scope."
-            />
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Events Timeline</h2>
-                <span>Live / {filteredEvents.length} shown</span>
-              </div>
-              <div className="filter-bar">
-                <label>
-                  Type
-                  <select
-                    value={eventTypeFilter}
-                    onChange={(event) => setEventTypeFilter(event.target.value)}
-                  >
-                    <option value="">All event types</option>
-                    {eventTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Resource
-                  <select
-                    value={eventResourceFilter}
-                    onChange={(event) =>
-                      setEventResourceFilter(event.target.value)
-                    }
-                  >
-                    <option value="all">All resources</option>
-                    {eventResourceTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Search
-                  <input
-                    value={eventSearch}
-                    onChange={(event) => setEventSearch(event.target.value)}
-                  />
-                </label>
-              </div>
-              <div className="table">
-                {filteredEvents.length === 0 ? (
-                  <EmptyState
-                    title="No events match"
-                    description="No registry events match the current type, resource, and search filters."
-                  />
-                ) : (
-                  filteredEvents.map((event) => (
-                    <div className="event-row timeline-row" key={event.id}>
-                      <time>{formatTimestamp(event.timestamp)}</time>
-                      <strong>{event.type}</strong>
-                      <span>{event.message}</span>
-                      <ResourceLink
-                        onClick={
-                          event.serviceId
-                            ? () => {
-                                setSelectedServiceId(event.serviceId ?? "");
-                                setActiveView("services");
-                              }
-                            : undefined
-                        }
-                      >
-                        {event.resourceType}:{event.resourceId}
-                      </ResourceLink>
-                      <span>{event.actor}</span>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
-          </section>
-        )}
+            <div className="table">
+              {filteredEvents.length === 0 ? (
+                <EmptyState
+                  title="No events match"
+                  description="No registry events match the current type, resource, and search filters."
+                />
+              ) : (
+                filteredEvents.map((event) => (
+                  <div className="event-row timeline-row" key={event.id}>
+                    <time title={formatTimestamp(event.timestamp)}>
+                      {formatActivityTimestamp(event.timestamp)}
+                    </time>
+                    <strong>{formatEventType(event.type)}</strong>
+                    <span>{event.message}</span>
+                    <ResourceLink
+                      onClick={
+                        event.serviceId
+                          ? () => {
+                              setSelectedServiceId(event.serviceId ?? "");
+                              setActiveView("services");
+                            }
+                          : undefined
+                      }
+                    >
+                      {event.resourceType}:{event.resourceId}
+                    </ResourceLink>
+                    <span>{event.actor}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      )}
     </AppShell>
   );
 }
@@ -4049,5 +4295,3 @@ function serviceOperationalStatus(service: Service, incidents: Incident[]) {
 }
 
 export default App;
-
-

@@ -44,9 +44,17 @@ button:disabled {
   opacity: 0.7;
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--brand-strong);
+  outline-offset: 2px;
+}
+
 .app-shell {
   @apply grid min-h-screen;
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-columns: 232px minmax(0, 1fr);
   background: var(--page-bg);
   color: var(--text);
 }
@@ -79,7 +87,7 @@ button:disabled {
 }
 
 .sidebar {
-  @apply sticky top-0 flex h-screen flex-col gap-7 overflow-y-auto border-r border-cyan-300/10 p-6 text-white;
+  @apply sticky top-0 flex h-screen flex-col gap-7 overflow-y-auto border-r border-cyan-300/10 p-5 text-white;
   background:
     radial-gradient(circle at 20% 8%, rgb(25 217 230 / 20%), transparent 26%),
     linear-gradient(180deg, #071827 0%, #06111f 100%);
@@ -120,11 +128,11 @@ button:disabled {
 }
 
 .brand-mark {
-  @apply grid h-12 w-12 place-items-center rounded-md border border-cyan-300/25 bg-gradient-to-br from-cyan-300 to-blue-600 text-xl font-black text-white shadow-glow;
+  @apply grid h-10 w-10 place-items-center rounded-md border border-cyan-300/20 bg-cyan-300/10 text-lg font-black text-white;
 }
 
 .sidebar-status {
-  @apply mt-auto grid gap-2 rounded-md border border-cyan-300/15 bg-white/[0.04] p-4 text-sm;
+  @apply mt-auto grid gap-2 rounded-md border border-cyan-300/10 bg-white/[0.03] p-3.5 text-sm;
 }
 
 .sidebar-status span {
@@ -133,7 +141,14 @@ button:disabled {
 }
 
 .sidebar-status strong {
-  @apply text-white;
+  @apply flex items-center gap-2 text-white;
+}
+
+.sidebar-status strong i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
 }
 
 .sidebar-status small {
@@ -142,20 +157,23 @@ button:disabled {
 
 .workspace {
   min-width: 0;
-  padding: 28px;
-  background:
-    radial-gradient(circle at 72% 0%, rgb(25 217 230 / 10%), transparent 32%),
-    var(--page-bg);
+  padding: 20px 28px 28px;
+  background: var(--page-bg);
 }
 
 .toolbar {
-  @apply mb-5 grid items-end gap-4 rounded-md border border-white/60 bg-white/80 p-4 shadow-panel backdrop-blur;
-  grid-template-columns: minmax(260px, 1fr) minmax(220px, 320px) auto;
+  @apply mb-5 grid items-center gap-4 border-b bg-transparent px-0 py-0 pb-4 shadow-none;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 300px) auto;
+  width: min(100%, 1560px);
+  margin-right: auto;
+  margin-left: auto;
+  border-color: var(--border);
 }
 
-.toolbar div {
+.toolbar-copy,
+.toolbar-control {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .toolbar span {
@@ -166,17 +184,18 @@ button:disabled {
 
 .toolbar-copy span,
 .eyebrow {
-  @apply text-xs font-bold uppercase text-cyan-600;
-  letter-spacing: 0.16em;
+  @apply text-sm font-medium normal-case;
+  color: var(--text-muted);
+  letter-spacing: 0;
 }
 
 .toolbar-copy h2 {
-  @apply m-0 text-2xl font-bold text-slate-950;
+  @apply m-0 text-2xl font-semibold text-slate-950;
   letter-spacing: 0;
 }
 
 .app-shell.dark .toolbar {
-  @apply border-cyan-300/10 bg-white/[0.04];
+  @apply border-cyan-300/10 bg-transparent;
 }
 
 .app-shell.dark .toolbar-copy h2 {
@@ -199,8 +218,8 @@ textarea {
 
 select,
 input {
-  min-height: 38px;
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 8px 11px;
 }
 
 textarea {
@@ -209,7 +228,7 @@ textarea {
   padding: 10px;
 }
 
-.toolbar button,
+.button-primary,
 .form-panel button {
   min-height: 38px;
   padding: 8px 14px;
@@ -217,6 +236,25 @@ textarea {
   border-color: transparent;
   color: #ffffff;
   box-shadow: 0 10px 28px rgb(19 120 255 / 18%);
+}
+
+.button-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.toolbar-actions button {
+  display: grid;
+  width: 36px;
+  min-height: 36px;
+  place-items: center;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+  font-size: 1rem;
 }
 
 .content-grid {
@@ -262,7 +300,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
-  box-shadow: 0 18px 50px rgb(3 10 24 / 7%);
+  box-shadow: 0 12px 32px rgb(3 10 24 / 6%);
   overflow: hidden;
 }
 
@@ -271,7 +309,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -287,6 +325,41 @@ textarea {
 
 .service-list {
   display: grid;
+  overflow-x: hidden;
+}
+
+.service-filter-bar {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.service-filter-bar label {
+  display: grid;
+  gap: 6px;
+}
+
+.service-filter-bar label span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.service-search input {
+  width: 100%;
+}
+
+.service-filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.clear-filters {
+  justify-self: start;
+  min-height: 32px;
+  padding: 4px 0;
 }
 
 .filter-bar {
@@ -330,8 +403,9 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 10px 18px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
 }
 
 .bulk-bar span {
@@ -344,6 +418,68 @@ textarea {
 .row button {
   min-height: 34px;
   padding: 6px 12px;
+}
+
+.service-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px 12px 12px;
+  background: var(--surface);
+}
+
+.service-row.selected {
+  background: var(--selected);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.service-row-check {
+  justify-content: center;
+  padding-top: 3px;
+}
+
+.service-row button {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  text-align: left;
+}
+
+.service-row button:hover strong {
+  color: var(--brand-strong);
+}
+
+.service-row-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.service-row-title strong {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-row button > span:not(.service-row-title) {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .inline-check {
@@ -575,8 +711,7 @@ textarea {
 .wizard-steps button.current {
   border-color: rgb(25 217 230 / 55%);
   background:
-    linear-gradient(135deg, rgb(25 217 230 / 14%), transparent),
-    var(--surface);
+    linear-gradient(135deg, rgb(25 217 230 / 14%), transparent), var(--surface);
   color: var(--text);
   box-shadow: 0 14px 36px rgb(25 217 230 / 13%);
 }
@@ -799,17 +934,17 @@ textarea {
 .availability-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(160px, 1fr));
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 0;
 }
 
 .availability-card {
   display: grid;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px;
-  background: var(--surface-muted);
+  gap: 7px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .availability-card span,
@@ -818,15 +953,73 @@ textarea {
 }
 
 .availability-card strong {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.availability-card em {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.availability-card-critical strong,
+.availability-card-critical em {
+  color: var(--critical-text);
+}
+
+.availability-card-degraded strong,
+.availability-card-degraded em {
+  color: var(--warning-text);
+}
+
+.availability-card-healthy strong,
+.availability-card-healthy em {
+  color: var(--success-text);
+}
+
+.availability-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.availability-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+}
+
+.availability-card-critical .availability-bar {
+  color: var(--critical-text);
+}
+
+.availability-card-degraded .availability-bar {
+  color: var(--warning-text);
+}
+
+.availability-card-healthy .availability-bar {
+  color: var(--success-text);
+}
+
+.panel > .availability-grid {
+  padding: 16px;
+}
+
+.overview-section .availability-grid,
+.service-tab-panel > .availability-grid {
+  padding: 0;
 }
 
 .metric-card {
   @apply grid min-w-0 gap-2 rounded-md border p-4;
   border-color: var(--border);
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 6%), transparent),
-    var(--surface);
+    linear-gradient(180deg, rgb(255 255 255 / 6%), transparent), var(--surface);
   box-shadow: 0 16px 42px rgb(3 10 24 / 7%);
 }
 
@@ -1073,8 +1266,8 @@ textarea {
 }
 
 .sidebar {
-  gap: 20px;
-  padding: 20px;
+  gap: 18px;
+  padding: 20px 18px;
   background: linear-gradient(180deg, #071827 0%, #06111f 100%);
 }
 
@@ -1082,7 +1275,7 @@ textarea {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   gap: 10px;
-  min-height: 40px;
+  min-height: 42px;
 }
 
 .nav-icon {
@@ -1092,7 +1285,7 @@ textarea {
   place-items: center;
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 4px;
-  background: rgb(255 255 255 / 4%);
+  background: transparent;
   color: #a5f3fc;
   font-size: 0.72rem;
 }
@@ -1115,12 +1308,13 @@ textarea {
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  padding: 2px 0;
+  padding: 4px 0 2px;
 }
 
 .page-header h1 {
-  margin: 2px 0 0;
-  font-size: 1.45rem;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
   line-height: 1.2;
 }
 
@@ -1133,15 +1327,21 @@ textarea {
 
 .breadcrumb {
   color: var(--brand);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .page-actions {
   display: flex;
   justify-content: end;
+}
+
+.page-actions button {
+  min-height: 40px;
+  padding: 8px 15px;
+  font-weight: 650;
 }
 
 .row {
@@ -1301,6 +1501,54 @@ textarea {
 .incident-triage-row span {
   color: var(--text-muted);
   font-size: 0.84rem;
+}
+
+.timeline-row {
+  display: grid;
+  grid-template-columns: 88px minmax(160px, 0.8fr) minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.table .timeline-row {
+  padding: 12px 14px;
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.activity-row time {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.activity-row strong {
+  font-weight: 650;
+}
+
+.activity-row span,
+.activity-row small {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.activity-row small {
+  justify-self: end;
 }
 
 .incident-triage-row {
@@ -1636,9 +1884,10 @@ textarea {
 
 .services-workflow {
   display: grid;
-  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
-  gap: 16px;
-  max-width: 1400px;
+  grid-template-columns: minmax(340px, 380px) minmax(0, 1fr);
+  gap: 18px;
+  width: min(100%, 1560px);
+  max-width: 1560px;
   margin: 0 auto;
 }
 
@@ -1660,12 +1909,14 @@ textarea {
   justify-content: space-between;
   gap: 16px;
   border-bottom: 1px solid var(--border);
-  padding: 18px;
+  padding: 20px 22px 18px;
 }
 
 .service-workspace-header h2 {
-  margin: 3px 0 0;
-  font-size: 1.35rem;
+  margin: 0;
+  font-size: 1.38rem;
+  font-weight: 650;
+  line-height: 1.25;
 }
 
 .service-workspace-header p,
@@ -1678,7 +1929,16 @@ textarea {
 }
 
 .service-workspace-header p {
-  margin: 6px 0;
+  max-width: 72ch;
+  margin: 8px 0 6px;
+  line-height: 1.5;
+}
+
+.service-title-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
 }
 
 .workspace-actions {
@@ -1688,23 +1948,33 @@ textarea {
   gap: 8px;
 }
 
+.workspace-actions button {
+  min-height: 38px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+  box-shadow: none;
+}
+
 .service-tabs {
   display: flex;
-  gap: 4px;
+  gap: 18px;
   border-bottom: 1px solid var(--border);
-  padding: 0 14px;
+  padding: 0 22px;
 }
 
 .service-tabs button {
-  min-height: 42px;
+  min-height: 46px;
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  padding: 0 10px;
+  padding: 0;
   background: transparent;
   box-shadow: none;
   color: var(--text-muted);
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 650;
 }
 
 .service-tabs button.active {
@@ -1714,14 +1984,15 @@ textarea {
 
 .service-tab-panel {
   display: grid;
-  gap: 16px;
-  padding: 16px 18px 20px;
+  gap: 22px;
+  padding: 20px 22px 24px;
 }
 
-.summary-grid {
+.summary-grid,
+.summary-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(160px, 1fr));
-  gap: 12px;
+  gap: 20px;
 }
 
 .summary-grid > div {
@@ -1737,6 +2008,33 @@ textarea {
   color: var(--text-muted);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.summary-strip {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 18px;
+}
+
+.summary-strip > div {
+  display: grid;
+  gap: 4px;
+}
+
+.summary-strip span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.summary-strip strong {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.overview-section {
+  display: grid;
+  gap: 12px;
 }
 
 .tab-toolbar,
@@ -1866,6 +2164,7 @@ textarea {
 
 @media (max-width: 820px) {
   .app-shell,
+  .services-workflow,
   .content-grid,
   .environments-grid,
   .incidents-grid,
@@ -1895,6 +2194,26 @@ textarea {
   }
 
   .toolbar-actions {
+    justify-content: start;
+  }
+
+  .services-workflow {
+    width: 100%;
+  }
+
+  .service-filter-row,
+  .summary-strip,
+  .summary-grid,
+  .service-workspace-header,
+  .activity-row {
+    grid-template-columns: 1fr;
+  }
+
+  .service-workspace-header {
+    display: grid;
+  }
+
+  .workspace-actions {
     justify-content: start;
   }
 
