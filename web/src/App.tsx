@@ -2615,88 +2615,93 @@ function App() {
                                             {editingHealthCheckId ===
                                             check.id ? (
                                               <form
-                                                className="inline-edit-form runtime-edit-form"
+                                                className="runtime-health-form"
                                                 onSubmit={
                                                   handleUpdateHealthCheck
                                                 }
                                               >
-                                                <label>
-                                                  Interval seconds
-                                                  <input
-                                                    min="1"
-                                                    type="number"
-                                                    value={
-                                                      healthEditForm.intervalSeconds
-                                                    }
-                                                    onChange={(event) =>
-                                                      setHealthEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          intervalSeconds:
-                                                            Number(
+                                                <h5>Health configuration</h5>
+                                                <div className="runtime-health-fields">
+                                                  <label>
+                                                    Interval seconds
+                                                    <input
+                                                      min="1"
+                                                      type="number"
+                                                      value={
+                                                        healthEditForm.intervalSeconds
+                                                      }
+                                                      onChange={(event) =>
+                                                        setHealthEditForm(
+                                                          (current) => ({
+                                                            ...current,
+                                                            intervalSeconds:
+                                                              Number(
+                                                                event.target
+                                                                  .value,
+                                                              ),
+                                                          }),
+                                                        )
+                                                      }
+                                                    />
+                                                  </label>
+                                                  <label>
+                                                    Timeout seconds
+                                                    <input
+                                                      min="1"
+                                                      type="number"
+                                                      value={
+                                                        healthEditForm.timeoutSeconds
+                                                      }
+                                                      onChange={(event) =>
+                                                        setHealthEditForm(
+                                                          (current) => ({
+                                                            ...current,
+                                                            timeoutSeconds:
+                                                              Number(
+                                                                event.target
+                                                                  .value,
+                                                              ),
+                                                          }),
+                                                        )
+                                                      }
+                                                    />
+                                                  </label>
+                                                  <label className="checkbox-label">
+                                                    <input
+                                                      checked={
+                                                        healthEditForm.enabled
+                                                      }
+                                                      type="checkbox"
+                                                      onChange={(event) =>
+                                                        setHealthEditForm(
+                                                          (current) => ({
+                                                            ...current,
+                                                            enabled:
                                                               event.target
-                                                                .value,
-                                                            ),
-                                                        }),
-                                                      )
+                                                                .checked,
+                                                          }),
+                                                        )
+                                                      }
+                                                    />
+                                                    Enabled
+                                                  </label>
+                                                </div>
+                                                <div className="runtime-health-actions">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      setEditingHealthCheckId("")
                                                     }
-                                                  />
-                                                </label>
-                                                <label>
-                                                  Timeout seconds
-                                                  <input
-                                                    min="1"
-                                                    type="number"
-                                                    value={
-                                                      healthEditForm.timeoutSeconds
-                                                    }
-                                                    onChange={(event) =>
-                                                      setHealthEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          timeoutSeconds:
-                                                            Number(
-                                                              event.target
-                                                                .value,
-                                                            ),
-                                                        }),
-                                                      )
-                                                    }
-                                                  />
-                                                </label>
-                                                <label className="checkbox-label">
-                                                  <input
-                                                    checked={
-                                                      healthEditForm.enabled
-                                                    }
-                                                    type="checkbox"
-                                                    onChange={(event) =>
-                                                      setHealthEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          enabled:
-                                                            event.target
-                                                              .checked,
-                                                        }),
-                                                      )
-                                                    }
-                                                  />
-                                                  Enabled
-                                                </label>
-                                                <button
-                                                  disabled={savingHealthCheck}
-                                                  type="submit"
-                                                >
-                                                  Save health check
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    setEditingHealthCheckId("")
-                                                  }
-                                                >
-                                                  Cancel
-                                                </button>
+                                                  >
+                                                    Cancel
+                                                  </button>
+                                                  <button
+                                                    disabled={savingHealthCheck}
+                                                    type="submit"
+                                                  >
+                                                    Save health check
+                                                  </button>
+                                                </div>
                                               </form>
                                             ) : null}
                                           </div>
@@ -2705,98 +2710,105 @@ function App() {
                                       {editingHealthCheckId === "new" &&
                                       healthForm.instanceId === instance.id ? (
                                         <form
-                                          className="inline-edit-form runtime-edit-form"
+                                          className="runtime-health-form"
                                           onSubmit={handleUpdateHealthCheck}
                                         >
-                                          <label>
-                                            Check name
-                                            <input
-                                              required
-                                              value={healthForm.name}
-                                              onChange={(event) =>
-                                                setHealthForm((current) => ({
-                                                  ...current,
-                                                  name: event.target.value,
-                                                }))
-                                              }
-                                            />
-                                          </label>
-                                          <label>
-                                            Check type
-                                            <select
-                                              value={healthForm.type}
-                                              onChange={(event) =>
-                                                setHealthForm((current) => ({
-                                                  ...current,
-                                                  type: event.target.value,
-                                                }))
+                                          <h5>Health configuration</h5>
+                                          <div className="runtime-health-fields">
+                                            <label>
+                                              Check name
+                                              <input
+                                                required
+                                                value={healthForm.name}
+                                                onChange={(event) =>
+                                                  setHealthForm((current) => ({
+                                                    ...current,
+                                                    name: event.target.value,
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              Check type
+                                              <select
+                                                value={healthForm.type}
+                                                onChange={(event) =>
+                                                  setHealthForm((current) => ({
+                                                    ...current,
+                                                    type: event.target.value,
+                                                  }))
+                                                }
+                                              >
+                                                <option value="HEALTH_CHECK_TYPE_HTTP">
+                                                  HTTP
+                                                </option>
+                                                <option value="HEALTH_CHECK_TYPE_HTTPS">
+                                                  HTTPS
+                                                </option>
+                                                <option value="HEALTH_CHECK_TYPE_GRPC">
+                                                  gRPC
+                                                </option>
+                                                <option value="HEALTH_CHECK_TYPE_TCP">
+                                                  TCP
+                                                </option>
+                                                <option value="HEALTH_CHECK_TYPE_UDP">
+                                                  UDP
+                                                </option>
+                                              </select>
+                                            </label>
+                                            <label>
+                                              Interval seconds
+                                              <input
+                                                min="1"
+                                                type="number"
+                                                value={
+                                                  healthForm.intervalSeconds
+                                                }
+                                                onChange={(event) =>
+                                                  setHealthForm((current) => ({
+                                                    ...current,
+                                                    intervalSeconds: Number(
+                                                      event.target.value,
+                                                    ),
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              Timeout seconds
+                                              <input
+                                                min="1"
+                                                type="number"
+                                                value={
+                                                  healthForm.timeoutSeconds
+                                                }
+                                                onChange={(event) =>
+                                                  setHealthForm((current) => ({
+                                                    ...current,
+                                                    timeoutSeconds: Number(
+                                                      event.target.value,
+                                                    ),
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                          </div>
+                                          <div className="runtime-health-actions">
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setEditingHealthCheckId("")
                                               }
                                             >
-                                              <option value="HEALTH_CHECK_TYPE_HTTP">
-                                                HTTP
-                                              </option>
-                                              <option value="HEALTH_CHECK_TYPE_HTTPS">
-                                                HTTPS
-                                              </option>
-                                              <option value="HEALTH_CHECK_TYPE_GRPC">
-                                                gRPC
-                                              </option>
-                                              <option value="HEALTH_CHECK_TYPE_TCP">
-                                                TCP
-                                              </option>
-                                              <option value="HEALTH_CHECK_TYPE_UDP">
-                                                UDP
-                                              </option>
-                                            </select>
-                                          </label>
-                                          <label>
-                                            Interval seconds
-                                            <input
-                                              min="1"
-                                              type="number"
-                                              value={
-                                                healthForm.intervalSeconds
-                                              }
-                                              onChange={(event) =>
-                                                setHealthForm((current) => ({
-                                                  ...current,
-                                                  intervalSeconds: Number(
-                                                    event.target.value,
-                                                  ),
-                                                }))
-                                              }
-                                            />
-                                          </label>
-                                          <label>
-                                            Timeout seconds
-                                            <input
-                                              min="1"
-                                              type="number"
-                                              value={healthForm.timeoutSeconds}
-                                              onChange={(event) =>
-                                                setHealthForm((current) => ({
-                                                  ...current,
-                                                  timeoutSeconds: Number(
-                                                    event.target.value,
-                                                  ),
-                                                }))
-                                              }
-                                            />
-                                          </label>
-                                          <button
-                                            disabled={savingHealthCheck}
-                                            type="submit"
-                                          >
-                                            Configure health
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              setEditingHealthCheckId("")
-                                            }
-                                          >
-                                            Cancel
-                                          </button>
+                                              Cancel
+                                            </button>
+                                            <button
+                                              disabled={savingHealthCheck}
+                                              type="submit"
+                                            >
+                                              Save health check
+                                            </button>
+                                          </div>
                                         </form>
                                       ) : null}
                                     </div>

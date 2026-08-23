@@ -71,3 +71,4 @@ web/out
 /registryctl
 /registry.exe
 /registryctl.exe
+/internal/webstatic/
