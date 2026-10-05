@@ -17,16 +17,17 @@ func TestValidateRejectsInvalidPort(t *testing.T) {
 
 func TestValidateRequiresAuthBootstrapOutsideDev(t *testing.T) {
 	cfg := defaultConfig()
-	cfg.Auth.Enabled = true
-	cfg.Server.DevMode = false
+	cfg.Auth.BootstrapCredentialPath = ""
 	if err := cfg.Validate(); err == nil {
-		t.Fatalf("expected auth bootstrap error")
+		t.Fatalf("expected bootstrap credential path error")
 	}
 }
 
 func TestValidateRejectsDefaultConfigWithoutBootstrap(t *testing.T) {
-	if err := defaultConfig().Validate(); err == nil {
-		t.Fatalf("expected default config to require auth bootstrap credentials")
+	cfg := defaultConfig()
+	cfg.Auth.SessionCookieName = ""
+	if err := cfg.Validate(); err == nil {
+		t.Fatalf("expected session cookie name error")
 	}
 }
 
@@ -51,9 +52,8 @@ func TestLoadAppliesEnvironmentOverrides(t *testing.T) {
 	t.Setenv("REGISTRY_AUTH_ENABLED", "true")
 	t.Setenv("REGISTRY_BOOTSTRAP_ADMIN_USERNAME", "root")
 	t.Setenv("REGISTRY_BOOTSTRAP_ADMIN_EMAIL", "root@example.test")
-	t.Setenv("REGISTRY_BOOTSTRAP_ADMIN_PASSWORD", "secret")
-	t.Setenv("REGISTRY_BOOTSTRAP_ADMIN_TOKEN_NAME", "bootstrap")
-	t.Setenv("REGISTRY_BOOTSTRAP_ADMIN_TOKEN", "sr_test")
+	t.Setenv("REGISTRY_BOOTSTRAP_CREDENTIAL_PATH", "./tmp/bootstrap")
+	t.Setenv("REGISTRY_AUTH_SESSION_COOKIE", "test_session")
 	t.Setenv("REGISTRY_AUTH_TOKEN_TTL", "2h")
 	t.Setenv("REGISTRY_RATE_LIMIT_ENABLED", "true")
 	t.Setenv("REGISTRY_RATE_LIMIT_REQUESTS_PER_MINUTE", "120")
@@ -73,7 +73,7 @@ func TestLoadAppliesEnvironmentOverrides(t *testing.T) {
 	if cfg.Telemetry.Enabled || cfg.Telemetry.OTLPEndpoint != "http://collector:4317" {
 		t.Fatalf("telemetry env overrides not applied: %+v", cfg.Telemetry)
 	}
-	if !cfg.Auth.Enabled || cfg.Auth.BootstrapAdminUsername != "root" || cfg.Auth.TokenTTL != 2*time.Hour {
+	if !cfg.Auth.Enabled || cfg.Auth.BootstrapAdminUsername != "root" || cfg.Auth.TokenTTL != 2*time.Hour || cfg.Auth.BootstrapCredentialPath != "./tmp/bootstrap" || cfg.Auth.SessionCookieName != "test_session" {
 		t.Fatalf("auth env overrides not applied: %+v", cfg.Auth)
 	}
 	if !cfg.RateLimit.Enabled || cfg.RateLimit.RequestsPerMinute != 120 || cfg.RateLimit.Burst != 12 {

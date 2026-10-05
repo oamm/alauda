@@ -3,7 +3,11 @@
 This service exposes ConnectRPC APIs generated from Protobuf plus a small set of operational REST endpoints:
 
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/password`
 - `GET /api/v1/auth/me`
+- `GET /api/v1/auth/sessions`
+- `DELETE /api/v1/auth/sessions/{id}`
 - `GET|POST /api/v1/auth/users`
 - `GET|POST /api/v1/auth/tokens`
 - `DELETE /api/v1/auth/tokens/{id}`
@@ -12,7 +16,7 @@ This service exposes ConnectRPC APIs generated from Protobuf plus a small set of
 - `POST /api/v1/alerts/test/{channelId}`
 - `GET /api/v1/ping`
 
-When `auth.enabled` is true and `server.devMode` is false, API requests require `Authorization: Bearer <token>` except login and ping. Read requests require `read`, mutations require `write`, and auth/token management requires `admin`.
+Configured servers require authentication for API requests by default. The explicit public API allowlist is `POST /api/v1/auth/login` and `GET /api/v1/ping`; liveness and readiness are exposed separately at `/healthz` and `/readyz`. Browser sessions use the HttpOnly `alauda_session` cookie, while Bearer tokens remain supported for CLI and automation. Missing or invalid authentication returns `401`; an authenticated principal without the required scope returns `403`. Read requests require `read`, mutations require `write`, and user/token/session administration requires `admin`.
 
 This document defines all Protocol Buffer service definitions and messages for the Service Registry.
 

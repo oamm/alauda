@@ -44,19 +44,47 @@ func (s *Service) Login(ctx context.Context, username, password string) (*Create
 	return created, user, nil
 }
 
+func (s *Service) LoginSession(ctx context.Context, username, password, userAgent, clientIP string) (*CreatedSession, *User, error) {
+	user, err := s.repo.GetUserByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, ErrInvalidCredentials
+		}
+		return nil, nil, err
+	}
+	if !user.Enabled || !CheckPassword(user.PasswordHash, password) {
+		return nil, nil, ErrInvalidCredentials
+	}
+	session, err := s.repo.CreateSession(ctx, user.ID, s.tokenTTL, userAgent, clientIP)
+	if err != nil {
+		return nil, nil, err
+	}
+	_ = s.repo.TouchLogin(ctx, user.ID)
+	return session, user, nil
+}
+
 func (s *Service) AuthenticateToken(ctx context.Context, secret string) (*Principal, error) {
 	token, user, err := s.repo.FindTokenBySecret(ctx, secret)
 	if err != nil {
 		return nil, err
 	}
 	return &Principal{
-		UserID:         user.ID,
-		Username:       user.Username,
-		Role:           user.Role,
-		TokenID:        token.ID,
-		Scopes:         token.Scopes,
-		EnvironmentIDs: token.EnvironmentIDs,
+		UserID:             user.ID,
+		Username:           user.Username,
+		Role:               user.Role,
+		TokenID:            token.ID,
+		Scopes:             token.Scopes,
+		EnvironmentIDs:     token.EnvironmentIDs,
+		MustChangePassword: user.MustChangePassword,
 	}, nil
+}
+
+func (s *Service) AuthenticateSession(ctx context.Context, secret string) (*Principal, error) {
+	session, user, err := s.repo.FindSessionBySecret(ctx, secret)
+	if err != nil {
+		return nil, err
+	}
+	return &Principal{UserID: user.ID, Username: user.Username, Role: user.Role, SessionID: session.ID, Scopes: RoleScopes(user.Role), MustChangePassword: user.MustChangePassword}, nil
 }
 
 func (s *Service) CreateToken(ctx context.Context, principal *Principal, input CreateTokenInput) (*CreatedToken, error) {

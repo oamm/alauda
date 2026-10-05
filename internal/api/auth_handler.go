@@ -9,16 +9,23 @@ import (
 	"time"
 
 	"github.com/company/service-registry/internal/auth"
+	"github.com/company/service-registry/internal/storage"
 )
 
 type authHandler struct {
-	service *auth.Service
-	repo    *auth.Repository
+	service    *auth.Service
+	repo       *auth.Repository
+	cookieName string
+	audit      auth.AuditLogger
 }
 
 func registerAuthREST(mux *http.ServeMux, handler authHandler) {
 	mux.HandleFunc("/api/v1/auth/login", handler.login)
+	mux.HandleFunc("/api/v1/auth/logout", handler.logout)
+	mux.HandleFunc("/api/v1/auth/password", handler.password)
 	mux.HandleFunc("/api/v1/auth/me", handler.me)
+	mux.HandleFunc("/api/v1/auth/sessions", handler.sessions)
+	mux.HandleFunc("/api/v1/auth/sessions/", handler.sessionByID)
 	mux.HandleFunc("/api/v1/auth/users", handler.users)
 	mux.HandleFunc("/api/v1/auth/tokens", handler.tokens)
 	mux.HandleFunc("/api/v1/auth/tokens/", handler.tokenByID)
@@ -37,16 +44,134 @@ func (h authHandler) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json body", http.StatusBadRequest)
 		return
 	}
-	created, user, err := h.service.Login(r.Context(), input.Username, input.Password)
+	created, user, err := h.service.LoginSession(r.Context(), input.Username, input.Password, r.UserAgent(), clientAddress(r))
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
+			h.auditLogin(r, input.Username, false)
 			http.Error(w, "invalid credentials", http.StatusUnauthorized)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": user, "token": created.Secret, "expiresAt": created.Token.ExpiresAt})
+	h.auditLogin(r, user.Username, true)
+	secure := r.TLS != nil
+	http.SetCookie(w, &http.Cookie{Name: h.cookie(), Value: created.Secret, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode, Expires: created.Session.ExpiresAt})
+	// Keep the token field for registryctl and other automation clients; browsers use the HttpOnly cookie.
+	writeJSON(w, http.StatusOK, map[string]any{"user": user, "token": created.Secret, "expiresAt": created.Session.ExpiresAt, "mustChangePassword": user.MustChangePassword})
+}
+
+func (h authHandler) auditLogin(r *http.Request, username string, success bool) {
+	if h.audit == nil {
+		return
+	}
+	status, message := "failure", "invalid credentials"
+	if success {
+		status, message = "success", "authenticated"
+	}
+	entry := storage.AuditLog{
+		Timestamp:         time.Now().UTC(),
+		Actor:             username,
+		Action:            "login",
+		ResourceType:      "authentication",
+		ResourceID:        "-",
+		ChangeDescription: message,
+		IP:                clientAddress(r),
+		UserAgent:         r.UserAgent(),
+		Status:            status,
+		ErrorMessage:      message,
+	}
+	if success {
+		entry.ErrorMessage = ""
+	}
+	_, _ = h.audit.Create(r.Context(), entry)
+}
+
+func (h authHandler) logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if ok && principal.SessionID != "" {
+		_ = h.repo.RevokeSession(r.Context(), principal.SessionID)
+	}
+	http.SetCookie(w, &http.Cookie{Name: h.cookie(), Value: "", Path: "/", HttpOnly: true, MaxAge: -1, SameSite: http.SameSiteLaxMode})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h authHandler) password(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	principal, ok := auth.PrincipalFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+		return
+	}
+	var input struct {
+		NewPassword     string `json:"newPassword"`
+		ConfirmPassword string `json:"confirmPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "invalid json body", http.StatusBadRequest)
+		return
+	}
+	if len(input.NewPassword) < 12 || input.NewPassword != input.ConfirmPassword {
+		http.Error(w, "password must be at least 12 characters and match confirmation", http.StatusBadRequest)
+		return
+	}
+	if err := h.repo.ChangePassword(r.Context(), principal.UserID, input.NewPassword); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if principal.SessionID != "" {
+		_ = h.repo.RevokeSession(r.Context(), principal.SessionID)
+	}
+	http.SetCookie(w, &http.Cookie{Name: h.cookie(), Value: "", Path: "/", HttpOnly: true, MaxAge: -1, SameSite: http.SameSiteLaxMode})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h authHandler) cookie() string {
+	if h.cookieName != "" {
+		return h.cookieName
+	}
+	return "alauda_session"
+}
+
+func (h authHandler) sessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	sessions, err := h.repo.ListSessions(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"sessions": sessions})
+}
+
+func (h authHandler) sessionByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/auth/sessions/")
+	if id == "" {
+		http.Error(w, "session id is required", http.StatusBadRequest)
+		return
+	}
+	if err := h.repo.RevokeSession(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "session not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h authHandler) me(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +189,7 @@ func (h authHandler) me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": user, "scopes": principal.Scopes})
+	writeJSON(w, http.StatusOK, map[string]any{"user": user, "scopes": principal.Scopes, "mustChangePassword": user.MustChangePassword})
 }
 
 func (h authHandler) users(w http.ResponseWriter, r *http.Request) {

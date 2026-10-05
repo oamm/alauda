@@ -7,7 +7,7 @@ $env:REGISTRY_CONFIG="config.production.yaml"
 registry server
 ```
 
-Use `server.devMode: false` and enable `auth.enabled` for production. Configure either a bootstrap admin password for interactive login or a fixed bootstrap token for automation.
+Use `server.devMode: false`. Production API resources are protected by default. On the first start, Alauda creates the `root` administrator and writes a one-time temporary credential to `auth.bootstrapCredentialPath` (default `./data/bootstrap-admin-credential`) with restrictive permissions. Retrieve that file once, sign in, and change the password. The credential is never regenerated or printed on later restarts.
 
 ## Health And Metrics
 
@@ -15,8 +15,8 @@ Use `server.devMode: false` and enable `auth.enabled` for production. Configure 
 | ---------- | ----------------------- |
 | `/healthz` | Process liveness        |
 | `/readyz`  | Database readiness      |
-| `/version` | Binary version metadata |
-| `/metrics` | Prometheus text metrics |
+| `/version` | Binary version metadata; authenticated |
+| `/metrics` | Prometheus text metrics; authenticated |
 
 ## SQLite Backups
 
@@ -35,9 +35,10 @@ Detailed health results are pruned on startup using `health.resultRetentionHours
 
 ## Security Checklist
 
-- Enable `auth.enabled`.
+- Keep authentication enabled; production cannot disable it.
 - Keep `server.devMode` disabled.
-- Set a strong bootstrap password or bootstrap token.
+- Protect the bootstrap credential file and remove it after securely recording the temporary credential.
+- Replace the temporary root password on first login.
 - Set `rateLimit.enabled`.
 - Store config secrets outside source control.
 - Scrape `/metrics` and alert on `/readyz` failures.

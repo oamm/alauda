@@ -28,12 +28,11 @@ alerts:
   maxRetries: 5
 
 auth:
-  enabled: false
-  bootstrapAdminUsername: "admin"
-  bootstrapAdminEmail: "admin@example.local"
-  bootstrapAdminPassword: ""
-  bootstrapAdminTokenName: "bootstrap-admin"
-  bootstrapAdminToken: ""
+  enabled: true
+  bootstrapAdminUsername: "root"
+  bootstrapAdminEmail: "root@example.local"
+  bootstrapCredentialPath: "./data/bootstrap-admin-credential"
+  sessionCookieName: "alauda_session"
   tokenTTL: 24h
 
 rateLimit:

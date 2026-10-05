@@ -12,6 +12,7 @@ import (
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
 	"github.com/company/service-registry/internal/alerts"
 	"github.com/company/service-registry/internal/api"
+	"github.com/company/service-registry/internal/auth"
 	"github.com/company/service-registry/internal/config"
 	"github.com/company/service-registry/internal/health"
 	"github.com/company/service-registry/internal/storage"
@@ -44,8 +45,21 @@ func (s *Server) Start() error {
 	// Register health endpoints
 	mux.HandleFunc("/healthz", s.healthz)
 	mux.HandleFunc("/readyz", s.readyz)
-	mux.HandleFunc("/version", s.version)
-	mux.HandleFunc("/metrics", s.metrics)
+	authRepo := auth.NewRepository(s.db)
+	authService := auth.NewService(authRepo, s.cfg.Auth.TokenTTL)
+	cookieName := s.cfg.Auth.SessionCookieName
+	if cookieName == "" {
+		cookieName = "alauda_session"
+	}
+	protectInfrastructure := auth.MiddlewareWithCookieName(s.cfg.Auth.Enabled || !s.cfg.Server.DevMode, authService, cookieName, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/version" {
+			s.version(w, r)
+			return
+		}
+		s.metrics(w, r)
+	}))
+	mux.Handle("/version", protectInfrastructure)
+	mux.Handle("/metrics", protectInfrastructure)
 
 	if s.webFS != nil {
 		fileServer := http.FileServer(http.FS(s.webFS))

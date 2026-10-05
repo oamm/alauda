@@ -20,12 +20,13 @@ func NewRepository(db *storage.Database) *Repository {
 }
 
 type CreateUserInput struct {
-	Username    string
-	Email       string
-	DisplayName string
-	Password    string
-	Role        Role
-	Tags        map[string]string
+	Username           string
+	Email              string
+	DisplayName        string
+	Password           string
+	Role               Role
+	Tags               map[string]string
+	MustChangePassword bool
 }
 
 type CreateTokenInput struct {
@@ -58,9 +59,9 @@ func (r *Repository) CreateUser(ctx context.Context, input CreateUserInput) (*Us
 	now := time.Now().UTC()
 	id := uuid.NewString()
 	_, err = r.db.Exec(ctx, `
-		INSERT INTO users (id, username, email, display_name, password_hash, role, enabled, tags, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-	`, id, input.Username, input.Email, input.DisplayName, passwordHash, string(input.Role), string(tagsJSON), now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+		INSERT INTO users (id, username, email, display_name, password_hash, role, enabled, must_change_password, tags, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+	`, id, input.Username, input.Email, input.DisplayName, passwordHash, string(input.Role), input.MustChangePassword, string(tagsJSON), now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func (r *Repository) CreateUser(ctx context.Context, input CreateUserInput) (*Us
 
 func (r *Repository) GetUser(ctx context.Context, id string) (*User, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, username, email, display_name, password_hash, role, enabled, tags, created_at, updated_at, last_login_at
+		SELECT id, username, email, display_name, password_hash, role, enabled, must_change_password, tags, created_at, updated_at, last_login_at
 		FROM users
 		WHERE id = ? AND deleted_at IS NULL
 	`, id)
@@ -78,7 +79,7 @@ func (r *Repository) GetUser(ctx context.Context, id string) (*User, error) {
 
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, username, email, display_name, password_hash, role, enabled, tags, created_at, updated_at, last_login_at
+		SELECT id, username, email, display_name, password_hash, role, enabled, must_change_password, tags, created_at, updated_at, last_login_at
 		FROM users
 		WHERE username = ? AND deleted_at IS NULL
 	`, username)
@@ -87,7 +88,7 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*U
 
 func (r *Repository) ListUsers(ctx context.Context) ([]*User, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, username, email, display_name, password_hash, role, enabled, tags, created_at, updated_at, last_login_at
+		SELECT id, username, email, display_name, password_hash, role, enabled, must_change_password, tags, created_at, updated_at, last_login_at
 		FROM users
 		WHERE deleted_at IS NULL
 		ORDER BY username ASC
@@ -164,7 +165,7 @@ func (r *Repository) FindTokenBySecret(ctx context.Context, secret string) (*API
 	row := r.db.QueryRow(ctx, `
 		SELECT t.id, t.user_id, t.name, t.token_hash, t.scopes, t.environment_ids, t.expires_at, t.last_used_at,
 		       t.enabled, t.created_at, t.created_by,
-		       u.id, u.username, u.email, u.display_name, u.password_hash, u.role, u.enabled, u.tags,
+		       u.id, u.username, u.email, u.display_name, u.password_hash, u.role, u.enabled, u.must_change_password, u.tags,
 		       u.created_at, u.updated_at, u.last_login_at
 		FROM api_tokens t
 		JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
@@ -244,7 +245,7 @@ func scanUser(row interface{ Scan(...any) error }) (*User, error) {
 	var tagsRaw string
 	var createdRaw, updatedRaw string
 	var lastLogin sql.NullString
-	if err := row.Scan(&user.ID, &user.Username, &user.Email, &user.DisplayName, &user.PasswordHash, &user.Role, &user.Enabled, &tagsRaw, &createdRaw, &updatedRaw, &lastLogin); err != nil {
+	if err := row.Scan(&user.ID, &user.Username, &user.Email, &user.DisplayName, &user.PasswordHash, &user.Role, &user.Enabled, &user.MustChangePassword, &tagsRaw, &createdRaw, &updatedRaw, &lastLogin); err != nil {
 		return nil, err
 	}
 	user.Tags = map[string]string{}
@@ -296,7 +297,7 @@ func scanTokenAndUser(row interface{ Scan(...any) error }) (*APIToken, *User, er
 	err := row.Scan(
 		&token.ID, &token.UserID, &token.Name, &token.TokenHash, &scopesRaw, &envRaw, &expiresRaw, &lastUsedRaw,
 		&token.Enabled, &tokenCreatedRaw, &token.CreatedBy,
-		&user.ID, &user.Username, &user.Email, &user.DisplayName, &user.PasswordHash, &user.Role, &user.Enabled, &tagsRaw,
+		&user.ID, &user.Username, &user.Email, &user.DisplayName, &user.PasswordHash, &user.Role, &user.Enabled, &user.MustChangePassword, &tagsRaw,
 		&userCreatedRaw, &userUpdatedRaw, &lastLoginRaw,
 	)
 	if err != nil {

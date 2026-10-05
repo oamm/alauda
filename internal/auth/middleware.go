@@ -20,8 +20,15 @@ func PrincipalFromContext(ctx context.Context) (*Principal, bool) {
 }
 
 func Middleware(enabled bool, service *Service, next http.Handler) http.Handler {
+	return MiddlewareWithCookieName(enabled, service, "alauda_session", next)
+}
+
+func MiddlewareWithCookieName(enabled bool, service *Service, cookieName string, next http.Handler) http.Handler {
 	if !enabled {
 		return next
+	}
+	if cookieName == "" {
+		cookieName = "alauda_session"
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isPublicPath(r.URL.Path) {
@@ -29,18 +36,35 @@ func Middleware(enabled bool, service *Service, next http.Handler) http.Handler 
 			return
 		}
 		secret := bearerToken(r.Header.Get("Authorization"))
+		credentialType := "bearer"
 		if secret == "" {
-			http.Error(w, "missing bearer token", http.StatusUnauthorized)
+			if cookie, err := r.Cookie(cookieName); err == nil {
+				secret = cookie.Value
+				credentialType = "session"
+			}
+		}
+		if secret == "" {
+			writeAuthError(w, http.StatusUnauthorized, "missing authentication")
 			return
 		}
 		principal, err := service.AuthenticateToken(r.Context(), secret)
+		if credentialType == "session" {
+			principal, err = service.AuthenticateSession(r.Context(), secret)
+		} else if err != nil {
+			// CLI clients may use the compatibility token returned by login; it is a hashed session secret.
+			principal, err = service.AuthenticateSession(r.Context(), secret)
+		}
 		if err != nil {
-			http.Error(w, "invalid bearer token", http.StatusUnauthorized)
+			writeAuthError(w, http.StatusUnauthorized, "invalid authentication")
+			return
+		}
+		if principal.MustChangePassword && !passwordChangeAllowed(r.URL.Path) {
+			writeAuthError(w, http.StatusForbidden, "password_change_required")
 			return
 		}
 		required := RequiredScope(r.Method, r.URL.Path)
 		if !HasScope(principal.Scopes, required) {
-			http.Error(w, "insufficient scope", http.StatusForbidden)
+			writeAuthError(w, http.StatusForbidden, "insufficient scope")
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), principal)))
@@ -48,7 +72,7 @@ func Middleware(enabled bool, service *Service, next http.Handler) http.Handler 
 }
 
 func RequiredScope(method, path string) Scope {
-	if strings.HasPrefix(path, "/api/v1/auth/users") || strings.HasPrefix(path, "/api/v1/auth/tokens") {
+	if strings.HasPrefix(path, "/api/v1/auth/users") || strings.HasPrefix(path, "/api/v1/auth/tokens") || strings.HasPrefix(path, "/api/v1/auth/sessions") {
 		return ScopeAdmin
 	}
 	if strings.Contains(path, "/List") || strings.Contains(path, "/Get") || strings.Contains(path, "/Watch") || method == http.MethodGet {
@@ -62,6 +86,16 @@ func RequiredScope(method, path string) Scope {
 
 func isPublicPath(path string) bool {
 	return path == "/api/v1/auth/login" || path == "/api/v1/ping"
+}
+
+func passwordChangeAllowed(path string) bool {
+	return path == "/api/v1/auth/me" || path == "/api/v1/auth/logout" || path == "/api/v1/auth/password"
+}
+
+func writeAuthError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(`{"error":"` + message + `"}`))
 }
 
 func bearerToken(header string) string {

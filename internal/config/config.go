@@ -70,10 +70,9 @@ type AuthConfig struct {
 	Enabled                 bool          `yaml:"enabled"`
 	BootstrapAdminUsername  string        `yaml:"bootstrapAdminUsername"`
 	BootstrapAdminEmail     string        `yaml:"bootstrapAdminEmail"`
-	BootstrapAdminPassword  string        `yaml:"bootstrapAdminPassword"`
-	BootstrapAdminTokenName string        `yaml:"bootstrapAdminTokenName"`
-	BootstrapAdminToken     string        `yaml:"bootstrapAdminToken"`
+	BootstrapCredentialPath string        `yaml:"bootstrapCredentialPath"`
 	TokenTTL                time.Duration `yaml:"tokenTTL"`
+	SessionCookieName       string        `yaml:"sessionCookieName"`
 }
 
 // RateLimitConfig controls API request throttling.
@@ -147,14 +146,11 @@ func Load() (*Config, error) {
 	if email := os.Getenv("REGISTRY_BOOTSTRAP_ADMIN_EMAIL"); email != "" {
 		cfg.Auth.BootstrapAdminEmail = email
 	}
-	if password := os.Getenv("REGISTRY_BOOTSTRAP_ADMIN_PASSWORD"); password != "" {
-		cfg.Auth.BootstrapAdminPassword = password
+	if credentialPath := os.Getenv("REGISTRY_BOOTSTRAP_CREDENTIAL_PATH"); credentialPath != "" {
+		cfg.Auth.BootstrapCredentialPath = credentialPath
 	}
-	if tokenName := os.Getenv("REGISTRY_BOOTSTRAP_ADMIN_TOKEN_NAME"); tokenName != "" {
-		cfg.Auth.BootstrapAdminTokenName = tokenName
-	}
-	if token := os.Getenv("REGISTRY_BOOTSTRAP_ADMIN_TOKEN"); token != "" {
-		cfg.Auth.BootstrapAdminToken = token
+	if cookieName := os.Getenv("REGISTRY_AUTH_SESSION_COOKIE"); cookieName != "" {
+		cfg.Auth.SessionCookieName = cookieName
 	}
 	if ttl := os.Getenv("REGISTRY_AUTH_TOKEN_TTL"); ttl != "" {
 		if parsed, err := time.ParseDuration(ttl); err == nil && parsed > 0 {
@@ -211,8 +207,14 @@ func (c *Config) Validate() error {
 	if !c.Server.DevMode && !c.Auth.Enabled {
 		return fmt.Errorf("auth must be enabled outside dev mode")
 	}
-	if c.Auth.Enabled && !c.Server.DevMode && c.Auth.BootstrapAdminPassword == "" && c.Auth.BootstrapAdminToken == "" {
-		return fmt.Errorf("auth bootstrap password or token must be configured when auth is enabled outside dev mode")
+	if c.Auth.BootstrapAdminUsername == "" {
+		return fmt.Errorf("auth.bootstrapAdminUsername is required")
+	}
+	if c.Auth.BootstrapCredentialPath == "" {
+		return fmt.Errorf("auth.bootstrapCredentialPath is required")
+	}
+	if c.Auth.SessionCookieName == "" {
+		return fmt.Errorf("auth.sessionCookieName is required")
 	}
 	if c.Auth.TokenTTL <= 0 {
 		return fmt.Errorf("auth.tokenTTL must be positive")
@@ -265,13 +267,14 @@ func defaultConfig() *Config {
 		},
 		Auth: AuthConfig{
 			Enabled:                 true,
-			BootstrapAdminUsername:  "admin",
-			BootstrapAdminEmail:     "admin@example.local",
-			BootstrapAdminTokenName: "bootstrap-admin",
+			BootstrapAdminUsername:  "root",
+			BootstrapAdminEmail:     "root@example.local",
+			BootstrapCredentialPath: "./data/bootstrap-admin-credential",
 			TokenTTL:                24 * time.Hour,
+			SessionCookieName:       "alauda_session",
 		},
 		RateLimit: RateLimitConfig{
-			Enabled:           false,
+			Enabled:           true,
 			RequestsPerMinute: 600,
 			Burst:             60,
 		},

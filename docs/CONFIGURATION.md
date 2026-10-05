@@ -24,11 +24,10 @@ storage:
 
 auth:
   enabled: true
-  bootstrapAdminUsername: "admin"
-  bootstrapAdminEmail: "admin@example.local"
-  bootstrapAdminPassword: ""
-  bootstrapAdminTokenName: "bootstrap-admin"
-  bootstrapAdminToken: ""
+  bootstrapAdminUsername: "root"
+  bootstrapAdminEmail: "root@example.local"
+  bootstrapCredentialPath: "./data/bootstrap-admin-credential"
+  sessionCookieName: "alauda_session"
   tokenTTL: 24h
 
 rateLimit:
@@ -52,8 +51,8 @@ rateLimit:
 | `REGISTRY_AUTH_ENABLED`                   | Require auth for API routes                |
 | `REGISTRY_BOOTSTRAP_ADMIN_USERNAME`       | Bootstrap admin username                   |
 | `REGISTRY_BOOTSTRAP_ADMIN_EMAIL`          | Bootstrap admin email                      |
-| `REGISTRY_BOOTSTRAP_ADMIN_PASSWORD`       | Bootstrap admin password                   |
-| `REGISTRY_BOOTSTRAP_ADMIN_TOKEN`          | Fixed bootstrap API token                  |
+| `REGISTRY_BOOTSTRAP_CREDENTIAL_PATH`     | One-time restricted bootstrap credential file |
+| `REGISTRY_AUTH_SESSION_COOKIE`            | Browser session cookie name                |
 | `REGISTRY_AUTH_TOKEN_TTL`                 | Login token TTL, for example `24h`         |
 | `REGISTRY_RATE_LIMIT_ENABLED`             | Enable API rate limiting                   |
 | `REGISTRY_RATE_LIMIT_REQUESTS_PER_MINUTE` | Per-client refill rate                     |
@@ -61,4 +60,4 @@ rateLimit:
 
 ## Validation
 
-The server validates port ranges, required storage paths, positive health scheduler values, token TTL, rate-limit values, and auth bootstrap settings before startup.
+The server validates port ranges, required storage paths, positive health scheduler values, token TTL, rate-limit values, and security bootstrap settings before startup. Production authentication cannot be disabled.

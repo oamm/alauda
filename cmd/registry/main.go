@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/company/service-registry/internal/auth"
 	"github.com/company/service-registry/internal/config"
 	"github.com/company/service-registry/internal/server"
 	"github.com/company/service-registry/internal/storage"
@@ -132,6 +133,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 	if err := storage.RunMigrations(context.Background(), db); err != nil {
 		slog.Error("Failed to run migrations", slog.Any("error", err))
 		return err
+	}
+	if cfg.Auth.Enabled {
+		result, err := auth.NewRepository(db).Bootstrap(context.Background(), cfg.Auth.BootstrapAdminUsername, cfg.Auth.BootstrapAdminEmail, cfg.Auth.BootstrapCredentialPath)
+		if err != nil {
+			return fmt.Errorf("security bootstrap failed closed: %w", err)
+		}
+		if result.Created {
+			slog.Info("Alauda first-time initialization completed", slog.String("username", result.Username), slog.String("credentialPath", result.CredentialPath))
+		}
 	}
 
 	// Create server
