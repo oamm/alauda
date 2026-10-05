@@ -5,6 +5,7 @@
 The Service Registry is a lightweight, self-hosted service registry and health-management platform for cataloging service endpoints, continuously validating their availability, tracking health history, and notifying operators when services fail or recover.
 
 ### Core Responsibilities
+
 ```
 Service Registry
 │
@@ -18,7 +19,9 @@ Service Registry
 ```
 
 ### Key Non-Responsibilities
+
 This system is **NOT**:
+
 - A service mesh
 - A reverse proxy or API gateway
 - A load balancer
@@ -69,6 +72,7 @@ This system is **NOT**:
 ### Module Boundaries
 
 #### Domain Layer (`internal/domain`)
+
 - Pure business logic entities
 - Domain services (interfaces, no implementation)
 - Event definitions
@@ -76,12 +80,14 @@ This system is **NOT**:
 - No external dependencies
 
 #### Application Layer (`internal/application`)
+
 - Use case orchestration
 - Command/query handling
 - Transaction management
 - Domain event publishing
 
 #### Health Subsystem (`internal/health`)
+
 - Health check types
 - Health scheduler
 - Worker pool
@@ -89,18 +95,21 @@ This system is **NOT**:
 - Health result evaluation
 
 #### Storage Layer (`internal/storage`)
+
 - Repository interfaces
 - SQLite implementation
 - Migrations
 - Query builders
 
 #### API Layer (`internal/api`)
+
 - ConnectRPC handlers
 - gRPC/HTTP server
 - Request/response mapping
 - Authentication/authorization
 
 #### Server (`internal/server`)
+
 - HTTP server setup
 - Middleware
 - Graceful shutdown
@@ -111,6 +120,7 @@ This system is **NOT**:
 ## 3. Data Flow Patterns
 
 ### Service Registration
+
 ```
 CLI/API Request
     ↓
@@ -128,6 +138,7 @@ Response
 ```
 
 ### Health Check Execution
+
 ```
 Scheduler (time-based)
     ↓
@@ -153,6 +164,7 @@ Persist Health Result & Events
 ```
 
 ### Live UI Updates
+
 ```
 Health Event Created
     ↓
@@ -170,61 +182,71 @@ Dashboard reflects new status
 ## 4. Key Architectural Decisions
 
 ### 1. Environment as First-Class Concept
+
 - **Decision**: Environment is NOT a tag; it's a primary domain entity
 - **Reasoning**: Services behave differently per environment; this is fundamental
 - **Implementation**: Every service deployment is explicitly linked to an environment
 - **UI Impact**: Global environment selector affects all views
 
 ### 2. Service → Deployment → Instance → Endpoint Hierarchy
+
 - **Service**: Logical application (e.g., `lynx-authentication`)
 - **Deployment**: Service in a specific environment (e.g., `lynx-authentication/prod`)
 - **Instance**: Individual running copy (e.g., `auth-prod-01` at `10.20.1.15`)
 - **Endpoint**: Network location exposed by instance (e.g., `https://10.20.1.15:8080/health`)
 
 ### 3. Health Checks Execute Outside Transactions
+
 - **Decision**: Network I/O never happens within database transactions
 - **Reasoning**: Prevent database locks during slow network operations
-- **Implementation**: 
+- **Implementation**:
   - Check scheduled independently
   - Result evaluated
   - State transition persisted in separate transaction
 
 ### 4. Bounded Worker Pool for Health Checks
+
 - **Decision**: Use fixed-size worker pool, not one goroutine per check
 - **Reasoning**: Predictable resource usage; prevents unlimited goroutine explosion
 - **Configuration**: Default 20 workers (configurable)
 - **Scalability**: Supports 20,000+ checks efficiently
 
 ### 5. Health State Machine
+
 - **States**: `UNKNOWN`, `HEALTHY`, `DEGRADED`, `UNHEALTHY`, `DISABLED`
 - **Transitions**: Deterministic based on explicit rules
 - **Failure Thresholds**: Configurable `failuresBeforeUnhealthy`, `successesBeforeHealthy`
 - **Incident Creation**: Only when transitioning into unhealthy state
 
 ### 6. Incidents vs. Events
+
 - **Incidents**: Discrete operational events (opened/resolved)
 - **Events**: Broader operational timeline (created, updated, deleted, etc.)
 - **Relationship**: Multiple events may occur within one incident
 
 ### 7. Simple Alert Mechanism
+
 - **Initial Channels**: Webhook + Email
 - **No Rules Engine**: Webhook enables unlimited integrations (Slack, Teams, PagerDuty)
 - **Cooldown**: Prevent alert fatigue
 - **Policy Model**: Per-environment, per-service configuration
 
 ### 8. Repositories as Domain-Specific Interfaces
+
 - **Pattern**: `ServiceRepository`, `HealthRepository`, `IncidentRepository`
 - **Reasoning**: Clear intent, type-safe, testable
 - **No Generic**: Avoid `Repository[T]` unless concrete benefit
 - **Implementation**: SQLite backend, PostgreSQL possible later
 
 ### 9. OpenTelemetry for Observability
+
 - **Scope**: Instrument registry itself only
 - **Metrics**: Service/instance counts, health check latency, incident counts
 - **Logs**: Structured logs via `slog`
 - **Out of Scope**: Full APM or metrics storage (bring-your-own collector)
 
 ### 10. Monorepo Structure
+
 - **Backend**: Pure Go server
 - **Frontend**: React + TypeScript, compiled to static files
 - **Embedded**: Frontend embedded in Go binary via `go:embed`
@@ -235,6 +257,7 @@ Dashboard reflects new status
 ## 5. Concurrency Model
 
 ### Health Scheduler
+
 ```
                  ┌──────────────┐
                  │  Scheduler   │
@@ -281,6 +304,7 @@ Dashboard reflects new status
 ```
 
 ### Critical Requirements
+
 1. **Bounded Concurrency**: Fixed worker pool size (default 20)
 2. **No Nested Transactions**: Health check result processing in separate transaction
 3. **Graceful Shutdown**: Drain queue, wait for in-flight checks
@@ -292,6 +316,7 @@ Dashboard reflects new status
 ## 6. Database Design Philosophy
 
 ### Principles
+
 1. **Relational Structure**: Use tables/relationships, not JSON blobs
 2. **Flexible Metadata**: JSON for non-queryable attributes
 3. **Normalized for Performance**: Appropriate indexes on query paths
@@ -300,6 +325,7 @@ Dashboard reflects new status
 6. **Foreign Keys Enabled**: Database enforces referential integrity
 
 ### Query Performance Targets
+
 - List services by environment: **< 100ms** (10K+ services)
 - List instances by deployment: **< 50ms** (10K+ instances)
 - List unhealthy instances: **< 100ms**
@@ -311,6 +337,7 @@ Dashboard reflects new status
 ## 7. API Design Principles
 
 ### Service Boundaries
+
 - `EnvironmentService`: Manage environments
 - `CatalogService`: Manage services (CRUD)
 - `DeploymentService`: Manage deployments (service + environment)
@@ -322,6 +349,7 @@ Dashboard reflects new status
 - `RegistryService`: Lookup services for discovery
 
 ### Core Lookup API
+
 ```
 ResolveService {
   service: string
@@ -352,6 +380,7 @@ ResolveService {
 ```
 
 ### Versioning
+
 - Package: `registry.v1`
 - API versioning: URL-based when evolving
 
@@ -360,11 +389,13 @@ ResolveService {
 ## 8. Security Model
 
 ### Authentication (MVP)
+
 - Local administrator account (username/password)
 - API tokens for automation
 - Token scopes (read, write, admin)
 
 ### Authorization (MVP)
+
 - Simple RBAC roles:
   - `Administrator`: Full access
   - `Operator`: Service operations, no configuration
@@ -372,12 +403,14 @@ ResolveService {
   - `Automation`: Token-based access for CI/CD
 
 ### Audit Trail
+
 - Every write operation logged
 - Actor, action, resource, timestamp, IP
 - RBAC rules changes tracked
 - Token access logged
 
 ### Future Enhancements
+
 - OIDC integration
 - Environment-level permissions
 - Service-level permissions
@@ -388,6 +421,7 @@ ResolveService {
 ## 9. Health Check Behavior
 
 ### Check Types
+
 ```
 HTTP/HTTPS
 ├── GET/POST/etc
@@ -410,6 +444,7 @@ Heartbeat/TTL
 ```
 
 ### Health State Computation
+
 ```
 Rule 1: All checks configured for instance are healthy
         → Instance is HEALTHY
@@ -428,13 +463,14 @@ Rule 5: Explicitly disabled
 ```
 
 ### Threshold Logic
+
 ```
 State: HEALTHY
   consecutive_failures = 0
 
 Check fails:
   consecutive_failures++
-  
+
   if consecutive_failures >= failuresBeforeUnhealthy:
     State → UNHEALTHY
     consecutive_failures = 0
@@ -447,7 +483,7 @@ State: UNHEALTHY
 
 Check succeeds:
   consecutive_successes++
-  
+
   if consecutive_successes >= successesBeforeHealthy:
     State → HEALTHY
     consecutive_failures = 0
@@ -456,6 +492,7 @@ Check succeeds:
 ```
 
 ### Critical Execution Rules
+
 - Never execute during database transaction
 - Always have timeout (default 5s)
 - Always have retry interval (default 10s)
@@ -467,6 +504,7 @@ Check succeeds:
 ## 10. Alert Engine
 
 ### Lifecycle
+
 ```
 Health transitions to UNHEALTHY
     ↓
@@ -485,6 +523,7 @@ Retry on failure (with backoff)
 ```
 
 ### Notification Channels
+
 ```
 Webhook
 ├── HTTP POST
@@ -499,6 +538,7 @@ Email
 ```
 
 ### Cooldown
+
 - Default: 10 minutes
 - Per alert policy
 - Prevents notification spam
@@ -509,6 +549,7 @@ Email
 ## 11. Event Stream Architecture
 
 ### Event Types
+
 ```
 Administrative Events
 ├── ServiceCreated
@@ -529,6 +570,7 @@ Operational Events
 ```
 
 ### Event Propagation
+
 ```
 Domain Event Created
     ↓
@@ -544,6 +586,7 @@ Subscribers notified:
 ```
 
 ### UI Live Updates
+
 - SSE (Server-Sent Events) or ConnectRPC streaming
 - Event subscriptions per filter (environment, service, etc)
 - Automatic reconnect with backoff
@@ -554,25 +597,30 @@ Subscribers notified:
 ## 12. Retention Strategy
 
 ### Detailed Health Results
+
 - Storage: Last 24 hours
 - Purge: Older results deleted
 - Reasoning: Recent data useful for diagnosis; old data not
 
 ### Health Transitions
+
 - Storage: 90 days
 - Purge: Archive or delete after 90 days
 - Reasoning: Useful for incident pattern analysis
 
 ### Incidents
+
 - Storage: Retained indefinitely
 - Reasoning: Historical records for audit and SLA calculations
 
 ### Events
+
 - Storage: 30 days by default
 - Purge: Configurable retention
 - Reasoning: Operational timeline; old events less useful
 
 ### Audit Logs
+
 - Storage: Retained indefinitely
 - Reasoning: Compliance and audit trail
 
@@ -581,6 +629,7 @@ Subscribers notified:
 ## 13. Observability
 
 ### Metrics (OpenTelemetry)
+
 ```
 registry_services_total (counter)
 registry_instances_total (counter)
@@ -600,6 +649,7 @@ registry_alerts_failed_total (counter)
 ```
 
 ### Logging
+
 - Structured logs via Go `slog`
 - Log levels: DEBUG, INFO, WARN, ERROR
 - All public API requests logged
@@ -607,6 +657,7 @@ registry_alerts_failed_total (counter)
 - State transitions logged at INFO level
 
 ### Registry Health Endpoints
+
 - `/healthz`: Liveness (always true if responding)
 - `/readyz`: Readiness (database connected, workers running)
 - `/version`: Version information
@@ -617,20 +668,24 @@ registry_alerts_failed_total (counter)
 ## 14. Future Extension Points
 
 ### Storage Backend
+
 - PostgreSQL support (repositories accept `database/sql` interface)
 - Migration framework independent of SQLite
 
 ### Authentication
+
 - OIDC provider integration
 - SSO support
 
 ### Alert Providers
+
 - Slack integration
 - Microsoft Teams integration
 - PagerDuty integration
 - Custom webhook templates
 
 ### Service Features
+
 - Automatic registration (SDKs, libraries)
 - Service dependency visualization
 - Maintenance windows
@@ -638,11 +693,13 @@ registry_alerts_failed_total (counter)
 - SLA/SLO reporting
 
 ### Kubernetes Integration
+
 - Sync services from Kubernetes resources
 - Watch cluster changes
 - Export back to Kubernetes
 
 ### High Availability
+
 - Multiple registry instances
 - Shared SQLite (via network filesystem) or PostgreSQL
 - Distributed event bus (for multi-instance alerting)
@@ -652,6 +709,7 @@ registry_alerts_failed_total (counter)
 ## 15. Configuration
 
 ### Deployment Modes
+
 ```
 Development:
   registry server --dev
@@ -665,12 +723,14 @@ Production:
 ```
 
 ### Configuration Sources (precedence)
+
 1. Defaults (code)
 2. Configuration file (`registry.yaml`)
 3. Environment variables
 4. CLI flags
 
 ### Key Configuration
+
 ```yaml
 server:
   address: 0.0.0.0
@@ -703,6 +763,7 @@ alerts:
 ## 16. Deployment
 
 ### Docker Image
+
 ```dockerfile
 # Stage 1: Frontend build
 FROM node:20 AS frontend-builder
@@ -717,6 +778,7 @@ ENTRYPOINT ["/usr/local/bin/registry"]
 ```
 
 ### Single Binary Composition
+
 ```
 Binary
 ├── Embedded React SPA (static files)
@@ -726,6 +788,7 @@ Binary
 ```
 
 ### Development Setup
+
 ```bash
 make dev
 # Opens http://localhost:9700
@@ -737,21 +800,22 @@ make dev
 
 ## 17. Architectural Risks & Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|-----------|
-| Health checks block UI updates | High | Separate scheduler goroutine, non-blocking persistence |
-| Unbounded goroutine growth | High | Fixed worker pool, bounded channels |
-| Database lock contention | High | Separate health check transaction, read replicas (future) |
-| Alert spam on flapping | Medium | Failure threshold, cooldown timer |
-| Lost events on crash | Low | Event persistence before publication |
-| SQLite scale limits | Low | PostgreSQL migration path designed upfront |
-| Missed health checks on overload | Low | Persistent queue, status page for dropped checks |
+| Risk                             | Impact | Mitigation                                                |
+| -------------------------------- | ------ | --------------------------------------------------------- |
+| Health checks block UI updates   | High   | Separate scheduler goroutine, non-blocking persistence    |
+| Unbounded goroutine growth       | High   | Fixed worker pool, bounded channels                       |
+| Database lock contention         | High   | Separate health check transaction, read replicas (future) |
+| Alert spam on flapping           | Medium | Failure threshold, cooldown timer                         |
+| Lost events on crash             | Low    | Event persistence before publication                      |
+| SQLite scale limits              | Low    | PostgreSQL migration path designed upfront                |
+| Missed health checks on overload | Low    | Persistent queue, status page for dropped checks          |
 
 ---
 
 ## 18. Success Criteria for MVP
 
 ### Phase 0 Complete ✓
+
 - [ ] Go server running
 - [ ] React UI running
 - [ ] SQLite schema initialized
@@ -759,35 +823,41 @@ make dev
 - [ ] Basic CRUD working
 
 ### Phase 1 Complete ✓
+
 - [ ] Services, deployments, instances manageable
 - [ ] Environments fully functional
 - [ ] CLI works for basic operations
 - [ ] UI shows service catalog
 
 ### Phase 2 Complete ✓
+
 - [ ] Health checks configured and executing
 - [ ] HTTP, TCP, gRPC checks working
 - [ ] State transitions deterministic
 - [ ] Scheduler stable under load
 
 ### Phase 3 Complete ✓
+
 - [ ] Incidents created and resolved
 - [ ] Availability calculated
 - [ ] Incident history available
 
 ### Phase 4 Complete ✓
+
 - [ ] Webhook alerts working
 - [ ] Email alerts working
 - [ ] Cooldown preventing spam
 - [ ] Recovery notifications sent
 
 ### Phase 5 Complete ✓
+
 - [ ] Dashboard displays metrics
 - [ ] Health view shows all checks
 - [ ] Live updates working
 - [ ] Service detail complete
 
 ### Phase 6 Complete ✓
+
 - [ ] Authentication working
 - [ ] RBAC enforced
 - [ ] Audit log complete
@@ -796,6 +866,7 @@ make dev
 ---
 
 ## 19. Document References
+
 - See `DOMAIN.md` for entity definitions
 - See `DATABASE.md` for SQLite schema
 - See `HEALTH.md` for health check details

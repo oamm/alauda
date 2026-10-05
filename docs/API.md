@@ -22,12 +22,20 @@ The API is organized into logical services around domain boundaries:
 - `CatalogService` (services management)
 - `DeploymentService` (service deployments)
 - `InstanceService` (service instances)
-- `RuntimeRegistrationService` (composite runtime registration workflow)
+- `InstanceService.RegisterRuntime` (composite runtime registration workflow)
 - `HealthService` (health checks and state)
 - `IncidentService` (incidents)
 - `AlertService` (alerts and policies)
 - `EventService` (event stream and history)
 - `RegistryService` (service lookup for discovery)
+
+### Public registration vocabulary
+
+Public registration uses `Service`, `Environment`, `Instance`, an address,
+`Endpoint`, and optional `Health monitoring`. `Deployment` and its database ID
+remain internal implementation details. Existing administrative APIs may still
+return internal records for compatibility, but normal registration clients
+should not need those IDs.
 
 ---
 
@@ -565,7 +573,7 @@ message ListEndpointsResponse {
 
 ---
 
-## Runtime Registration (runtime_registration.proto)
+## Service Registration (`InstanceService.RegisterRuntime`)
 
 ```protobuf
 syntax = "proto3";
@@ -574,22 +582,18 @@ package registry.v1;
 
 import "registry/v1/catalog.proto";
 import "registry/v1/common.proto";
-import "registry/v1/health.proto";
-
-service RuntimeRegistrationService {
+service InstanceService {
   rpc RegisterRuntime(RegisterRuntimeRequest) returns (RegisterRuntimeResponse);
 }
 
 message RegisterRuntimeRequest {
   string service_id = 1;
   string environment_id = 2;
-  RuntimeInstanceInput instance = 3;
-  repeated RuntimeEndpointInput endpoints = 4;
-  RuntimeHealthCheckInput health_check = 5; // Optional
-  string request_id = 6; // Optional idempotency key
+  RuntimeInstanceRegistration instance = 3;
+  repeated RuntimeEndpointRegistration endpoints = 4;
 }
 
-message RuntimeInstanceInput {
+message RuntimeInstanceRegistration {
   string name = 1;
   string address = 2;
   string description = 3;
@@ -597,7 +601,7 @@ message RuntimeInstanceInput {
   map<string, string> metadata = 5;
 }
 
-message RuntimeEndpointInput {
+message RuntimeEndpointRegistration {
   string name = 1;
   Protocol protocol = 2;
   int32 port = 3;
@@ -607,28 +611,95 @@ message RuntimeEndpointInput {
   map<string, string> metadata = 7;
 }
 
-message RuntimeHealthCheckInput {
-  string name = 1;
-  HealthCheckType type = 2;
-  string endpoint_name = 3;
-  string path = 4;
-  int32 interval_seconds = 5;
-  int32 timeout_seconds = 6;
-  int32 failures_before_unhealthy = 7;
-  int32 successes_before_healthy = 8;
-  string description = 9;
-  map<string, string> metadata = 10;
-}
-
 message RegisterRuntimeResponse {
   ServiceDeployment deployment = 1;
   ServiceInstance instance = 2;
   repeated Endpoint endpoints = 3;
-  HealthCheck health_check = 4; // Set only when requested and created
 }
 ```
 
 `RegisterRuntime` is the preferred API for the standard web workflow. It resolves or creates the unique Service + Environment deployment, creates the runtime Instance, creates one or more Endpoints, enforces the one-primary-endpoint invariant, and returns the complete runtime registration result.
+
+### Public CLI-friendly contract
+
+The current wire request is ID-based and nested for compatibility. A future
+additive public adapter over this same operation should accept stable public
+references and flatten the service-address input:
+
+The additive protobuf direction is:
+
+```protobuf
+message RegisterRuntimeRequest {
+  string service_id = 1;       // existing clients
+  string environment_id = 2;   // existing clients
+  RuntimeInstanceRegistration instance = 3;
+  repeated RuntimeEndpointRegistration endpoints = 4;
+  string service = 5;          // public stable service name
+  string environment = 6;      // public environment key/name
+  string request_id = 7;       // future replay protection
+  bool reconcile = 8;          // future create-or-update behavior
+}
+```
+
+Fields 5-8 are design direction only until the server implements lookup,
+precedence, and idempotency semantics.
+
+```json
+{
+  "service": "Authentication.Grpc",
+  "environment": "staging",
+  "name": "authentication-01",
+  "address": "lynx-authentication.lynx",
+  "endpoints": [
+    { "protocol": "grpc", "port": 81, "primary": true }
+  ]
+}
+```
+
+The adapter resolves `service` by exact stable service name, resolves
+`environment` by key first and then by unique name, rejects missing or
+ambiguous references, and invokes the same RegisterRuntime operation. It must
+not create a Service or Environment implicitly. Endpoint names may be derived
+from protocol only when unique; otherwise callers must provide them. The first
+endpoint may become primary only when no endpoint is marked primary.
+
+The backend translation remains:
+
+```text
+Service + Environment + Address
+  -> resolve Service
+  -> resolve Environment
+  -> find/create Deployment
+  -> create Instance
+  -> create Endpoint(s)
+```
+
+Health monitoring is a separate follow-up operation and must not be required
+for service registration or rolled back with the address registration.
+
+### Idempotency and reconciliation
+
+Current behavior is create-only. A repeated request with the same runtime name
+within the same Service + Environment Deployment hits the database uniqueness
+constraint; a different name creates another Instance. Address is not a
+uniqueness key, and no request idempotency key is honored. Clients must not
+retry blindly after an unknown result.
+
+The recommended future `reconcile=true` behavior is to match
+Service + Environment + Runtime name, update address/description and reconcile
+endpoints when found, or create the runtime when missing. An explicit request
+ID should provide replay protection for create requests, backed by durable
+request-result storage or an equivalent transactional mechanism.
+
+If a name is omitted by a future CLI, it may derive one deterministically from
+service and address only after documented normalization rules. It must not
+silently choose a name when multiple existing runtimes could match.
+
+Current CLI limitations are: Service and Environment lookup require database
+IDs; runtime and endpoint names are required; responses contain internal
+Deployment and Instance records; and validation errors are not yet structured
+per public field. These should be addressed additively in a public adapter,
+without creating a separate CLI persistence workflow.
 
 The persistence portion should behave as one logical operation. For SQLite, deployment resolution, instance creation, and endpoint creation should occur inside one transaction where possible. Events should be published after commit. If health-check creation is not included in the same transaction, the response/error must clearly indicate whether runtime registration succeeded and health-check creation failed.
 
