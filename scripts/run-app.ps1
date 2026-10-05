@@ -4,7 +4,8 @@ param(
     [int]$Port = 9700,
     [string]$StoragePath = ".artifacts\dev-registry.db",
     [switch]$SkipUiBuild,
-    [switch]$OpenBrowser
+    [switch]$OpenBrowser,
+    [switch]$ResetDevPassword
 )
 
 $ErrorActionPreference = "Stop"
@@ -64,7 +65,8 @@ if ($storageDirectory) {
 }
 
 $bootstrapCredentialPath = [System.IO.Path]::GetFullPath("$StoragePath.bootstrap-credential")
-if (Test-Path -LiteralPath $bootstrapCredentialPath) {
+$bootstrapCredentialAlreadyExists = Test-Path -LiteralPath $bootstrapCredentialPath
+if ($ResetDevPassword -and $bootstrapCredentialAlreadyExists) {
     Remove-Item -LiteralPath $bootstrapCredentialPath -Force
 }
 
@@ -74,7 +76,7 @@ $env:REGISTRY_STORAGE_PATH = $StoragePath
 $env:REGISTRY_DEV_MODE = "true"
 $env:REGISTRY_AUTH_ENABLED = "true"
 $env:REGISTRY_BOOTSTRAP_CREDENTIAL_PATH = $bootstrapCredentialPath
-$env:REGISTRY_RESET_DEV_BOOTSTRAP = "true"
+$env:REGISTRY_RESET_DEV_BOOTSTRAP = if ($ResetDevPassword) { "true" } else { "false" }
 $env:REGISTRY_TELEMETRY_ENABLED = "false"
 $env:REGISTRY_LOG_LEVEL = "debug"
 
@@ -89,32 +91,41 @@ $goCommand = Get-Command go -ErrorAction Stop
 $registryProcess = Start-Process -FilePath $goCommand.Source -ArgumentList @("run", ".\cmd\registry", "--dev") -NoNewWindow -PassThru
 
 try {
-    $credentialReady = $false
-    for ($attempt = 0; $attempt -lt 60; $attempt++) {
-        if ($registryProcess.HasExited) {
-            throw "Registry stopped before bootstrap completed (exit code $($registryProcess.ExitCode))."
+    $credentialNeedsWait = $ResetDevPassword -or -not $bootstrapCredentialAlreadyExists
+    if ($credentialNeedsWait) {
+        $credentialReady = $false
+        for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            if ($registryProcess.HasExited) {
+                throw "Registry stopped before bootstrap completed (exit code $($registryProcess.ExitCode))."
+            }
+            if (Test-Path -LiteralPath $bootstrapCredentialPath) {
+                $credentialReady = $true
+                break
+            }
+            Start-Sleep -Milliseconds 500
         }
-        if (Test-Path -LiteralPath $bootstrapCredentialPath) {
-            $credentialReady = $true
-            break
+        if (-not $credentialReady) {
+            throw "Timed out waiting for bootstrap credential file: $bootstrapCredentialPath"
         }
-        Start-Sleep -Milliseconds 500
     }
-    if (-not $credentialReady) {
-        throw "Timed out waiting for bootstrap credential file: $bootstrapCredentialPath"
+
+    if ($credentialNeedsWait) {
+        $credentialLines = Get-Content -LiteralPath $bootstrapCredentialPath
+        if ($credentialLines.Count -lt 2 -or $credentialLines[0] -notmatch '^username: ') {
+            throw "Bootstrap credential file has an invalid format: $bootstrapCredentialPath"
+        }
+        $bootstrapUsername = $credentialLines[0].Substring("username: ".Length)
+        $bootstrapPassword = $credentialLines[1]
+        Write-Host "Development bootstrap credential ready." -ForegroundColor Green
+        Write-Host "Username: $bootstrapUsername" -ForegroundColor Yellow
+        Write-Host "Temporary password: $bootstrapPassword" -ForegroundColor Yellow
+        Write-Host "Credential file: $bootstrapCredentialPath"
+        Write-Host "Change this password after signing in." -ForegroundColor Yellow
+        Write-Host ""
+    } else {
+        Write-Host "Using the existing development credential. Pass -ResetDevPassword to rotate it." -ForegroundColor Cyan
+        Write-Host ""
     }
-    $credentialLines = Get-Content -LiteralPath $bootstrapCredentialPath
-    if ($credentialLines.Count -lt 2 -or $credentialLines[0] -notmatch '^username: ') {
-        throw "Bootstrap credential file has an invalid format: $bootstrapCredentialPath"
-    }
-    $bootstrapUsername = $credentialLines[0].Substring("username: ".Length)
-    $bootstrapPassword = $credentialLines[1]
-    Write-Host "Development bootstrap credential ready." -ForegroundColor Green
-    Write-Host "Username: $bootstrapUsername" -ForegroundColor Yellow
-    Write-Host "Temporary password: $bootstrapPassword" -ForegroundColor Yellow
-    Write-Host "Credential file: $bootstrapCredentialPath"
-    Write-Host "Change this password after signing in." -ForegroundColor Yellow
-    Write-Host ""
 
     Write-Host "Press Ctrl+C to stop."
     Write-Host ""
