@@ -208,6 +208,9 @@ func (c *Config) Validate() error {
 	if c.Health.ResultRetentionHours <= 0 {
 		return fmt.Errorf("health.resultRetentionHours must be positive")
 	}
+	if !c.Server.DevMode && !c.Auth.Enabled {
+		return fmt.Errorf("auth must be enabled outside dev mode")
+	}
 	if c.Auth.Enabled && !c.Server.DevMode && c.Auth.BootstrapAdminPassword == "" && c.Auth.BootstrapAdminToken == "" {
 		return fmt.Errorf("auth bootstrap password or token must be configured when auth is enabled outside dev mode")
 	}
@@ -261,7 +264,7 @@ func defaultConfig() *Config {
 			MaxRetries: 5,
 		},
 		Auth: AuthConfig{
-			Enabled:                 false,
+			Enabled:                 true,
 			BootstrapAdminUsername:  "admin",
 			BootstrapAdminEmail:     "admin@example.local",
 			BootstrapAdminTokenName: "bootstrap-admin",

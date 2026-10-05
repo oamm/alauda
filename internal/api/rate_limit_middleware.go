@@ -92,12 +92,9 @@ func (l *rateLimiter) cleanup(now time.Time) {
 }
 
 func clientAddress(r *http.Request) string {
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		return strings.TrimSpace(strings.Split(forwarded, ",")[0])
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
 		return host
 	}
-	return r.RemoteAddr
+	return strings.TrimSpace(r.RemoteAddr)
 }

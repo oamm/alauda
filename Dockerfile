@@ -1,7 +1,7 @@
 # Multi-stage production build
 
 # Stage 1: Frontend build
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/web
 
@@ -12,21 +12,22 @@ COPY web .
 RUN npm run build
 
 # Stage 2: Backend build
-FROM golang:1.21-alpine AS backend-builder
+FROM golang:1.25-alpine AS backend-builder
 
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache git
+RUN apk add --no-cache git gcc musl-dev
 
 # Copy Go modules
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy source code
 COPY cmd ./cmd
 COPY internal ./internal
 COPY api ./api
+COPY gen ./gen
 
 # Build the binary
 RUN CGO_ENABLED=1 GOOS=linux go build \

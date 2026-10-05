@@ -58,3 +58,13 @@ func TestRateLimiterRefillsTokens(t *testing.T) {
 		t.Fatalf("request should be allowed after refill")
 	}
 }
+
+func TestClientAddressIgnoresSpoofedForwardedHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ping", nil)
+	req.RemoteAddr = "10.0.0.7:1234"
+	req.Header.Set("X-Forwarded-For", "192.0.2.99")
+
+	if got := clientAddress(req); got != "10.0.0.7" {
+		t.Fatalf("client address = %q, want socket peer address", got)
+	}
+}

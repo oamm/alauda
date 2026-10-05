@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.ai
+.artifacts
+test-results
+data
+*.db
+*.db-shm
+*.db-wal
+node_modules
+web/dist
+bin
+*.exe
+*.dll
+*.dylib

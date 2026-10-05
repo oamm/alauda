@@ -24,9 +24,17 @@ func TestValidateRequiresAuthBootstrapOutsideDev(t *testing.T) {
 	}
 }
 
-func TestValidateAcceptsDefaultConfig(t *testing.T) {
-	if err := defaultConfig().Validate(); err != nil {
-		t.Fatalf("default config invalid: %v", err)
+func TestValidateRejectsDefaultConfigWithoutBootstrap(t *testing.T) {
+	if err := defaultConfig().Validate(); err == nil {
+		t.Fatalf("expected default config to require auth bootstrap credentials")
+	}
+}
+
+func TestValidateRejectsDisabledAuthOutsideDev(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Auth.Enabled = false
+	if err := cfg.Validate(); err == nil {
+		t.Fatalf("expected disabled auth to be rejected outside dev mode")
 	}
 }
 
@@ -79,6 +87,7 @@ func TestLoadReadsYAMLConfig(t *testing.T) {
 server:
   address: 127.0.0.1
   port: 9900
+  devMode: true
   readTimeout: 3s
   writeTimeout: 4s
 storage:
