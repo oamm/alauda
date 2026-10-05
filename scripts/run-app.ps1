@@ -63,11 +63,15 @@ if ($storageDirectory) {
     New-Item -ItemType Directory -Force -Path $storageDirectory | Out-Null
 }
 
+$bootstrapCredentialPath = [System.IO.Path]::GetFullPath("$StoragePath.bootstrap-credential")
+$bootstrapCredentialAlreadyExists = Test-Path -LiteralPath $bootstrapCredentialPath
+
 $env:REGISTRY_ADDRESS = $Address
 $env:REGISTRY_PORT = "$Port"
 $env:REGISTRY_STORAGE_PATH = $StoragePath
 $env:REGISTRY_DEV_MODE = "true"
-$env:REGISTRY_AUTH_ENABLED = "false"
+$env:REGISTRY_AUTH_ENABLED = "true"
+$env:REGISTRY_BOOTSTRAP_CREDENTIAL_PATH = $bootstrapCredentialPath
 $env:REGISTRY_TELEMETRY_ENABLED = "false"
 $env:REGISTRY_LOG_LEVEL = "debug"
 
@@ -78,11 +82,49 @@ Write-Host "UI:      $url"
 Write-Host "Health:  $url/healthz"
 Write-Host "DB:      $StoragePath"
 Write-Host ""
-Write-Host "Press Ctrl+C to stop."
-Write-Host ""
+$goCommand = Get-Command go -ErrorAction Stop
+$registryProcess = Start-Process -FilePath $goCommand.Source -ArgumentList @("run", ".\cmd\registry", "--dev") -NoNewWindow -PassThru
 
-if ($OpenBrowser) {
-    Start-Process $url
+try {
+    if (-not $bootstrapCredentialAlreadyExists) {
+        $credentialReady = $false
+        for ($attempt = 0; $attempt -lt 60; $attempt++) {
+            if ($registryProcess.HasExited) {
+                throw "Registry stopped before bootstrap completed (exit code $($registryProcess.ExitCode))."
+            }
+            if (Test-Path -LiteralPath $bootstrapCredentialPath) {
+                $credentialReady = $true
+                break
+            }
+            Start-Sleep -Milliseconds 500
+        }
+        if (-not $credentialReady) {
+            throw "Timed out waiting for bootstrap credential file: $bootstrapCredentialPath"
+        }
+
+        $credentialLines = Get-Content -LiteralPath $bootstrapCredentialPath
+        if ($credentialLines.Count -lt 2 -or $credentialLines[0] -notmatch '^username: ') {
+            throw "Bootstrap credential file has an invalid format: $bootstrapCredentialPath"
+        }
+        $bootstrapUsername = $credentialLines[0].Substring("username: ".Length)
+        $bootstrapPassword = $credentialLines[1]
+        Write-Host "Alauda first-time initialization completed." -ForegroundColor Green
+        Write-Host "Username: $bootstrapUsername" -ForegroundColor Yellow
+        Write-Host "Temporary password: $bootstrapPassword" -ForegroundColor Yellow
+        Write-Host "Credential file: $bootstrapCredentialPath"
+        Write-Host "Change this password after signing in." -ForegroundColor Yellow
+        Write-Host ""
+    }
+
+    Write-Host "Press Ctrl+C to stop."
+    Write-Host ""
+    if ($OpenBrowser) {
+        Start-Process $url
+    }
+    Wait-Process -Id $registryProcess.Id
 }
-
-go run .\cmd\registry --dev
+finally {
+    if (-not $registryProcess.HasExited) {
+        Stop-Process -Id $registryProcess.Id -Force
+    }
+}
