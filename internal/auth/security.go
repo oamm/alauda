@@ -20,6 +20,45 @@ type BootstrapResult struct {
 	CredentialPath string
 }
 
+// ResetDevelopmentBootstrap rotates the root development credential. It is
+// intentionally separate from Bootstrap so production initialization remains
+// one-time and idempotent.
+func (r *Repository) ResetDevelopmentBootstrap(ctx context.Context, username, credentialPath string) (*BootstrapResult, error) {
+	if err := os.Remove(credentialPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("remove development bootstrap credential: %w", err)
+	}
+	password, err := newBootstrapCredential(credentialPath, username)
+	if err != nil {
+		return nil, err
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return nil, fmt.Errorf("hash development bootstrap credential: %w", err)
+	}
+
+	tx, err := r.db.BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin development bootstrap reset: %w", err)
+	}
+	defer tx.Rollback()
+
+	var userID string
+	if err := tx.QueryRowContext(ctx, "SELECT id FROM users WHERE username = ? AND deleted_at IS NULL", username).Scan(&userID); err != nil {
+		return nil, fmt.Errorf("find development bootstrap administrator: %w", err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, "UPDATE users SET password_hash = ?, must_change_password = 1, updated_at = ? WHERE id = ?", hash, now, userID); err != nil {
+		return nil, fmt.Errorf("reset development bootstrap password: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", now, userID); err != nil {
+		return nil, fmt.Errorf("revoke development bootstrap sessions: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit development bootstrap reset: %w", err)
+	}
+	return &BootstrapResult{Created: true, Username: username, CredentialPath: credentialPath}, nil
+}
+
 // Bootstrap performs the one-time initialization under a database uniqueness boundary.
 // Existing installations are marked initialized and are never given an implicit root.
 func (r *Repository) Bootstrap(ctx context.Context, username, email, credentialPath string) (*BootstrapResult, error) {
@@ -88,6 +127,10 @@ func bootstrapCredential(path, username string) (string, error) {
 		return "", fmt.Errorf("read bootstrap credential file: %w", err)
 	}
 
+	return newBootstrapCredential(path, username)
+}
+
+func newBootstrapCredential(path, username string) (string, error) {
 	secret, _, err := NewToken()
 	if err != nil {
 		return "", fmt.Errorf("generate bootstrap credential: %w", err)

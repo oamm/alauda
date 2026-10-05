@@ -142,6 +142,13 @@ func runServer(cmd *cobra.Command, args []string) error {
 		if result.Created {
 			slog.Info("Alauda first-time initialization completed", slog.String("username", result.Username), slog.String("credentialPath", result.CredentialPath))
 		}
+		if cfg.Server.DevMode && os.Getenv("REGISTRY_RESET_DEV_BOOTSTRAP") == "true" {
+			result, err := auth.NewRepository(db).ResetDevelopmentBootstrap(context.Background(), cfg.Auth.BootstrapAdminUsername, cfg.Auth.BootstrapCredentialPath)
+			if err != nil {
+				return fmt.Errorf("development bootstrap reset failed: %w", err)
+			}
+			slog.Info("Development bootstrap credential reset", slog.String("username", result.Username), slog.String("credentialPath", result.CredentialPath))
+		}
 	}
 
 	// Create server
