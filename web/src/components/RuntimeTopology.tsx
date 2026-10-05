@@ -35,11 +35,11 @@ export function RuntimeTopology({
   if (deployments.length === 0) {
     return (
       <EmptyState
-        title="No runtime topology"
-        description={`${serviceName} has catalog metadata, but no deployment, instance, endpoint, or health relationship is registered in the current scope.`}
+            title="No instances"
+            description={`${serviceName} has catalog metadata, but no instance, endpoint, or health relationship is registered in the current scope.`}
         action={
           <button type="button" onClick={onRegisterRuntime}>
-            Register runtime
+            Add instance
           </button>
         }
       />
@@ -62,7 +62,7 @@ export function RuntimeTopology({
           <section className="topology-deployment" key={deployment.id}>
             <div className="topology-node topology-root">
               <div>
-                <span>Deployment</span>
+                <span>Environment</span>
                 <strong>{environmentName(environments, deployment.environmentId)}</strong>
               </div>
               <StatusBadge
@@ -73,7 +73,7 @@ export function RuntimeTopology({
               {deploymentInstances.length === 0 ? (
                 <EmptyState
                   title="No instances"
-                  description="This deployment exists, but no concrete runtime targets are registered."
+                  description="This environment has no concrete service instances yet."
                   action={
                     <button type="button" onClick={onRegisterRuntime}>
                       Add instance
@@ -98,8 +98,7 @@ export function RuntimeTopology({
                     <div className="topology-instance" key={instance.id}>
                       <div className="topology-node">
                         <div>
-                          <span>Instance</span>
-                          <strong>{instance.name}</strong>
+                        <strong>{instance.name}</strong>
                           <small>
                             {instance.address}:{instance.port || "dynamic"} ·{" "}
                             {formatTimestamp(instance.lastSeenAt)}
@@ -132,7 +131,7 @@ export function RuntimeTopology({
                         ))}
                         {instanceChecks.map((check) => (
                           <div className="topology-leaf" key={check.id}>
-                            <span>Health check</span>
+                            <span>Health monitoring</span>
                             <strong>
                               {check.name} · {formatCheckType(check.type)} every{" "}
                               {check.intervalSeconds}s

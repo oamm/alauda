@@ -96,22 +96,22 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("registers runtime through the composite API", async () => {
+  it("adds an instance through the composite API", async () => {
     render(<App />);
 
     await screen.findByText("Checkout service created");
     fireEvent.click(screen.getByRole("button", { name: "Services" }));
 
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
     fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
     fireEvent.change(screen.getByLabelText("Instance name"), {
       target: { value: "checkout-prod-02" },
     });
-    fireEvent.change(screen.getByLabelText("Address"), {
+    fireEvent.change(screen.getByLabelText("Address / hostname"), {
       target: { value: "10.0.0.2" },
     });
-    fireEvent.change(screen.getByLabelText("Name"), {
-      target: { value: "http" },
+    fireEvent.change(screen.getByLabelText("Path"), {
+      target: { value: "/" },
     });
     const addInstanceButtons = screen.getAllByRole("button", {
       name: "Add instance",
@@ -119,7 +119,7 @@ describe("App", () => {
     fireEvent.click(addInstanceButtons[addInstanceButtons.length - 1]);
 
     await screen.findByText(
-      "Runtime registered successfully: checkout-prod-02.",
+      "Instance added successfully: checkout-prod-02.",
     );
 
     const registerCall = vi
@@ -143,7 +143,7 @@ describe("App", () => {
     });
   });
 
-  it("scopes runtime registration to the selected service workspace", async () => {
+  it("scopes instance creation to the selected service workspace", async () => {
     render(<App />);
 
     await screen.findByText("Checkout service created");
@@ -153,10 +153,10 @@ describe("App", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.queryByText("Register Runtime")).not.toBeInTheDocument();
+    expect(screen.queryByText("Add instance")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Target" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
     expect(screen.getByText("Endpoints")).toBeInTheDocument();
     expect(screen.getAllByText("Health").length).toBeGreaterThan(0);
 
@@ -172,7 +172,7 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Instance name"), {
       target: { value: "checkout-prod-03" },
     });
-    fireEvent.change(screen.getByLabelText("Address"), {
+    fireEvent.change(screen.getByLabelText("Address / hostname"), {
       target: { value: "10.0.0.3" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -180,58 +180,46 @@ describe("App", () => {
     expect(screen.getByLabelText("Instance name")).toHaveValue(
       "checkout-prod-03",
     );
-    expect(screen.getByLabelText("Address")).toHaveValue("10.0.0.3");
+    expect(screen.getByLabelText("Address / hostname")).toHaveValue("10.0.0.3");
   });
 
-  it("expands health monitoring locally without submitting or losing form state", async () => {
+  it("configures optional health monitoring after adding an instance", async () => {
     const startingUrl = window.location.href;
     render(<App />);
 
     await screen.findByText("Checkout service created");
     fireEvent.click(screen.getByRole("button", { name: "Services" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
     fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
 
     fireEvent.change(screen.getByLabelText("Instance name"), {
       target: { value: "checkout-prod-04" },
     });
-    fireEvent.change(screen.getByLabelText("Address"), {
+    fireEvent.change(screen.getByLabelText("Address / hostname"), {
       target: { value: "10.0.0.4" },
     });
-    fireEvent.change(screen.getByLabelText("Name"), {
-      target: { value: "public" },
+    fireEvent.change(screen.getByLabelText("Path"), {
+      target: { value: "/public" },
     });
 
-    const healthToggle = screen.getByRole("button", {
-      name: /Health monitoring/i,
-    });
-    expect(healthToggle).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(healthToggle);
-
-    expect(healthToggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByLabelText("Check type")).toBeInTheDocument();
-    expect(screen.getByLabelText("Interval")).toBeInTheDocument();
+    expect(screen.queryByText("Health monitoring")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
+    await screen.findByText("Instance added successfully");
+    expect(screen.getByText("checkout-prod-02")).toBeInTheDocument();
+    expect(screen.getByText("10.0.0.2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Configure health monitoring" }));
+    expect(screen.getByText("Check type")).toBeInTheDocument();
+    expect(screen.getByText("Interval (seconds)")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByLabelText("Instance name")).toHaveValue(
-      "checkout-prod-04",
-    );
-    expect(screen.getByLabelText("Address")).toHaveValue("10.0.0.4");
-    expect(screen.getByLabelText("Name")).toHaveValue("public");
     expect(window.location.href).toBe(startingUrl);
+    fireEvent.click(screen.getByRole("button", { name: "Save health monitoring" }));
+    await screen.findByText(/Health monitoring could not be configured/);
+    expect(screen.getByRole("button", { name: "Retry health configuration" })).toBeInTheDocument();
     expect(
       vi.mocked(fetch).mock.calls.filter(([input]) =>
         input.toString().includes("RegisterRuntime"),
       ),
-    ).toHaveLength(0);
-
-    fireEvent.click(healthToggle);
-
-    expect(healthToggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByLabelText("Check type")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Instance name")).toHaveValue(
-      "checkout-prod-04",
-    );
+    ).toHaveLength(1);
   });
 
   it("has no WCAG 2 A/AA axe violations on the dashboard", async () => {

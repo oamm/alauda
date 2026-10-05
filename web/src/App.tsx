@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
 import { AppShell } from "./components/AppShell";
+import { AddRuntimeDialog } from "./components/AddRuntimeDialog";
 import { AvailabilityCard, MetricCard } from "./components/Cards";
 import {
   EmptyState,
@@ -19,6 +20,7 @@ import {
   pluralize,
 } from "./utils/format";
 import { DashboardView } from "./views/DashboardView";
+import { RuntimeTopology } from "./components/RuntimeTopology";
 import {
   AlertPolicy,
   ApiToken,
@@ -138,7 +140,6 @@ function App() {
   >("overview");
   const [showCreateService, setShowCreateService] = useState(false);
   const [showAddRuntime, setShowAddRuntime] = useState(false);
-  const [showRuntimeHealth, setShowRuntimeHealth] = useState(false);
   const [healthStatusFilter, setHealthStatusFilter] = useState("all");
   const [selectedBulkServiceIds, setSelectedBulkServiceIds] = useState<
     string[]
@@ -178,6 +179,15 @@ function App() {
   const [authMessage, setAuthMessage] = useState("");
   const [error, setError] = useState("");
   const [registrationSuccess, setRegistrationSuccess] = useState("");
+  const [registeredRuntime, setRegisteredRuntime] = useState<{
+    name: string;
+    address: string;
+    instanceId: string;
+    endpoints: Pick<Endpoint, "id" | "protocol" | "port" | "path" | "primary">[];
+  } | null>(null);
+  const [healthFollowUpError, setHealthFollowUpError] = useState("");
+  const [healthFollowUpConfigured, setHealthFollowUpConfigured] = useState(false);
+  const [savingHealthFollowUp, setSavingHealthFollowUp] = useState(false);
   const [serviceForm, setServiceForm] = useState({
     name: "",
     displayName: "",
@@ -1139,25 +1149,19 @@ function App() {
     if (!serviceId) {
       return;
     }
-    const primaryEndpoint = registrationForm.endpoints[0];
+    const invalidEndpoint = registrationForm.endpoints.find(
+      (endpoint) => !endpoint.name.trim() || endpoint.port < 1 || endpoint.port > 65535,
+    );
     if (
       !registrationForm.environmentId ||
       !registrationForm.instanceName.trim() ||
       !registrationForm.address.trim() ||
-      !primaryEndpoint?.name.trim() ||
-      primaryEndpoint.port < 1 ||
-      primaryEndpoint.port > 65535
+      registrationForm.endpoints.length === 0 ||
+      invalidEndpoint ||
+      !registrationForm.endpoints.some((endpoint) => endpoint.primary) ||
+      new Set(registrationForm.endpoints.map((endpoint) => `${endpoint.protocol}:${endpoint.port}:${endpoint.path}`)).size !== registrationForm.endpoints.length
     ) {
-      setError("Environment, instance name, address, endpoint name, and a valid endpoint port are required.");
-      return;
-    }
-    if (
-      registrationForm.configureHealth &&
-      (!registrationForm.healthName.trim() ||
-        registrationForm.healthIntervalSeconds < 1 ||
-        registrationForm.healthTimeoutSeconds < 1)
-    ) {
-      setError("Health check name, interval, and timeout are required when health monitoring is configured.");
+      setError("Choose an environment, enter instance details, and provide unique endpoints with a valid port and one primary endpoint.");
       return;
     }
     setSavingRegistration(true);
@@ -1183,45 +1187,6 @@ function App() {
         })),
       });
 
-      let healthMessage = "";
-      if (registrationForm.configureHealth) {
-        try {
-          const registeredInstance = registration.instance;
-          if (!registeredInstance) {
-            throw new Error("RegisterRuntime returned no instance");
-          }
-          const endpoint =
-            registration.endpoints?.find((item) => item.primary) ??
-            registration.endpoints?.[0];
-          const check = await createHealthCheck({
-            instanceId: registeredInstance.id,
-            endpointId: endpoint?.id ?? "",
-            name: registrationForm.healthName,
-            type: registrationForm.healthType,
-            enabled: true,
-            intervalSeconds: registrationForm.healthIntervalSeconds,
-            timeoutSeconds: registrationForm.healthTimeoutSeconds,
-            failuresBeforeUnhealthy:
-              registrationForm.healthFailuresBeforeUnhealthy,
-            successesBeforeHealthy:
-              registrationForm.healthSuccessesBeforeHealthy,
-            description: "Created during runtime registration",
-            metadata: {
-              path: endpoint?.path || primaryEndpoint.path || "/",
-              expectedStatus: "200-299",
-            },
-          });
-          healthMessage = ` Health check ${check.name} created.`;
-          setSelectedHealthCheckId(check.id);
-        } catch (healthErr) {
-          setError(
-            healthErr instanceof Error
-              ? `Runtime registered, but health check creation failed: ${healthErr.message}`
-              : "Runtime registered, but health check creation failed.",
-          );
-        }
-      }
-
       setRegistrationForm((current) => ({
         ...current,
         instanceName: "",
@@ -1233,20 +1198,79 @@ function App() {
       await loadCatalog(selectedEnvironmentId);
       setSelectedServiceId(serviceId);
       setServiceTab("runtime");
-      setShowAddRuntime(false);
-      setRegistrationSuccess(
-        `Runtime registered successfully: ${registration.instance?.name ?? "instance"}.${healthMessage}`,
-      );
+      if (!registration.instance) {
+        throw new Error("RegisterRuntime returned no instance");
+      }
+      setRegisteredRuntime({
+        name: registration.instance.name,
+        address: registration.instance.address,
+        instanceId: registration.instance.id,
+        endpoints: registration.endpoints ?? [],
+      });
+      setHealthFollowUpError("");
+      setHealthFollowUpConfigured(false);
+      setRegistrationSuccess("Instance added successfully.");
       setAuthMessage(
-        `Runtime registered successfully: ${registration.instance?.name ?? "instance"}.${healthMessage}`,
+        `Instance added successfully: ${registration.instance.name}.`,
       );
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to register instance",
+        err instanceof Error ? err.message : "Failed to register service",
       );
     } finally {
       setSavingRegistration(false);
     }
+  }
+
+  async function handleCreateRegisteredHealth() {
+    if (!registeredRuntime) {
+      return;
+    }
+    if (
+      !registrationForm.healthName.trim() ||
+      registrationForm.healthIntervalSeconds < 1 ||
+      registrationForm.healthTimeoutSeconds < 1
+    ) {
+      setHealthFollowUpError("Health check name, interval, and timeout are required.");
+      return;
+    }
+    setSavingHealthFollowUp(true);
+    setHealthFollowUpError("");
+    try {
+      const endpoint = registeredRuntime.endpoints.find((item) => item.primary) ?? registeredRuntime.endpoints[0];
+      const check = await createHealthCheck({
+        instanceId: registeredRuntime.instanceId,
+        endpointId: endpoint?.id ?? "",
+        name: registrationForm.healthName,
+        type: registrationForm.healthType,
+        enabled: true,
+        intervalSeconds: registrationForm.healthIntervalSeconds,
+        timeoutSeconds: registrationForm.healthTimeoutSeconds,
+        failuresBeforeUnhealthy: registrationForm.healthFailuresBeforeUnhealthy,
+        successesBeforeHealthy: registrationForm.healthSuccessesBeforeHealthy,
+        description: "Created after instance registration",
+        metadata: { path: endpoint?.path || "/", expectedStatus: "200-299" },
+      });
+      setSelectedHealthCheckId(check.id);
+      setHealthFollowUpConfigured(true);
+      await loadCatalog(selectedEnvironmentId);
+    } catch (err) {
+      setHealthFollowUpError(
+        err instanceof Error
+          ? `Health monitoring could not be configured: ${err.message}`
+          : "Health monitoring could not be configured.",
+      );
+    } finally {
+      setSavingHealthFollowUp(false);
+    }
+  }
+
+  function closeRuntimeDialog() {
+    setShowAddRuntime(false);
+    setRegisteredRuntime(null);
+    setHealthFollowUpError("");
+    setHealthFollowUpConfigured(false);
+    setRegistrationSuccess("");
   }
 
   async function handleDeleteSelectedServices() {
@@ -1604,6 +1628,7 @@ function App() {
   void removeRegistrationEndpoint;
   void setPrimaryRegistrationEndpoint;
   void focusRegistrationForm;
+  void RuntimeTopology;
   void startEditInstance;
   void startEditEndpoint;
   void handleUpdateInstance;
@@ -1671,7 +1696,7 @@ function App() {
                 ? `in ${currentEnvironmentName}`
                 : "across all environments"
             }`}
-            description="Manage service catalog and runtime registrations."
+            description="Manage the service catalog and registered addresses."
             action={
               <button
                 className="button-primary"
@@ -1932,7 +1957,7 @@ function App() {
                       role="tab"
                       type="button"
                     >
-                      {tab[0].toUpperCase() + tab.slice(1)}
+                      {tab === "runtime" ? "Availability" : tab[0].toUpperCase() + tab.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -1941,7 +1966,7 @@ function App() {
                   <div className="service-tab-panel">
                     <div className="summary-strip">
                       <div>
-                        <span>Runtime</span>
+                        <span>Instances</span>
                         <strong>{selectedServiceRuntimeSummary}</strong>
                       </div>
                       <div>
@@ -2001,7 +2026,7 @@ function App() {
                   <div className="service-tab-panel">
                     <div className="tab-toolbar">
                       <div>
-                        <h3>Runtime</h3>
+                        <h3>Service availability</h3>
                         <span>
                           {selectedEnvironmentId
                             ? currentEnvironmentName
@@ -2013,20 +2038,20 @@ function App() {
                           type="button"
                           onClick={() => setShowAddRuntime(true)}
                         >
-                          Add runtime
+                          Add instance
                         </button>
                       ) : null}
                     </div>
                     {selectedServiceDeployments.length === 0 ? (
                       <EmptyState
-                        title="No runtime registered"
-                        description={`${selectedService.displayName || selectedService.name} exists in the catalog but has no runtime instance in this scope.`}
+                        title="No instances"
+                        description={`${selectedService.displayName || selectedService.name} exists in the catalog but has no instance in this scope.`}
                         action={
                           <button
                             type="button"
                             onClick={() => setShowAddRuntime(true)}
                           >
-                            Add runtime
+                            Add instance
                           </button>
                         }
                       />
@@ -2055,12 +2080,7 @@ function App() {
                                     deployment.environmentId,
                                   )}
                                 </h3>
-                                <span>
-                                  {pluralize(
-                                    deploymentInstances.length,
-                                    "instance",
-                                  )}
-                                </span>
+                                <span>{pluralize(deploymentInstances.length, "instance")}</span>
                               </div>
                               <StatusBadge
                                 status={
@@ -2083,7 +2103,7 @@ function App() {
                             {deploymentInstances.length === 0 ? (
                               <EmptyState
                                 title="No instances"
-                                description="This deployment has no runtime targets yet."
+                                description="This environment has no instances yet."
                                 action={
                                   <button
                                     type="button"
@@ -2169,7 +2189,7 @@ function App() {
                                               handleDeleteInstance(instance)
                                             }
                                           >
-                                            Delete instance
+                                            Remove instance
                                           </button>
                                         </div>
                                       </details>
@@ -2231,7 +2251,7 @@ function App() {
                                           disabled={savingRuntimeEdit}
                                           type="submit"
                                         >
-                                          Save instance
+                                          Save
                                         </button>
                                         <button
                                           type="button"
@@ -2844,7 +2864,7 @@ function App() {
                       {selectedServiceHealthChecks.length === 0 ? (
                         <EmptyState
                           title="No health checks"
-                          description="No monitoring configuration is attached to this service runtime yet."
+                        description="No monitoring configuration is attached to a service instance yet."
                         />
                       ) : (
                         selectedServiceHealthChecks.map((check) => (
@@ -2946,7 +2966,7 @@ function App() {
             ) : (
               <EmptyState
                 title="Select a service"
-                description="Choose a service from the catalog to inspect runtime, health, incidents, and events in one workspace."
+                description="Choose a service from the catalog to inspect instances, health, incidents, and events in one workspace."
               />
             )}
           </div>
@@ -2981,7 +3001,7 @@ function App() {
                       )}
                     />
                   </dd>
-                  <dt>Deployments</dt>
+                  <dt>Environments</dt>
                   <dd>{selectedServiceDeployments.length}</dd>
                   <dt>Instances</dt>
                   <dd>{selectedServiceInstances.length}</dd>
@@ -2989,7 +3009,7 @@ function App() {
               ) : (
                 <EmptyState
                   title="Select a service"
-                  description="Choose a service from the table to inspect its runtime topology, health checks, incidents, and events."
+                  description="Choose a service from the table to inspect its instances, health checks, incidents, and events."
                 />
               )}
             </div>
@@ -3004,8 +3024,8 @@ function App() {
               <div className="table">
                 {!selectedService || selectedServiceDeployments.length === 0 ? (
                   <EmptyState
-                    title="No runtime environments"
-                    description="This service has not been deployed into the selected environment scope yet."
+                    title="No registered environments"
+                    description="This service has no instance in the selected environment scope yet."
                   />
                 ) : (
                   selectedServiceDeployments.map((deployment) => {
@@ -3040,32 +3060,11 @@ function App() {
               </div>
             </div>
 
-            <RuntimeRegistrationWizard
-              environments={environments}
-              form={registrationForm}
-              registrationSuccess={registrationSuccess}
-              saving={savingRegistration}
-              selectedEnvironment={selectedEnvironment}
-              selectedService={selectedService}
-              selectedServiceId={selectedServiceId}
-              services={services}
-              step={registrationStep}
-              onAddEndpoint={addRegistrationEndpoint}
-              onBack={() => setRegistrationStep((step) => Math.max(step - 1, 0))}
-              onRemoveEndpoint={removeRegistrationEndpoint}
-              onSetPrimaryEndpoint={setPrimaryRegistrationEndpoint}
-              onServiceChange={setSelectedServiceId}
-              onStepChange={setRegistrationStep}
-              onSubmit={handleRegisterInstance}
-              onUpdateEndpoint={updateRegistrationEndpoint}
-              setForm={setRegistrationForm}
-            />
-
             <div className="panel service-wide-panel">
               <div className="panel-heading">
-                <h2>Runtime Topology</h2>
+                          <h2>Instances</h2>
                 <span>
-                  Service / Deployment / Instance / Endpoint / Health
+                  Service / Environment / Address / Endpoint / Health monitoring
                 </span>
               </div>
               <RuntimeTopology
@@ -3118,8 +3117,8 @@ function App() {
                   <div className="empty-action">
                     <strong>
                       {selectedEnvironmentDeployment
-                        ? "No runtime instances registered."
-                        : `${selectedService?.name ?? "This service"} has no runtime registration in ${selectedEnvironment?.name ?? "this environment"}.`}
+                        ? "No instances yet."
+                        : `${selectedService?.name ?? "This service"} has no instance in ${selectedEnvironment?.name ?? "this environment"}.`}
                     </strong>
                     <p>
                       Alauda knows this service exists, but it does not yet know
@@ -3127,8 +3126,8 @@ function App() {
                     </p>
                     <button type="button" onClick={focusRegistrationForm}>
                       {selectedEnvironmentDeployment
-                        ? "Register first instance"
-                        : `Register runtime in ${selectedEnvironment?.name ?? "environment"}`}
+                        ? "Add first instance"
+                        : `Add instance in ${selectedEnvironment?.name ?? "environment"}`}
                     </button>
                   </div>
                 ) : (
@@ -3136,7 +3135,6 @@ function App() {
                     <div className="instance-row" key={instance.id}>
                       <div>
                         <strong>{instance.name}</strong>
-                        <span>{instance.id}</span>
                       </div>
                       <span>{instance.address}</span>
                       <span>
@@ -3210,7 +3208,7 @@ function App() {
                             Enabled
                           </label>
                           <button disabled={savingRuntimeEdit} type="submit">
-                            Save instance
+                            Save
                           </button>
                           <button
                             type="button"
@@ -3235,7 +3233,7 @@ function App() {
                 {selectedServiceEndpoints.length === 0 ? (
                   <EmptyState
                     title="No endpoints"
-                    description="Instances exist, but no protocol/path targets are attached to them yet."
+                    description="Instances exist, but no protocol/path endpoints are attached yet."
                   />
                 ) : (
                   selectedServiceEndpoints.map((endpoint) => {
@@ -3388,7 +3386,7 @@ function App() {
                 {selectedServiceHealthChecks.length === 0 ? (
                   <EmptyState
                     title="No health checks"
-                    description="No monitoring configuration is attached to this service runtime yet."
+                        description="No monitoring configuration is attached to a service instance yet."
                   />
                 ) : (
                   selectedServiceHealthChecks.map((check) => (
@@ -3621,6 +3619,30 @@ function App() {
           ) : null}
 
           {showAddRuntime && selectedService ? (
+            <AddRuntimeDialog
+              environments={environments}
+              form={registrationForm}
+              registrationSuccess={registrationSuccess}
+              saving={savingRegistration}
+              selectedService={selectedService}
+              onAddEndpoint={addRegistrationEndpoint}
+              onRemoveEndpoint={removeRegistrationEndpoint}
+              onSetPrimaryEndpoint={setPrimaryRegistrationEndpoint}
+              onSubmit={handleRegisterInstance}
+              onUpdateEndpoint={updateRegistrationEndpoint}
+              setForm={setRegistrationForm}
+              onClose={closeRuntimeDialog}
+              registeredRuntime={registeredRuntime ?? undefined}
+              healthError={healthFollowUpError}
+              healthConfigured={healthFollowUpConfigured}
+              healthSaving={savingHealthFollowUp}
+              onConfigureHealth={() => setHealthFollowUpError("")}
+              onCreateHealth={handleCreateRegisteredHealth}
+            />
+          ) : null}
+
+          {/* Legacy inline registration form consolidated into AddRuntimeDialog. */}
+          {/*
             <div
               aria-labelledby="add-instance-title"
               aria-modal="true"
@@ -3635,8 +3657,8 @@ function App() {
                   <div>
                     <h2 id="add-instance-title">
                       {selectedEnvironmentDeployment
-                        ? `Add instance to ${selectedService.displayName || selectedService.name}`
-                        : "Add runtime"}
+                        ? `Register service for ${selectedService!.displayName || selectedService!.name}`
+                        : "Register service"}
                     </h2>
                     <span>
                       Service
@@ -3653,7 +3675,7 @@ function App() {
                 </div>
                 <div className="context-strip">
                   <span>Service</span>
-                  <strong>{selectedService.displayName || selectedService.name}</strong>
+                  <strong>{selectedService!.displayName || selectedService!.name}</strong>
                 </div>
                 <label>
                   Environment
@@ -3677,7 +3699,7 @@ function App() {
                 </label>
                 <div className="form-fields-grid">
                   <label>
-                    Instance name
+                    Name
                     <input
                       required
                       data-registration-instance-name
@@ -3721,7 +3743,7 @@ function App() {
                     <span>Endpoint</span>
                     <strong>Required</strong>
                   </div>
-                  <p>An instance must have at least one endpoint.</p>
+                  <p>A service address must have at least one endpoint.</p>
                   <div className="form-fields-grid">
                     <label>
                       Name
@@ -3887,20 +3909,20 @@ function App() {
                     {savingRegistration
                       ? "Adding"
                       : selectedEnvironmentDeployment
-                        ? "Add instance"
-                        : "Add runtime"}
+                        ? "Register"
+                        : "Register service"}
                   </button>
                 </div>
               </form>
             </div>
-          ) : null}
+          */}
         </section>
       ) : activeView === "environments" ? (
         <section className="content-grid environments-grid">
           <PageHeader
             title="Environments"
             context={`${environments.length} environments`}
-            description="Runtime scopes used to filter services, deployments, incidents, alerts, and events."
+            description="Environment scopes used to filter services, incidents, alerts, and events."
           />
           <div className="panel">
             <div className="panel-heading">
@@ -3987,7 +4009,7 @@ function App() {
           <PageHeader
             title="Health"
             context={`${filteredHealthInstances.length} instances · ${healthChecks.filter((check) => check.enabled).length} enabled checks`}
-            description="Monitor unhealthy instances, recent check results, and manual execution from the current environment scope."
+            description="Monitor unhealthy service instances, recent check results, and manual execution from the current environment scope."
           />
           <div className="panel service-wide-panel">
             <div className="panel-heading">
@@ -4028,7 +4050,7 @@ function App() {
 
           <div className="panel service-wide-panel">
             <div className="panel-heading">
-              <h2>Instance Health</h2>
+              <h2>Instance health</h2>
               <span>{filteredHealthInstances.length} shown</span>
             </div>
             <div className="filter-bar">
@@ -4051,7 +4073,7 @@ function App() {
               {filteredHealthInstances.length === 0 ? (
                 <EmptyState
                   title="No health targets"
-                  description="No runtime instances match the selected health filter."
+                      description="No instances match the selected health filter."
                 />
               ) : (
                 filteredHealthInstances.map((instance) => {
@@ -4060,7 +4082,7 @@ function App() {
                     <div className="instance-row" key={instance.id}>
                       <div>
                         <strong>{instance.name}</strong>
-                        <span>{instance.id}</span>
+                        <span>{instance.address}</span>
                       </div>
                       <span>
                         {state?.currentState ? (
@@ -4094,7 +4116,7 @@ function App() {
             {healthChecks.length === 0 && !loading ? (
               <EmptyState
                 title="No health checks"
-                description="Create a health check or register runtime with monitoring enabled to start tracking state."
+                description="Create a health check or register a service with monitoring enabled to start tracking state."
               />
             ) : (
               <div className="service-list">
@@ -4111,7 +4133,7 @@ function App() {
                   >
                     <strong>{check.name}</strong>
                     <span>
-                      {formatCheckType(check.type)} / {check.instanceId}
+                      {formatCheckType(check.type)}
                     </span>
                   </button>
                 ))}
@@ -4192,7 +4214,7 @@ function App() {
               <h2>Create Health Check</h2>
             </div>
             <label>
-              Instance ID
+              Instance reference
               <input
                 required
                 value={healthForm.instanceId}
@@ -4205,7 +4227,7 @@ function App() {
               />
             </label>
             <label>
-              Endpoint ID
+              Endpoint reference
               <input
                 value={healthForm.endpointId}
                 onChange={(event) =>
@@ -4594,7 +4616,7 @@ function App() {
               </select>
             </label>
             <label>
-              Deployment ID
+              Environment scope reference
               <input
                 value={policyForm.deploymentId}
                 onChange={(event) =>
@@ -5247,7 +5269,7 @@ function compactMap(value: Record<string, string>) {
 
 function formatPolicyScope(policy: AlertPolicy) {
   if (policy.deploymentId) {
-    return `Deployment ${policy.deploymentId}`;
+    return `Environment scope ${policy.deploymentId}`;
   }
   if (policy.environmentId) {
     return `Environment ${policy.environmentId}`;
