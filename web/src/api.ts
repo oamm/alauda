@@ -1,8 +1,13 @@
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
 let bearerToken = "";
+let authenticationFailureHandler: (() => void) | undefined;
 
 export function setBearerToken(token: string) {
   bearerToken = token;
+}
+
+export function setAuthenticationFailureHandler(handler?: () => void) {
+  authenticationFailureHandler = handler;
 }
 
 export type Environment = {
@@ -180,6 +185,18 @@ export type UserAccount = {
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string;
+  mustChangePassword?: boolean;
+};
+
+export type Session = {
+  id: string;
+  userId: string;
+  createdAt: string;
+  lastActivityAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+  userAgent?: string;
+  clientIp?: string;
 };
 
 export type ApiToken = {
@@ -332,6 +349,13 @@ type LoginResponse = {
   user?: UserAccount;
   token?: string;
   expiresAt?: string;
+  mustChangePassword?: boolean;
+};
+
+type CurrentSessionResponse = {
+  user?: UserAccount;
+  scopes?: string[];
+  mustChangePassword?: boolean;
 };
 
 type ListUsersResponse = {
@@ -351,6 +375,8 @@ type CreateApiTokenResponse = {
   secret?: string;
 };
 
+type ListSessionsResponse = { sessions?: Session[] };
+
 function authHeaders(): Record<string, string> {
   return bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {};
 }
@@ -359,7 +385,7 @@ async function connectRequest<TResponse>(
   path: string,
   body: Record<string, unknown>,
 ): Promise<TResponse> {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await authenticatedFetch(`${apiBaseUrl}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -374,6 +400,14 @@ async function connectRequest<TResponse>(
   }
 
   return response.json() as Promise<TResponse>;
+}
+
+async function authenticatedFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, { ...init, credentials: "include" });
+  if (response.status === 401) {
+    authenticationFailureHandler?.();
+  }
+  return response;
 }
 
 export async function listEnvironments(): Promise<Environment[]> {
@@ -920,7 +954,7 @@ export async function updateAlertPolicy(input: {
 export async function testNotificationChannel(
   channelId: string,
 ): Promise<string> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${apiBaseUrl}/api/v1/alerts/test/${channelId}`,
     {
       method: "POST",
@@ -938,7 +972,7 @@ export async function login(input: {
   username: string;
   password: string;
 }): Promise<LoginResponse> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -949,8 +983,39 @@ export async function login(input: {
   return response.json() as Promise<LoginResponse>;
 }
 
+export async function getCurrentSession(): Promise<CurrentSessionResponse> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/me`);
+  if (!response.ok) {
+    throw new Error((await response.text()) || "Session unavailable");
+  }
+  return response.json() as Promise<CurrentSessionResponse>;
+}
+
+export async function logout(): Promise<void> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/logout`, {
+    method: "POST",
+  });
+  if (!response.ok && response.status !== 401) {
+    throw new Error((await response.text()) || "Logout failed");
+  }
+}
+
+export async function changePassword(input: {
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<void> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || "Password update failed");
+  }
+}
+
 export async function listUsers(): Promise<UserAccount[]> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/users`, {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/users`, {
     headers: authHeaders(),
   });
   if (!response.ok) {
@@ -967,7 +1032,7 @@ export async function createUser(input: {
   password: string;
   role: string;
 }): Promise<UserAccount> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/users`, {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(input),
@@ -984,7 +1049,7 @@ export async function createUser(input: {
 
 export async function listApiTokens(userId: string): Promise<ApiToken[]> {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/tokens${query}`, {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/tokens${query}`, {
     headers: authHeaders(),
   });
   if (!response.ok) {
@@ -1000,7 +1065,7 @@ export async function createApiToken(input: {
   scopes: string[];
   expiresAt?: string;
 }): Promise<CreateApiTokenResponse> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/tokens`, {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/tokens`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(input),
@@ -1012,11 +1077,32 @@ export async function createApiToken(input: {
 }
 
 export async function revokeApiToken(id: string): Promise<void> {
-  const response = await fetch(`${apiBaseUrl}/api/v1/auth/tokens/${id}`, {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/tokens/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
   if (!response.ok) {
     throw new Error((await response.text()) || "Revoke token failed");
+  }
+}
+
+export async function listSessions(): Promise<Session[]> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/sessions`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || "List sessions failed");
+  }
+  const payload = (await response.json()) as ListSessionsResponse;
+  return payload.sessions ?? [];
+}
+
+export async function revokeSession(id: string): Promise<void> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/sessions/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || "Revoke session failed");
   }
 }

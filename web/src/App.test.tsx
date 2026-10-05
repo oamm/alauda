@@ -35,6 +35,24 @@ describe("App", () => {
     vi.unstubAllGlobals();
   });
 
+  it("renders only the dedicated login boundary without a session", async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().includes("/api/v1/auth/me")) {
+        return new Response(JSON.stringify({ error: "invalid authentication" }), { status: 401 });
+      }
+      return new Response(JSON.stringify(mockResponse(input.toString())), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      });
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Sign in to Alauda" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(screen.queryByText("System status")).not.toBeInTheDocument();
+  });
+
   it("renders operational dashboard data", async () => {
     render(<App />);
 
@@ -74,14 +92,13 @@ describe("App", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Incident Detail")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
     fireEvent.click(screen.getByRole("button", { name: "Events" }));
     expect(screen.getAllByText("service.created").length).toBeGreaterThan(0);
     expect(screen.getByText("Checkout service created")).toBeInTheDocument();
   });
 
   it("shows security users and API tokens", async () => {
-    window.localStorage.setItem("registryToken", "sr_test");
     render(<App />);
 
     await screen.findByText("Checkout service created");
@@ -90,10 +107,28 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.getAllByText("admin").length).toBeGreaterThan(0),
     );
+    expect(screen.queryByText("Sign in to Alauda")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Users" }));
     expect(screen.getByText("automation")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "API tokens" }));
     expect(
       screen.getByRole("button", { name: "Create token" }),
     ).toBeInTheDocument();
+  });
+
+  it("uses the shared tab interaction contract", async () => {
+    render(<App />);
+
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", { name: "Services" }));
+
+    const overviewTab = screen.getByRole("tab", { name: "Overview" });
+    expect(overviewTab).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(overviewTab, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Availability" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("adds an instance through the composite API", async () => {
@@ -104,6 +139,9 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
     fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
+    expect(
+      screen.getByRole("button", { name: "Close dialog" }),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Instance name"), {
       target: { value: "checkout-prod-02" },
     });

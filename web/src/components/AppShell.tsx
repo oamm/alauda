@@ -14,6 +14,7 @@ type AppShellProps = {
   selectedEnvironmentId: string;
   onEnvironmentChange: (environmentId: string) => void;
   onRefresh: () => void;
+  onLogout: () => void;
   onSecurityOpen: () => void;
   onToggleDarkMode: () => void;
   onViewChange: (view: ActiveView) => void;
@@ -41,6 +42,7 @@ export function AppShell({
   selectedEnvironmentId,
   onEnvironmentChange,
   onRefresh,
+  onLogout,
   onSecurityOpen,
   onToggleDarkMode,
   onViewChange,
@@ -101,6 +103,7 @@ export function AppShell({
               : `${degradedServiceCount} degraded service${degradedServiceCount === 1 ? "" : "s"} · ${openIncidentCount} open incident${openIncidentCount === 1 ? "" : "s"}`}
           </small>
         </div>
+        <button className="account-action" type="button" onClick={onLogout}>Log out</button>
       </aside>
 
       <main className="workspace">

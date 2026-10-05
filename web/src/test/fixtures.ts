@@ -1,4 +1,19 @@
 export function mockResponse(path: string) {
+  if (path.includes("/api/v1/auth/me")) {
+    return {
+      user: {
+        id: "user-1",
+        username: "admin",
+        email: "admin@example.test",
+        displayName: "Admin",
+        role: "Administrator",
+        enabled: true,
+        mustChangePassword: false,
+      },
+      scopes: ["read", "write", "admin"],
+      mustChangePassword: false,
+    };
+  }
   if (path.includes("/api/v1/auth/users")) {
     return {
       users: [
