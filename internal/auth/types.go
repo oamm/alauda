@@ -31,11 +31,30 @@ type APIToken struct {
 	CreatedBy      string     `json:"createdBy"`
 }
 
+type ApplicationKey struct {
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	SecretHash     string     `json:"-"`
+	Scopes         []Scope    `json:"scopes"`
+	EnvironmentIDs []string   `json:"environmentIds,omitempty"`
+	ExpiresAt      *time.Time `json:"expiresAt,omitempty"`
+	LastUsedAt     *time.Time `json:"lastUsedAt,omitempty"`
+	Enabled        bool       `json:"enabled"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	CreatedBy      string     `json:"createdBy"`
+}
+
+type CreatedApplicationKey struct {
+	Key    *ApplicationKey `json:"key"`
+	Secret string          `json:"secret"`
+}
+
 type Principal struct {
 	UserID             string
 	Username           string
 	Role               Role
 	TokenID            string
+	ApplicationKeyID   string
 	Scopes             []Scope
 	EnvironmentIDs     []string
 	SessionID          string

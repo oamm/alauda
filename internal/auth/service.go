@@ -79,6 +79,14 @@ func (s *Service) AuthenticateToken(ctx context.Context, secret string) (*Princi
 	}, nil
 }
 
+func (s *Service) AuthenticateApplicationKey(ctx context.Context, secret string) (*Principal, error) {
+	key, err := s.repo.FindApplicationKeyBySecret(ctx, secret)
+	if err != nil {
+		return nil, err
+	}
+	return &Principal{ApplicationKeyID: key.ID, Scopes: key.Scopes, EnvironmentIDs: key.EnvironmentIDs}, nil
+}
+
 func (s *Service) AuthenticateSession(ctx context.Context, secret string) (*Principal, error) {
 	session, user, err := s.repo.FindSessionBySecret(ctx, secret)
 	if err != nil {
@@ -96,4 +104,15 @@ func (s *Service) CreateToken(ctx context.Context, principal *Principal, input C
 	}
 	input.CreatedBy = principal.UserID
 	return s.repo.CreateToken(ctx, input)
+}
+
+func (s *Service) CreateApplicationKey(ctx context.Context, principal *Principal, input CreateApplicationKeyInput) (*CreatedApplicationKey, error) {
+	if principal == nil || !HasScope(principal.Scopes, ScopeAdmin) {
+		return nil, errors.New("admin scope is required")
+	}
+	if len(input.Scopes) == 0 {
+		input.Scopes = []Scope{ScopeRead}
+	}
+	input.CreatedBy = principal.UserID
+	return s.repo.CreateApplicationKey(ctx, input)
 }

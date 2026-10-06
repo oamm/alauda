@@ -50,6 +50,15 @@ func (r *EnvironmentRepository) Get(ctx context.Context, id string) (*registryv1
 	return scanEnvironment(row)
 }
 
+func (r *EnvironmentRepository) GetByKey(ctx context.Context, key string) (*registryv1.Environment, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id, key, name, description, enabled, tier, tags, created_at, updated_at
+		FROM environments
+		WHERE key = ? AND deleted_at IS NULL
+	`, key)
+	return scanEnvironment(row)
+}
+
 func (r *EnvironmentRepository) List(ctx context.Context, includeDisabled bool, pageSize int, pageToken string) ([]*registryv1.Environment, string, error) {
 	if pageSize <= 0 || pageSize > 200 {
 		pageSize = 50

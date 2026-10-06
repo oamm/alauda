@@ -9,6 +9,7 @@ import (
 )
 
 const tokenPrefix = "sr_"
+const applicationKeyPrefix = "ak_"
 
 func NewToken() (string, string, error) {
 	raw := make([]byte, 32)
@@ -17,6 +18,15 @@ func NewToken() (string, string, error) {
 	}
 	token := tokenPrefix + base64.RawURLEncoding.EncodeToString(raw)
 	return token, HashToken(token), nil
+}
+
+func NewApplicationKey() (string, string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", "", err
+	}
+	secret := applicationKeyPrefix + base64.RawURLEncoding.EncodeToString(raw)
+	return secret, HashToken(secret), nil
 }
 
 func HashToken(token string) string {

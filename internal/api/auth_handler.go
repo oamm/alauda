@@ -29,6 +29,8 @@ func registerAuthREST(mux *http.ServeMux, handler authHandler) {
 	mux.HandleFunc("/api/v1/auth/users", handler.users)
 	mux.HandleFunc("/api/v1/auth/tokens", handler.tokens)
 	mux.HandleFunc("/api/v1/auth/tokens/", handler.tokenByID)
+	mux.HandleFunc("/api/v1/auth/application-keys", handler.applicationKeys)
+	mux.HandleFunc("/api/v1/auth/application-keys/", handler.applicationKeyByID)
 }
 
 func (h authHandler) login(w http.ResponseWriter, r *http.Request) {
@@ -304,6 +306,61 @@ func (h authHandler) tokenByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h authHandler) applicationKeys(w http.ResponseWriter, r *http.Request) {
+	principal, _ := auth.PrincipalFromContext(r.Context())
+	switch r.Method {
+	case http.MethodGet:
+		keys, err := h.repo.ListApplicationKeys(r.Context())
+		if err != nil {
+			http.Error(w, "failed to list application keys", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"keys": keys})
+	case http.MethodPost:
+		var input struct {
+			Name           string       `json:"name"`
+			Scopes         []auth.Scope `json:"scopes"`
+			EnvironmentIDs []string     `json:"environmentIds"`
+			ExpiresAt      *time.Time   `json:"expiresAt"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil || strings.TrimSpace(input.Name) == "" {
+			http.Error(w, "name is required", http.StatusBadRequest)
+			return
+		}
+		created, err := h.service.CreateApplicationKey(r.Context(), principal, auth.CreateApplicationKeyInput{
+			Name: input.Name, Scopes: input.Scopes, EnvironmentIDs: input.EnvironmentIDs, ExpiresAt: input.ExpiresAt,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		writeJSON(w, http.StatusCreated, created)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (h authHandler) applicationKeyByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/auth/application-keys/")
+	if id == "" {
+		http.Error(w, "key id is required", http.StatusBadRequest)
+		return
+	}
+	if err := h.repo.RevokeApplicationKey(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "application key not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to revoke application key", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

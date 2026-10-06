@@ -44,6 +44,8 @@ func RegisterRoutesWithConfig(mux *http.ServeMux, db *storage.Database, cfg *con
 	registerAlertREST(apiMux, storage.NewAlertRepository(db), alerts.NewEngine(storage.NewAlertRepository(db), nil))
 	registerAuthREST(apiMux, authHandler{service: authService, repo: authRepo, cookieName: cookieName, audit: auditRepo})
 	registerAuditREST(apiMux, auditRepo)
+	RegisterExternalCatalogREST(apiMux, db)
+	RegisterRESTResources(apiMux, db)
 
 	apiMux.HandleFunc("/api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -52,4 +54,5 @@ func RegisterRoutesWithConfig(mux *http.ServeMux, db *storage.Database, cfg *con
 	})
 
 	mux.Handle("/api/v1/", secure(apiMux))
+	RegisterOpenAPI(mux, secure)
 }

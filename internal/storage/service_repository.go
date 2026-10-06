@@ -52,6 +52,15 @@ func (r *ServiceRepository) Get(ctx context.Context, id string) (*registryv1.Ser
 	return scanService(row)
 }
 
+func (r *ServiceRepository) GetByName(ctx context.Context, name string) (*registryv1.Service, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id, name, display_name, description, tags, metadata, created_at, updated_at
+		FROM services
+		WHERE name = ? AND deleted_at IS NULL
+	`, name)
+	return scanService(row)
+}
+
 func (r *ServiceRepository) List(ctx context.Context, environmentID string, pageSize int, pageToken string) ([]*registryv1.Service, string, error) {
 	if pageSize <= 0 || pageSize > 200 {
 		pageSize = 50
@@ -140,14 +149,14 @@ func (r *ServiceRepository) Delete(ctx context.Context, id string) error {
 
 func scanService(row scanner) (*registryv1.Service, error) {
 	var (
-		id           string
-		name         string
-		displayName  string
-		description  string
-		tagsRaw      string
-		metadataRaw  string
-		createdRaw   string
-		updatedRaw   string
+		id          string
+		name        string
+		displayName string
+		description string
+		tagsRaw     string
+		metadataRaw string
+		createdRaw  string
+		updatedRaw  string
 	)
 
 	if err := row.Scan(&id, &name, &displayName, &description, &tagsRaw, &metadataRaw, &createdRaw, &updatedRaw); err != nil {

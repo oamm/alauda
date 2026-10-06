@@ -39,6 +39,14 @@ type CreateTokenInput struct {
 	Token          string
 }
 
+type CreateApplicationKeyInput struct {
+	Name           string
+	Scopes         []Scope
+	EnvironmentIDs []string
+	ExpiresAt      *time.Time
+	CreatedBy      string
+}
+
 type CreatedToken struct {
 	Token  *APIToken `json:"token"`
 	Secret string    `json:"secret"`
@@ -212,6 +220,84 @@ func (r *Repository) RevokeToken(ctx context.Context, id string) error {
 	return err
 }
 
+func (r *Repository) CreateApplicationKey(ctx context.Context, input CreateApplicationKeyInput) (*CreatedApplicationKey, error) {
+	secret, secretHash, err := NewApplicationKey()
+	if err != nil {
+		return nil, err
+	}
+	if len(input.Scopes) == 0 {
+		input.Scopes = []Scope{ScopeRead}
+	}
+	scopesJSON, err := json.Marshal(input.Scopes)
+	if err != nil {
+		return nil, err
+	}
+	environmentsJSON, err := json.Marshal(input.EnvironmentIDs)
+	if err != nil {
+		return nil, err
+	}
+	id := uuid.NewString()
+	now := time.Now().UTC()
+	_, err = r.db.Exec(ctx, `
+		INSERT INTO application_keys (id, name, secret_hash, scopes, environment_ids, expires_at, enabled, created_at, created_by)
+		VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+	`, id, input.Name, secretHash, string(scopesJSON), string(environmentsJSON), nullTime(input.ExpiresAt), now.Format(time.RFC3339Nano), input.CreatedBy)
+	if err != nil {
+		return nil, err
+	}
+	key, err := r.GetApplicationKey(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &CreatedApplicationKey{Key: key, Secret: secret}, nil
+}
+
+func (r *Repository) GetApplicationKey(ctx context.Context, id string) (*ApplicationKey, error) {
+	row := r.db.QueryRow(ctx, `SELECT id, name, secret_hash, scopes, environment_ids, expires_at, last_used_at, enabled, created_at, created_by FROM application_keys WHERE id = ?`, id)
+	return scanApplicationKey(row)
+}
+
+func (r *Repository) ListApplicationKeys(ctx context.Context) ([]*ApplicationKey, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, name, secret_hash, scopes, environment_ids, expires_at, last_used_at, enabled, created_at, created_by FROM application_keys ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	keys := []*ApplicationKey{}
+	for rows.Next() {
+		key, err := scanApplicationKey(rows)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
+}
+
+func (r *Repository) FindApplicationKeyBySecret(ctx context.Context, secret string) (*ApplicationKey, error) {
+	row := r.db.QueryRow(ctx, `SELECT id, name, secret_hash, scopes, environment_ids, expires_at, last_used_at, enabled, created_at, created_by FROM application_keys WHERE secret_hash = ?`, HashToken(secret))
+	key, err := scanApplicationKey(row)
+	if err != nil {
+		return nil, err
+	}
+	if (key.ExpiresAt != nil && time.Now().UTC().After(*key.ExpiresAt)) || !key.Enabled {
+		return nil, sql.ErrNoRows
+	}
+	_, _ = r.db.Exec(ctx, `UPDATE application_keys SET last_used_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), key.ID)
+	return key, nil
+}
+
+func (r *Repository) RevokeApplicationKey(ctx context.Context, id string) error {
+	result, err := r.db.Exec(ctx, `UPDATE application_keys SET enabled = 0 WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if count, _ := result.RowsAffected(); count == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *Repository) BootstrapAdmin(ctx context.Context, input CreateUserInput, tokenName, token string) (*CreatedToken, error) {
 	user, err := r.GetUserByUsername(ctx, input.Username)
 	if err != nil {
@@ -325,6 +411,28 @@ func scanTokenAndUser(row interface{ Scan(...any) error }) (*APIToken, *User, er
 		user.LastLoginAt = &t
 	}
 	return &token, &user, nil
+}
+
+func scanApplicationKey(row interface{ Scan(...any) error }) (*ApplicationKey, error) {
+	var key ApplicationKey
+	var scopesRaw, environmentsRaw string
+	var expiresRaw, lastUsedRaw sql.NullString
+	var createdRaw string
+	if err := row.Scan(&key.ID, &key.Name, &key.SecretHash, &scopesRaw, &environmentsRaw, &expiresRaw, &lastUsedRaw, &key.Enabled, &createdRaw, &key.CreatedBy); err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(scopesRaw), &key.Scopes)
+	_ = json.Unmarshal([]byte(environmentsRaw), &key.EnvironmentIDs)
+	if expiresRaw.Valid {
+		t := parseTime(expiresRaw.String)
+		key.ExpiresAt = &t
+	}
+	if lastUsedRaw.Valid {
+		t := parseTime(lastUsedRaw.String)
+		key.LastUsedAt = &t
+	}
+	key.CreatedAt = parseTime(createdRaw)
+	return &key, nil
 }
 
 func emptyStringMap(value map[string]string) map[string]string {

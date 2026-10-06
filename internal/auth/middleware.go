@@ -48,6 +48,9 @@ func MiddlewareWithCookieName(enabled bool, service *Service, cookieName string,
 			return
 		}
 		principal, err := service.AuthenticateToken(r.Context(), secret)
+		if strings.HasPrefix(secret, "ak_") {
+			principal, err = service.AuthenticateApplicationKey(r.Context(), secret)
+		}
 		if credentialType == "session" {
 			principal, err = service.AuthenticateSession(r.Context(), secret)
 		} else if err != nil {
@@ -72,7 +75,7 @@ func MiddlewareWithCookieName(enabled bool, service *Service, cookieName string,
 }
 
 func RequiredScope(method, path string) Scope {
-	if strings.HasPrefix(path, "/api/v1/auth/users") || strings.HasPrefix(path, "/api/v1/auth/tokens") || strings.HasPrefix(path, "/api/v1/auth/sessions") {
+	if strings.HasPrefix(path, "/api/v1/auth/users") || strings.HasPrefix(path, "/api/v1/auth/tokens") || strings.HasPrefix(path, "/api/v1/auth/application-keys") || strings.HasPrefix(path, "/api/v1/auth/sessions") {
 		return ScopeAdmin
 	}
 	if strings.Contains(path, "/List") || strings.Contains(path, "/Get") || strings.Contains(path, "/Watch") || method == http.MethodGet {
