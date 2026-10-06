@@ -212,6 +212,18 @@ export type ApiToken = {
   createdBy: string;
 };
 
+export type ApplicationKey = {
+  id: string;
+  name: string;
+  scopes: string[];
+  environmentIds?: string[];
+  expiresAt?: string;
+  lastUsedAt?: string;
+  enabled: boolean;
+  createdAt?: string;
+  createdBy: string;
+};
+
 type ListEnvironmentsResponse = {
   environments?: Environment[];
 };
@@ -374,6 +386,9 @@ type CreateApiTokenResponse = {
   token?: ApiToken;
   secret?: string;
 };
+
+type ListApplicationKeysResponse = { keys?: ApplicationKey[] };
+type CreateApplicationKeyResponse = { key?: ApplicationKey; secret?: string };
 
 type ListSessionsResponse = { sessions?: Session[] };
 
@@ -1084,6 +1099,36 @@ export async function revokeApiToken(id: string): Promise<void> {
   if (!response.ok) {
     throw new Error((await response.text()) || "Revoke token failed");
   }
+}
+
+export async function listApplicationKeys(): Promise<ApplicationKey[]> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/application-keys`, { headers: authHeaders() });
+  if (!response.ok) throw new Error((await response.text()) || "List application keys failed");
+  const payload = (await response.json()) as ListApplicationKeysResponse;
+  return payload.keys ?? [];
+}
+
+export async function createApplicationKey(input: {
+  name: string;
+  scopes: string[];
+  environmentIds?: string[];
+  expiresAt?: string;
+}): Promise<CreateApplicationKeyResponse> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/application-keys`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error((await response.text()) || "Create application key failed");
+  return response.json() as Promise<CreateApplicationKeyResponse>;
+}
+
+export async function revokeApplicationKey(id: string): Promise<void> {
+  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/application-keys/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error((await response.text()) || "Revoke application key failed");
 }
 
 export async function listSessions(): Promise<Session[]> {

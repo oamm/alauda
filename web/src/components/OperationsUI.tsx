@@ -1,4 +1,118 @@
-import { ReactNode } from "react";
+import { ButtonHTMLAttributes, ReactNode } from "react";
+
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "icon";
+type ButtonSize = "sm" | "md";
+
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  loading?: boolean;
+};
+
+export function Button({
+  variant = "secondary",
+  size = "md",
+  loading = false,
+  className = "",
+  disabled,
+  children,
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      {...props}
+      aria-busy={loading || undefined}
+      className={`ui-button ui-button-${variant} ui-button-${size} ${className}`.trim()}
+      disabled={disabled || loading}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function IconButton({
+  label,
+  size = "md",
+  className = "",
+  children,
+  ...props
+}: Omit<ButtonProps, "variant" | "children"> & {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      {...props}
+      aria-label={label}
+      className={`ui-icon-button ${className}`.trim()}
+      size={size}
+      variant="icon"
+    >
+      {children}
+    </Button>
+  );
+}
+
+export function ActionGroup({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`action-group ${className}`.trim()}>{children}</div>;
+}
+
+export function Metadata({ children }: { children: ReactNode }) {
+  return <span className="metadata-cluster">{children}</span>;
+}
+
+export function Tabs({
+  ariaLabel,
+  items,
+  value,
+  onChange,
+}: {
+  ariaLabel: string;
+  items: Array<{ value: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="ui-tabs" role="tablist" aria-label={ariaLabel}>
+      {items.map((item) => (
+        <button
+          aria-selected={value === item.value}
+          className={value === item.value ? "active" : ""}
+          key={item.value}
+          onClick={() => onChange(item.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") {
+              return;
+            }
+            event.preventDefault();
+            const tabs = Array.from(
+              event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                '[role="tab"]',
+              ) ?? [],
+            );
+            const currentIndex = tabs.indexOf(event.currentTarget);
+            const nextIndex =
+              (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+              tabs.length;
+            tabs[nextIndex]?.focus();
+            tabs[nextIndex]?.click();
+          }}
+          role="tab"
+          tabIndex={value === item.value ? 0 : -1}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type StatusTone =
   | "healthy"
@@ -109,18 +223,27 @@ export function LoadingRows({ rows = 4 }: { rows?: number }) {
 export function ResourceLink({
   children,
   onClick,
+  href = "#",
 }: {
   children: ReactNode;
   onClick?: () => void;
+  href?: string;
 }) {
   if (!onClick) {
     return <span className="resource-link static">{children}</span>;
   }
 
   return (
-    <button className="resource-link" type="button" onClick={onClick}>
+    <a
+      className="resource-link"
+      href={href}
+      onClick={(event) => {
+        event.preventDefault();
+        onClick();
+      }}
+    >
       {children}
-    </button>
+    </a>
   );
 }
 

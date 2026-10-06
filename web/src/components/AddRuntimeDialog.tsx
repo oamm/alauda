@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { Environment, Service } from "../api";
+import { Button, IconButton } from "./OperationsUI";
 
 export type RegistrationEndpointDraft = {
   name: string;
@@ -61,15 +62,23 @@ export function AddRuntimeDialog({
   const [healthOpen, setHealthOpen] = useState(false);
   useEffect(() => {
     dialogRef.current?.querySelector<HTMLInputElement>("[data-registration-instance-name]")?.focus();
-  }, []);
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
 
   return <div className="modal-backdrop" role="presentation">
     <div aria-labelledby="add-instance-title" aria-modal="true" className="modal form-panel drawer-form runtime-registration-dialog" ref={dialogRef} role="dialog">
       <form noValidate onSubmit={onSubmit}>
         <div className="modal-header">
           <div><h2 id="add-instance-title">Add instance</h2><span>{selectedService.displayName || selectedService.name}</span></div>
-          <button aria-label="Close" className="icon-button" type="button" onClick={onClose}>x</button>
+          <IconButton label="Close dialog" type="button" onClick={onClose}>x</IconButton>
         </div>
+        <div className="modal-body">
         <div className="context-strip"><span>Service</span><strong>{selectedService.displayName || selectedService.name}</strong></div>
         {registeredRuntime ? <section className="form-section" aria-live="polite">
           <p className="success" role="status">Instance added successfully</p>
@@ -112,14 +121,15 @@ export function AddRuntimeDialog({
               <label>Port<input aria-label={`Endpoint ${index + 1} port`} max="65535" min="1" required type="number" value={endpoint.port} onChange={(event) => onUpdateEndpoint(index, { port: Number(event.target.value) })} /></label>
               <label>Path<input aria-label={`Endpoint ${index + 1} path`} value={endpoint.path} onChange={(event) => onUpdateEndpoint(index, { path: event.target.value })} /></label>
               <label className="checkbox-label"><input aria-label={`Endpoint ${index + 1} primary`} checked={endpoint.primary} name="registration-primary-endpoint" type="radio" onChange={() => onSetPrimaryEndpoint(index)} /> Primary</label>
-              <button disabled={form.endpoints.length === 1} type="button" onClick={() => onRemoveEndpoint(index)}>Remove</button>
+              <IconButton disabled={form.endpoints.length === 1} label="Remove endpoint" size="sm" type="button" onClick={() => onRemoveEndpoint(index)}>x</IconButton>
             </div>)}
           </div>
-          <button type="button" onClick={onAddEndpoint}>+ Add endpoint</button>
+          <Button size="sm" type="button" onClick={onAddEndpoint}>+ Add endpoint</Button>
         </section>
         {registrationSuccess ? <p className="success" role="status">{registrationSuccess}</p> : null}
         <div className="drawer-actions"><button type="button" onClick={onClose}>Cancel</button><button disabled={saving || environments.length === 0} type="submit">{saving ? "Adding" : "Add instance"}</button></div>
         </>}
+        </div>
       </form>
     </div>
   </div>;

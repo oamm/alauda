@@ -379,6 +379,65 @@ textarea::placeholder {
   font-size: 1rem;
 }
 
+.subnav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.subnav button {
+  border-color: transparent;
+  background: transparent;
+}
+
+.subnav button.active {
+  border-color: var(--brand);
+  background: var(--selected);
+  color: var(--brand-strong);
+}
+
+.dialog-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(7 24 39 / 52%);
+}
+
+.dialog-panel {
+  width: min(100%, 680px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+
+.workflow-disclosure {
+  display: grid;
+  gap: 12px;
+}
+
+.workflow-disclosure > summary {
+  width: fit-content;
+  cursor: pointer;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 10px 15px;
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.workflow-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.workflow-disclosure[open] > summary {
+  border-color: var(--brand);
+  background: var(--selected);
+}
+
 .panel-heading span {
   color: var(--text-muted);
   font-size: 0.86rem;
@@ -2620,4 +2679,883 @@ textarea::placeholder {
   .row-actions {
     justify-content: start;
   }
+}
+
+/* Global refinement layer: shared rhythm, sizing, and overflow rules. */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --control-sm: 34px;
+  --control-md: 40px;
+  --content-max: 1560px;
+  --dialog-margin: 24px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 0;
+  min-height: 100%;
+}
+
+body {
+  line-height: 1.45;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+  min-width: 0;
+}
+
+button {
+  min-height: var(--control-md);
+  border-radius: 6px;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+button.button-sm,
+.row button,
+.bulk-bar button,
+.pagination-bar button,
+.runtime-subheading button,
+.channel-row button,
+.incident-row button,
+.topology-leaf button {
+  min-height: var(--control-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+.button-primary,
+.button-secondary,
+.button-danger,
+.button-ghost,
+.icon-button {
+  flex: 0 0 auto;
+}
+
+.button-secondary {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.icon-button,
+.toolbar-actions button,
+.resource-menu > summary {
+  width: var(--control-md);
+  min-width: var(--control-md);
+  min-height: var(--control-md);
+  padding: 0;
+}
+
+.workspace {
+  width: 100%;
+  max-width: none;
+}
+
+.toolbar,
+.content-grid,
+.services-workflow,
+.dashboard-grid {
+  min-width: 0;
+}
+
+.toolbar {
+  width: min(100%, var(--content-max));
+}
+
+.content-grid,
+.services-workflow {
+  width: min(100%, var(--content-max));
+  margin-inline: auto;
+}
+
+.panel {
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(3 10 24 / 5%);
+}
+
+.panel-heading,
+.page-header,
+.workspace-actions,
+.drawer-actions,
+.button-row,
+.toolbar-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.panel-heading > *,
+.page-header > *,
+.workspace-actions > *,
+.drawer-actions > *,
+.button-row > * {
+  min-width: 0;
+}
+
+.panel-heading h2,
+.page-header h1,
+.service-workspace-header h2,
+.section-heading h3 {
+  line-height: 1.3;
+}
+
+.page-header h1 {
+  font-size: 1.625rem;
+}
+
+.panel-heading h2,
+.section-heading h3,
+.tab-toolbar h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.metadata,
+.detail-list dt,
+.field-hint,
+.panel-heading span,
+.page-header small {
+  font-size: 0.8125rem;
+}
+
+.form-fields-grid,
+.runtime-health-fields,
+.endpoint-editor-row,
+.inline-edit-form,
+.wizard-step-content .form-fields-grid {
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.endpoint-editor-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) auto;
+}
+
+.inline-edit-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+
+.form-panel,
+.form-section,
+.wizard-step-content {
+  min-width: 0;
+}
+
+.form-panel label,
+.form-section label,
+.runtime-health-form label {
+  min-width: 0;
+}
+
+.table,
+.service-list,
+.compact-table {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table > *,
+.service-list > *,
+.compact-table > *,
+.row,
+.table-row,
+.instance-row,
+.endpoint-row,
+.policy-row,
+.channel-row,
+.incident-row,
+.event-row,
+.health-result-row {
+  min-width: 0;
+}
+
+.row > *,
+.table-row > *,
+.instance-row > *,
+.endpoint-row > *,
+.policy-row > *,
+.channel-row > *,
+.incident-row > *,
+.event-row > *,
+.health-result-row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.service-tabs,
+.subnav {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.service-tabs button,
+.subnav button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.modal-backdrop,
+.dialog-backdrop {
+  padding: var(--dialog-margin);
+}
+
+.modal,
+.dialog-panel {
+  width: min(100%, 720px);
+  max-width: calc(100vw - (var(--dialog-margin) * 2));
+  max-height: calc(100vh - (var(--dialog-margin) * 2));
+  min-width: 0;
+  overflow: hidden;
+}
+
+.modal > form,
+.dialog-panel {
+  min-width: 0;
+}
+
+.runtime-registration-dialog > form {
+  display: flex;
+  max-height: calc(100vh - (var(--dialog-margin) * 2));
+  min-width: 0;
+  flex-direction: column;
+}
+
+.modal-header {
+  flex: 0 0 auto;
+}
+
+.modal-body {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.dialog-panel {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.modal-body .form-fields-grid,
+.modal-body .endpoint-editor-row {
+  width: 100%;
+  max-width: 100%;
+}
+
+.modal-body .endpoint-editor-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+}
+
+.section-heading,
+.tab-toolbar,
+.runtime-environment-heading,
+.runtime-instance-header,
+.runtime-child-row,
+.runtime-subheading,
+.context-strip {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  min-height: 24px;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    padding: var(--space-4);
+  }
+
+  .endpoint-editor-row,
+  .inline-edit-form,
+  .modal-body .endpoint-editor-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .endpoint-editor-row > button,
+  .modal-body .endpoint-editor-row > button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --dialog-margin: 12px;
+  }
+
+  .workspace {
+    padding: var(--space-3);
+  }
+
+  .panel-heading,
+  .page-header,
+  .service-workspace-header,
+  .drawer-actions,
+  .button-row {
+    align-items: stretch;
+  }
+
+  .panel-heading > div,
+  .page-actions,
+  .workspace-actions,
+  .drawer-actions,
+  .button-row {
+    width: 100%;
+  }
+
+  .panel-heading button,
+  .page-actions button,
+  .workspace-actions button,
+  .drawer-actions button,
+  .button-row button {
+    flex: 1 1 auto;
+  }
+
+  .form-fields-grid,
+  .runtime-health-fields,
+  .endpoint-editor-row,
+  .inline-edit-form,
+  .modal-body .endpoint-editor-row,
+  .wizard-step-content .form-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-tabs,
+  .subnav {
+    gap: var(--space-2);
+  }
+
+  .modal-backdrop,
+  .dialog-backdrop {
+    align-items: end;
+    padding: var(--dialog-margin);
+  }
+
+  .modal,
+  .dialog-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Interaction primitives. Components own semantics; this layer owns the contract. */
+.ui-button {
+  min-height: var(--control-md);
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ui-button-sm {
+  min-height: var(--control-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+}
+
+.ui-button-primary {
+  border-color: transparent;
+  background: var(--brand);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgb(19 120 255 / 14%);
+}
+
+.ui-button-secondary {
+  background: var(--surface);
+}
+
+.ui-button-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.ui-button-danger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  box-shadow: none;
+}
+
+.ui-button-icon,
+.ui-icon-button {
+  width: var(--control-md);
+  min-width: var(--control-md);
+  padding: 0;
+}
+
+.ui-button:hover:not(:disabled),
+.ui-button:focus-visible {
+  border-color: var(--brand);
+}
+
+.ui-button-ghost:hover:not(:disabled) {
+  background: var(--selected);
+}
+
+.ui-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.action-group {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ui-tabs {
+  display: flex;
+  min-width: 0;
+  min-height: var(--control-md);
+  align-items: center;
+  gap: var(--space-2);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+
+.ui-tabs button {
+  flex: 0 0 auto;
+  min-height: var(--control-md);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ui-tabs button.active {
+  border-bottom-color: var(--brand);
+  background: transparent;
+  color: var(--text);
+}
+
+.ui-tabs button:hover:not(:disabled),
+.ui-tabs button:focus-visible {
+  background: var(--selected);
+}
+
+.resource-link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+}
+
+.sidebar a {
+  text-decoration: none;
+}
+
+.modal-header .ui-icon-button {
+  flex: 0 0 auto;
+}
+
+.modal-body .drawer-actions,
+.dialog-panel .dialog-actions {
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.endpoint-editor-row > button[disabled] {
+  min-width: var(--control-sm);
+  padding-inline: var(--space-2);
+}
+
+/* Compact density contract for operational lists and metadata. */
+:root {
+  --density-row-y: 8px;
+  --density-row-x: 12px;
+  --density-section-y: 12px;
+  --density-panel-y: 10px;
+}
+
+.action-group {
+  column-gap: var(--space-2);
+  row-gap: var(--space-2);
+}
+
+.metadata-cluster {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.metadata-cluster > span + span::before {
+  margin-right: 8px;
+  color: var(--border-strong);
+  content: "•";
+}
+
+.service-row {
+  gap: var(--space-2);
+  padding: var(--density-row-y) var(--density-row-x);
+}
+
+.service-row button {
+  gap: 3px;
+}
+
+.service-row button > .metadata-cluster {
+  display: flex;
+}
+
+.table-row,
+.health-result-row,
+.compact-row,
+.environment-overview-row,
+.policy-row,
+.channel-row,
+.instance-row,
+.endpoint-row,
+.incident-row,
+.event-row {
+  padding-block: var(--density-row-y);
+  line-height: 1.3;
+}
+
+.table-row,
+.health-result-row,
+.policy-row,
+.channel-row,
+.instance-row,
+.endpoint-row,
+.incident-row,
+.event-row {
+  gap: var(--space-3);
+}
+
+.panel-heading {
+  gap: var(--space-3);
+  padding: var(--density-panel-y) 14px;
+}
+
+.filter-bar,
+.service-filter-bar {
+  gap: var(--space-3);
+  padding: var(--density-section-y) 14px;
+}
+
+.filter-bar label,
+.service-filter-bar label,
+.form-panel label,
+.runtime-health-form label {
+  gap: 4px;
+}
+
+.pagination-bar {
+  gap: var(--space-3);
+  padding: 8px 12px;
+}
+
+.bulk-bar {
+  gap: var(--space-2);
+  padding: 8px 12px;
+}
+
+.detail-list {
+  gap: 8px 14px;
+  padding: 12px 14px;
+}
+
+.form-panel {
+  gap: 10px;
+}
+
+.form-panel > label,
+.form-fields-grid {
+  padding-inline: 12px;
+}
+
+.form-panel .form-fields-grid label {
+  padding-inline: 0;
+}
+
+.form-fields-grid {
+  gap: var(--space-3);
+}
+
+.form-section {
+  gap: var(--space-2);
+  padding-block: 0;
+}
+
+.form-section-heading,
+.section-heading {
+  gap: var(--space-2);
+  margin-inline: 12px;
+}
+
+.empty-state {
+  gap: var(--space-2);
+  padding: 14px;
+}
+
+.loading-rows span {
+  height: 36px;
+}
+
+.service-workspace-header {
+  gap: var(--space-4);
+  padding: 16px 18px 14px;
+}
+
+.service-tab-panel {
+  gap: var(--space-4);
+  padding: 16px 18px 18px;
+}
+
+.summary-grid,
+.summary-strip {
+  gap: var(--space-3);
+}
+
+.summary-grid > div {
+  padding: 10px;
+}
+
+.runtime-instance {
+  gap: var(--space-2);
+  padding: 10px;
+}
+
+.runtime-nested {
+  gap: var(--space-2);
+  padding-left: 12px;
+}
+
+.wizard-shell,
+.wizard-step-content {
+  gap: 14px;
+}
+
+.wizard-card {
+  min-height: 0;
+  padding: 16px;
+}
+
+.wizard-actions,
+.drawer-actions {
+  gap: var(--space-3);
+  padding: 12px 14px;
+}
+
+.services-workflow {
+  grid-template-columns: clamp(300px, 25vw, 400px) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.page-header {
+  gap: var(--space-4);
+}
+
+@media (max-width: 820px) {
+  .services-workflow {
+    grid-template-columns: 1fr;
+  }
+
+  .metadata-cluster {
+    gap: 3px 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .service-row,
+  .table-row,
+  .health-result-row,
+  .compact-row,
+  .environment-overview-row,
+  .policy-row,
+  .channel-row,
+  .instance-row,
+  .endpoint-row,
+  .incident-row,
+  .event-row {
+    padding-block: 9px;
+  }
+
+  .metadata-cluster > span + span::before {
+    margin-right: 6px;
+  }
+}
+.auth-boundary {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f1f5f9;
+}
+
+.auth-card {
+  width: min(100%, 420px);
+  padding: 32px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 18px 50px rgb(15 23 42 / 12%);
+}
+
+.auth-brand { margin-bottom: 32px; }
+.auth-card h2 { margin: 0 0 20px; }
+.auth-card > p { color: #475569; line-height: 1.5; }
+.auth-card .form-panel { display: grid; gap: 16px; }
+.account-action { margin: 16px; width: calc(100% - 32px); }
+
+.settings-page {
+  width: min(100%, 1120px);
+  margin-inline: auto;
+}
+
+.settings-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px 0 20px;
+}
+
+.settings-page-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.settings-page-header p {
+  max-width: 640px;
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.application-key-table {
+  overflow: hidden;
+  border: 1px solid #dbe2ea;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.application-key-table-header,
+.application-key-table-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(110px, 1fr) minmax(130px, 1.2fr) 110px 110px 90px 80px;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+.application-key-table-header {
+  border-bottom: 1px solid #dbe2ea;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.application-key-table-row {
+  min-height: 68px;
+  border-bottom: 1px solid #edf1f5;
+  color: #334155;
+  font-size: 0.875rem;
+}
+
+.application-key-table-row:last-child { border-bottom: 0; }
+.application-key-table-row > * { min-width: 0; overflow-wrap: anywhere; }
+.application-key-table-row strong { color: #0f172a; }
+.application-key-table .empty-state { margin: 28px; }
+.text-action { padding: 6px 8px; border: 0; background: transparent; color: #2563eb; }
+.danger-action { color: #b91c1c; }
+
+.application-key-modal { width: min(100%, 560px); }
+.application-key-modal > form { display: flex; max-height: calc(100vh - 48px); flex-direction: column; }
+.application-key-modal .modal-header { padding: 16px 18px 14px; }
+.application-key-modal .modal-header h2 { font-size: 1.0625rem; }
+.application-key-modal .modal-header span { display: block; margin-top: 3px; line-height: 1.35; }
+.application-key-modal .modal-body { padding: 16px 18px 18px; }
+.application-key-form-body { display: grid; gap: 16px; }
+.application-key-form-body label,
+.application-key-form-body fieldset { display: grid; gap: 6px; }
+.application-key-form-body fieldset { margin: 0; padding: 0; border: 0; }
+.application-key-form-body legend { margin-bottom: 1px; color: #0f172a; font-size: 0.875rem; font-weight: 600; }
+.field-help,
+.choice-row small { color: #64748b; font-size: 0.8125rem; font-weight: 400; }
+.choice-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.choice-row { display: flex !important; min-height: 40px; grid-template-columns: auto 1fr; align-items: center; gap: 8px !important; padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 5px; background: #ffffff; }
+.choice-row:has(input:checked) { border-color: #bfdbfe; background: #f8fbff; }
+.choice-row:has(input:disabled) { background: #f8fafc; color: #94a3b8; }
+.choice-row span { display: grid; gap: 1px; min-width: 0; }
+.choice-row strong { font-size: 0.8125rem; }
+.choice-row input { width: 16px; height: 16px; margin: 0; flex: 0 0 16px; accent-color: #2563eb; }
+.environment-all-choice { margin-bottom: 1px; }
+.environment-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.application-key-modal .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px 16px; border-top: 1px solid #eef2f7; }
+.application-key-modal .dialog-actions .ui-button { min-height: var(--control-md); }
+.application-key-modal .ui-icon-button { color: var(--text-muted); }
+.secret-callout { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px solid #93c5fd; border-radius: 6px; background: #eff6ff; }
+.secret-callout code { min-width: 0; flex: 1; overflow-wrap: anywhere; color: #1e3a8a; font-size: 0.8125rem; }
+.application-key-secret-step { display: grid; gap: 22px; padding: 24px; }
+
+@media (max-width: 900px) {
+  .application-key-table-header { display: none; }
+  .application-key-table-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; padding: 16px; }
+  .application-key-table-row > span:nth-child(2),
+  .application-key-table-row > span:nth-child(3),
+  .application-key-table-row > span:nth-child(4),
+  .application-key-table-row > span:nth-child(5) { grid-column: 1; }
+  .application-key-table-row > span:nth-child(2)::before { content: "Scopes: "; color: #64748b; }
+  .application-key-table-row > span:nth-child(3)::before { content: "Environments: "; color: #64748b; }
+  .application-key-table-row > span:nth-child(4)::before { content: "Created: "; color: #64748b; }
+  .application-key-table-row > span:nth-child(5)::before { content: "Expires: "; color: #64748b; }
+  .application-key-table-row > .status-badge,
+  .application-key-table-row > button,
+  .application-key-table-row > span:last-child { grid-column: 2; grid-row: 1; }
+}
+
+@media (max-width: 640px) {
+  .settings-page-header { flex-direction: column; }
+  .settings-page-header > button { width: 100%; }
+  .choice-grid,
+  .environment-choices { grid-template-columns: 1fr; }
 }

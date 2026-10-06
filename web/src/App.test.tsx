@@ -112,7 +112,7 @@ describe("App", () => {
     expect(screen.getByText("automation")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "API tokens" }));
     expect(
-      screen.getByRole("button", { name: "Create token" }),
+      screen.getByRole("button", { name: "Create API token" }),
     ).toBeInTheDocument();
   });
 
@@ -125,7 +125,7 @@ describe("App", () => {
     const overviewTab = screen.getByRole("tab", { name: "Overview" });
     expect(overviewTab).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(overviewTab, { key: "ArrowRight" });
-    expect(screen.getByRole("tab", { name: "Availability" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Instances" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -137,8 +137,8 @@ describe("App", () => {
     await screen.findByText("Checkout service created");
     fireEvent.click(screen.getByRole("button", { name: "Services" }));
 
-    fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
-    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Instances" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
     expect(
       screen.getByRole("button", { name: "Close dialog" }),
     ).toBeInTheDocument();
@@ -194,15 +194,15 @@ describe("App", () => {
     expect(screen.queryByText("Add instance")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Target" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Instances" }));
     expect(screen.getByText("Endpoints")).toBeInTheDocument();
     expect(screen.getAllByText("Health").length).toBeGreaterThan(0);
 
     expect(
-      screen.queryByRole("button", { name: "Add instance" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Add instance" }),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
     expect(screen.getAllByText("Service").length).toBeGreaterThan(0);
     expect(screen.getAllByText("checkout").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Service")).not.toBeInTheDocument();
@@ -214,7 +214,7 @@ describe("App", () => {
       target: { value: "10.0.0.3" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
     expect(screen.getByLabelText("Instance name")).toHaveValue(
       "checkout-prod-03",
     );
@@ -227,8 +227,8 @@ describe("App", () => {
 
     await screen.findByText("Checkout service created");
     fireEvent.click(screen.getByRole("button", { name: "Services" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
-    fireEvent.click(screen.getByRole("button", { name: "+ Add instance" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Instances" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
 
     fireEvent.change(screen.getByLabelText("Instance name"), {
       target: { value: "checkout-prod-04" },
@@ -241,7 +241,10 @@ describe("App", () => {
     });
 
     expect(screen.queryByText("Health monitoring")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Add instance" }));
+    const addInstanceButtons = screen.getAllByRole("button", {
+      name: "Add instance",
+    });
+    fireEvent.click(addInstanceButtons[addInstanceButtons.length - 1]);
     await screen.findByText("Instance added successfully");
     expect(screen.getByText("checkout-prod-02")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.2")).toBeInTheDocument();
@@ -258,6 +261,17 @@ describe("App", () => {
         input.toString().includes("RegisterRuntime"),
       ),
     ).toHaveLength(1);
+  });
+
+  it("keeps instance creation out of the availability view", async () => {
+    render(<App />);
+
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", { name: "Services" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Availability" }));
+
+    expect(screen.queryByRole("button", { name: "Add instance" })).not.toBeInTheDocument();
+    expect(screen.getByText("checkout-a")).toBeInTheDocument();
   });
 
   it("has no WCAG 2 A/AA axe violations on the dashboard", async () => {
