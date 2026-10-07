@@ -1,4 +1,51 @@
-export function mockResponse(path: string) {
+export function mockResponse(path: string, init?: RequestInit) {
+  if (
+    path.includes("CreateHealthCheck") ||
+    path.includes("UpdateHealthCheck")
+  ) {
+    return {
+      healthCheck: {
+        id: "hc-1",
+        instanceId: "inst-1",
+        name: "HTTP health",
+        type: "HEALTH_CHECK_TYPE_HTTP",
+        enabled: true,
+        intervalSeconds: 10,
+        timeoutSeconds: 3,
+        failuresBeforeUnhealthy: 3,
+        successesBeforeHealthy: 2,
+        ...JSON.parse(init?.body?.toString() ?? "{}"),
+      },
+    };
+  }
+  if (path.includes("CreateEndpoint") || path.includes("UpdateEndpoint")) {
+    return {
+      endpoint: {
+        id: path.includes("CreateEndpoint") ? "end-2" : "end-1",
+        instanceId: "inst-1",
+        name: "http",
+        protocol: "PROTOCOL_HTTP",
+        port: 8080,
+        path: "/",
+        enabled: true,
+        primary: false,
+        ...JSON.parse(init?.body?.toString() ?? "{}"),
+      },
+    };
+  }
+  if (path.includes("UpdateInstance")) {
+    return {
+      instance: {
+        id: "inst-1",
+        deploymentId: "dep-1",
+        name: "checkout-a",
+        address: "10.0.0.1",
+        port: 8080,
+        enabled: true,
+        ...JSON.parse(init?.body?.toString() ?? "{}"),
+      },
+    };
+  }
   if (path.includes("/api/v1/auth/me")) {
     return {
       user: {

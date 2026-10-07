@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
+import "./components/ui/ui.css";
 import { AppShell } from "./components/AppShell";
-import { AddRuntimeDialog } from "./components/AddRuntimeDialog";
+import { FormField, Input, PasswordInput, Alert, Button as FormButton } from "./components/ui";
 import { AvailabilityCard, MetricCard } from "./components/Cards";
 import {
   EmptyState,
@@ -23,9 +24,10 @@ import {
   formatTimestamp,
   pluralize,
 } from "./utils/format";
-import { DashboardView } from "./views/DashboardView";
 import { RuntimeTopology } from "./components/RuntimeTopology";
 import { HealthWorkspace } from "./views/HealthWorkspace";
+import { ServicesWorkspace } from "./components/ServicesWorkspace";
+import { OperationalWorkspace } from "./components/OperationalWorkspace";
 import {
   AlertPolicy,
   ApplicationKey,
@@ -60,7 +62,6 @@ import {
   eventStreamUrl,
   getAvailability,
   getCurrentSession,
-  getInstanceHealthState,
   listAlertPolicies,
   listDeployments,
   listEndpoints,
@@ -95,6 +96,20 @@ import {
   UserAccount,
 } from "./api";
 
+function endpointMutationError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Failed to update endpoint";
+  try {
+    const response = JSON.parse(message);
+    if (response?.code === "already_exists") {
+      return "An endpoint with this name already exists on this instance. Choose a different name.";
+    }
+    if (typeof response?.message === "string") return response.message;
+  } catch {
+    // Connect errors may also be plain text.
+  }
+  return message;
+}
+
 function newRegistrationEndpoint(
   overrides: Partial<{
     name: string;
@@ -115,7 +130,8 @@ function newRegistrationEndpoint(
 }
 
 function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
-  const [activeView, setActiveView] = useState<ActiveView>("dashboard");
+  const initialPath = parseApplicationPath(window.location.pathname);
+  const [activeView, setActiveView] = useState<ActiveView>(initialPath.view);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [deployments, setDeployments] = useState<ServiceDeployment[]>([]);
@@ -146,7 +162,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }>({});
   const [latestState, setLatestState] = useState<HealthStateView | null>(null);
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState("");
-  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [selectedServiceId, setSelectedServiceId] = useState(initialPath.serviceId);
   const [selectedHealthCheckId, setSelectedHealthCheckId] = useState("");
   const [serviceSearch, setServiceSearch] = useState("");
   const [serviceHealthFilter, setServiceHealthFilter] = useState("all");
@@ -154,7 +170,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [servicePage, setServicePage] = useState(1);
   const [serviceTab, setServiceTab] = useState<
     "overview" | "instances" | "availability" | "health" | "incidents" | "events"
-  >("overview");
+  >(initialPath.serviceTab);
   const [showCreateService, setShowCreateService] = useState(false);
   const [showAddRuntime, setShowAddRuntime] = useState(false);
   const [healthStatusFilter, setHealthStatusFilter] = useState("all");
@@ -221,6 +237,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     description: "",
   });
   const [serviceEditForm, setServiceEditForm] = useState({
+    name: "",
     displayName: "",
     description: "",
   });
@@ -336,7 +353,14 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }, [showCreateApplicationKey, showCreateUser, showCreateApiToken]);
 
   const selectedService = useMemo(
-    () => services.find((service) => service.id === selectedServiceId),
+    () => services.find((service) => service.id === selectedServiceId) ?? {
+      id: "",
+      name: "",
+      displayName: "",
+      description: "",
+      tags: {},
+      metadata: {},
+    },
     [selectedServiceId, services],
   );
   const selectedHealthCheck = useMemo(
@@ -585,13 +609,9 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
         nextInstances.map((instance) => listEndpoints(instance.id)),
       )
     ).flat();
-    const nextHealthStates = (
-      await Promise.all(
-        nextInstances.map((instance) =>
-          getInstanceHealthState(instance.id).catch(() => null),
-        ),
-      )
-    ).filter((state): state is HealthStateView => state !== null);
+    // Some deployed API versions do not expose instance state yet. Keep the
+    // topology usable and let the service UI render an explicit unknown state.
+    const nextHealthStates: HealthStateView[] = [];
     setDeployments(scopedDeployments);
     setInstances(nextInstances);
     setEndpoints(nextEndpoints);
@@ -671,6 +691,32 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   useEffect(() => {
     setServicePage((current) => Math.min(current, servicePageCount));
   }, [servicePageCount]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = parseApplicationPath(window.location.pathname);
+      setActiveView(path.view);
+      if (path.serviceId) setSelectedServiceId(path.serviceId);
+      if (path.serviceTab) setServiceTab(path.serviceTab);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const nextPath = applicationPath(activeView, selectedServiceId, serviceTab);
+    if (window.location.pathname !== nextPath) {
+      window.history.replaceState({}, "", nextPath);
+    }
+  }, [activeView, selectedServiceId, serviceTab]);
+
+  function navigateTo(view: ActiveView) {
+    setActiveView(view);
+    const nextPath = applicationPath(view, view === "services" ? selectedServiceId : "", serviceTab);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+  }
 
   useEffect(() => {
     setRegistrationForm((current) => ({
@@ -846,6 +892,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   function startEditService(service: Service) {
     setEditingServiceId(service.id);
     setServiceEditForm({
+      name: service.name,
       displayName: service.displayName || service.name,
       description: service.description ?? "",
     });
@@ -975,10 +1022,13 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }
 
   function startAddEndpoint(instance: ServiceInstance) {
+    const names = new Set(endpoints.filter(endpoint => endpoint.instanceId === instance.id).map(endpoint => endpoint.name));
+    let name = "http";
+    for (let suffix = 2; names.has(name); suffix++) name = `http-${suffix}`;
     setEditingEndpointId("");
     setAddingEndpointInstanceId(instance.id);
     setEndpointEditForm({
-      name: "http",
+      name,
       protocol: "PROTOCOL_HTTP",
       port: primaryEndpointForInstance(endpoints, instance.id)?.port || 8080,
       path: "/",
@@ -1059,13 +1109,23 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     const current = endpoints.find(
       (endpoint) => endpoint.id === editingEndpointId,
     );
+    const name = endpointEditForm.name.trim();
+    const instanceId = addingEndpointInstanceId || current?.instanceId;
+    if (!name) {
+      setError("Endpoint name is required.");
+      return;
+    }
+    if (endpoints.some(endpoint => endpoint.instanceId === instanceId && endpoint.id !== editingEndpointId && endpoint.name === name)) {
+      setError("An endpoint with this name already exists on this instance. Choose a different name.");
+      return;
+    }
     setSavingRuntimeEdit(true);
     setError("");
     try {
       if (addingEndpointInstanceId) {
         await createEndpoint({
           instanceId: addingEndpointInstanceId,
-          name: endpointEditForm.name,
+          name,
           protocol: endpointEditForm.protocol,
           port: endpointEditForm.port,
           path: endpointEditForm.path,
@@ -1075,7 +1135,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       } else {
         await updateEndpoint({
           id: editingEndpointId,
-          name: endpointEditForm.name,
+          name,
           protocol: endpointEditForm.protocol,
           port: endpointEditForm.port,
           path: endpointEditForm.path,
@@ -1090,7 +1150,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       await loadCatalog(selectedEnvironmentId);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update endpoint",
+        endpointMutationError(err),
       );
     } finally {
       setSavingRuntimeEdit(false);
@@ -1460,6 +1520,10 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     try {
       const response = await runHealthCheck(id);
       setLatestState(response.state ?? null);
+      if (response.state) {
+        const state = response.state;
+        setHealthStates(current => [...current.filter(item => item.instanceId !== state.instanceId), state]);
+      }
       setHealthResults(await listHealthResults(id));
     } catch (err) {
       setError(
@@ -1708,6 +1772,64 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   void formatEndpointSummary;
   void formatEndpointUrl;
 
+  const operationalProps = {
+    loading,
+    environments,
+    services,
+    deployments,
+    instances,
+    incidents,
+    filteredIncidents,
+    selectedIncident,
+    events,
+    filteredEvents,
+    availability,
+    healthChecksCount: healthChecks.length,
+    alertPolicies,
+    notificationChannels,
+    selectedEnvironmentId,
+    currentEnvironmentName,
+    incidentStateFilter,
+    incidentSearch,
+    eventTypeFilter,
+    eventResourceFilter,
+    eventSearch,
+    eventTypes,
+    eventResourceTypes,
+    alertsSection,
+    environmentForm,
+    policyForm,
+    channelForm,
+    editingPolicyId,
+    editingChannelId,
+    savingEnvironment,
+    savingPolicy,
+    savingChannel,
+    testingChannelId,
+    resolvingIncidentId,
+    onIncidentStateFilter: setIncidentStateFilter,
+    onIncidentSearch: setIncidentSearch,
+    onEventTypeFilter: setEventTypeFilter,
+    onEventResourceFilter: setEventResourceFilter,
+    onEventSearch: setEventSearch,
+    onAlertsSection: setAlertsSection,
+    onEnvironmentForm: setEnvironmentForm,
+    onPolicyForm: setPolicyForm,
+    onChannelForm: setChannelForm,
+    onCreateEnvironment: handleCreateEnvironment,
+    onCreatePolicy: handleCreatePolicy,
+    onCreateChannel: handleCreateChannel,
+    onCancelPolicy: cancelPolicyEdit,
+    onCancelChannel: cancelChannelEdit,
+    onEditPolicy: editPolicy,
+    onEditChannel: editChannel,
+    onTestChannel: (id: string) => { void handleTestChannel(id); },
+    onResolveIncident: (id: string) => { void handleResolveIncident(id); },
+    onSelectedIncident: setSelectedIncidentId,
+    onViewChange: (view: "environments" | "services" | "incidents" | "alerts" | "events") => navigateTo(view),
+    onSelectService: setSelectedServiceId,
+  };
+
   return (
     <AppShell
       activeView={activeView}
@@ -1721,7 +1843,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       onRefresh={() => loadCatalog()}
       onLogout={() => { void handleLogout(); }}
       onSecurityOpen={() => {
-        setActiveView("security");
+        navigateTo("security");
         loadSecurityData().catch((err: unknown) =>
           setError(
             err instanceof Error
@@ -1731,7 +1853,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
         );
       }}
       onToggleDarkMode={() => setDarkMode((value) => !value)}
-      onViewChange={setActiveView}
+      onViewChange={navigateTo}
     >
       {loading ? <div className="status">Loading registry data...</div> : null}
 
@@ -1745,18 +1867,105 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       {authMessage && <div className="success">{authMessage}</div>}
 
       {activeView === "dashboard" ? (
-        <DashboardView
-          alertPolicies={alertPolicies}
-          availability={availability}
-          environments={environments}
-          events={events}
-          healthChecks={healthChecks}
-          incidents={incidents}
-          notificationChannels={notificationChannels}
-          selectedEnvironmentId={selectedEnvironmentId}
-          services={services}
-        />
+        <OperationalWorkspace {...operationalProps} view="dashboard" />
       ) : activeView === "services" ? (
+        <ServicesWorkspace
+          error={error}
+          loading={loading}
+          environments={environments}
+          services={services}
+          filteredServices={filteredServices}
+          visibleServices={visibleServices}
+          deployments={deployments}
+          instances={instances}
+          endpoints={endpoints}
+          healthChecks={healthChecks}
+          healthStates={healthStates}
+          incidents={incidents}
+          events={events}
+          availability={serviceAvailability}
+          selectedEnvironmentId={selectedEnvironmentId}
+          currentEnvironmentName={currentEnvironmentName}
+          selectedServiceId={selectedServiceId}
+          onSelectService={setSelectedServiceId}
+          serviceSearch={serviceSearch}
+          setServiceSearch={setServiceSearch}
+          serviceHealthFilter={serviceHealthFilter}
+          setServiceHealthFilter={setServiceHealthFilter}
+          serviceTagFilter={serviceTagFilter}
+          setServiceTagFilter={setServiceTagFilter}
+          servicePage={servicePage}
+          servicePageCount={servicePageCount}
+          setServicePage={setServicePage}
+          selectedBulkServiceIds={selectedBulkServiceIds}
+          toggleBulkService={toggleBulkService}
+          selectVisibleServices={selectVisibleServices}
+          clearBulkSelection={() => setSelectedBulkServiceIds([])}
+          handleCopySelectedServiceIds={handleCopySelectedServiceIds}
+          handleDeleteSelectedServices={handleDeleteSelectedServices}
+          bulkActionRunning={bulkActionRunning}
+          serviceTab={serviceTab}
+          setServiceTab={(value) => setServiceTab(value as typeof serviceTab)}
+          serviceForm={serviceForm}
+          setServiceForm={setServiceForm}
+          showCreateService={showCreateService}
+          setShowCreateService={setShowCreateService}
+          handleCreateService={handleCreateService}
+          editingServiceId={editingServiceId}
+          setEditingServiceId={setEditingServiceId}
+          serviceEditForm={serviceEditForm}
+          setServiceEditForm={setServiceEditForm}
+          handleUpdateService={handleUpdateService}
+          handleDeleteService={handleDeleteService}
+          savingService={savingService}
+          showAddRuntime={showAddRuntime}
+          setShowAddRuntime={setShowAddRuntime}
+          registrationForm={registrationForm}
+          setRegistrationForm={setRegistrationForm}
+          registrationSuccess={registrationSuccess}
+          savingRegistration={savingRegistration}
+          addRegistrationEndpoint={addRegistrationEndpoint}
+          removeRegistrationEndpoint={removeRegistrationEndpoint}
+          setPrimaryRegistrationEndpoint={setPrimaryRegistrationEndpoint}
+          updateRegistrationEndpoint={updateRegistrationEndpoint}
+          handleRegisterInstance={handleRegisterInstance}
+          closeRuntimeDialog={closeRuntimeDialog}
+          registeredRuntime={registeredRuntime ?? undefined}
+          healthFollowUpError={healthFollowUpError}
+          healthFollowUpConfigured={healthFollowUpConfigured}
+          savingHealthFollowUp={savingHealthFollowUp}
+          handleCreateRegisteredHealth={handleCreateRegisteredHealth}
+          editingInstanceId={editingInstanceId}
+          setEditingInstanceId={setEditingInstanceId}
+          instanceEditForm={instanceEditForm}
+          setInstanceEditForm={setInstanceEditForm}
+          handleUpdateInstance={handleUpdateInstance}
+          handleDeleteInstance={handleDeleteInstance}
+          savingRuntimeEdit={savingRuntimeEdit}
+          editingEndpointId={editingEndpointId}
+          addingEndpointInstanceId={addingEndpointInstanceId}
+          startAddEndpoint={startAddEndpoint}
+          setEditingEndpointId={setEditingEndpointId}
+          setAddingEndpointInstanceId={setAddingEndpointInstanceId}
+          endpointEditForm={endpointEditForm}
+          setEndpointEditForm={setEndpointEditForm}
+          handleUpdateEndpoint={handleUpdateEndpoint}
+          handleDeleteEndpoint={handleDeleteEndpoint}
+          editingHealthCheckId={editingHealthCheckId}
+          setEditingHealthCheckId={setEditingHealthCheckId}
+          healthForm={healthForm}
+          setHealthForm={setHealthForm}
+          handleUpdateHealthCheck={handleUpdateHealthCheck}
+          handleDeleteHealthCheck={handleDeleteHealthCheck}
+          savingHealthCheck={savingHealthCheck}
+          handleRunHealthCheck={handleRunHealthCheck}
+          startEditHealthCheck={startEditHealthCheck}
+          healthEditForm={healthEditForm}
+          setHealthEditForm={setHealthEditForm}
+          testResult={testResult}
+          setError={setError}
+        />
+      ) : false ? (
         <section className="services-workflow">
           <PageHeader
             title="Services"
@@ -3705,29 +3914,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
             </div>
           ) : null}
 
-          {showAddRuntime && selectedService ? (
-            <AddRuntimeDialog
-              environments={environments}
-              form={registrationForm}
-              registrationSuccess={registrationSuccess}
-              saving={savingRegistration}
-              selectedService={selectedService}
-              onAddEndpoint={addRegistrationEndpoint}
-              onRemoveEndpoint={removeRegistrationEndpoint}
-              onSetPrimaryEndpoint={setPrimaryRegistrationEndpoint}
-              onSubmit={handleRegisterInstance}
-              onUpdateEndpoint={updateRegistrationEndpoint}
-              setForm={setRegistrationForm}
-              onClose={closeRuntimeDialog}
-              registeredRuntime={registeredRuntime ?? undefined}
-              healthError={healthFollowUpError}
-              healthConfigured={healthFollowUpConfigured}
-              healthSaving={savingHealthFollowUp}
-              onConfigureHealth={() => setHealthFollowUpError("")}
-              onCreateHealth={handleCreateRegisteredHealth}
-            />
-          ) : null}
-
           {/* Legacy inline registration form consolidated into AddRuntimeDialog. */}
           {/*
             <div
@@ -4005,6 +4191,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
           */}
         </section>
       ) : activeView === "environments" ? (
+        <OperationalWorkspace {...operationalProps} view="environments" />
+      ) : false ? (
         <section className="content-grid environments-grid">
           <PageHeader
             title="Environments"
@@ -4449,6 +4637,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
           </form>
         </section>
       ) : activeView === "incidents" ? (
+        <OperationalWorkspace {...operationalProps} view="incidents" />
+      ) : false ? (
         <section className="content-grid incidents-grid">
           <PageHeader
             title="Incidents"
@@ -4590,45 +4780,47 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
                 </div>
                 <dl className="detail-list">
                   <dt>ID</dt>
-                  <dd>{selectedIncident.id}</dd>
+                  <dd>{selectedIncident!.id}</dd>
                   <dt>State</dt>
                   <dd>
                     <StatusBadge
-                      status={formatIncidentState(selectedIncident.state)}
+                      status={formatIncidentState(selectedIncident!.state)}
                     />
                   </dd>
                   <dt>Reason</dt>
-                  <dd>{selectedIncident.reason || "None"}</dd>
+                  <dd>{selectedIncident!.reason || "None"}</dd>
                   <dt>Impact</dt>
-                  <dd>{selectedIncident.impactSummary || "None"}</dd>
+                  <dd>{selectedIncident!.impactSummary || "None"}</dd>
                   <dt>Service</dt>
                   <dd>
                     <ResourceLink
                       onClick={() => {
-                        setSelectedServiceId(selectedIncident.serviceId);
+                        setSelectedServiceId(selectedIncident!.serviceId);
                         setSelectedIncidentId("");
                         setActiveView("services");
                       }}
                     >
-                      {selectedIncident.serviceId}
+                      {selectedIncident!.serviceId}
                     </ResourceLink>
                   </dd>
                   <dt>Instance</dt>
-                  <dd>{selectedIncident.instanceId}</dd>
+                  <dd>{selectedIncident!.instanceId}</dd>
                   <dt>Opened</dt>
-                  <dd>{formatTimestamp(selectedIncident.openedAt)}</dd>
+                  <dd>{formatTimestamp(selectedIncident!.openedAt)}</dd>
                   <dt>Resolved</dt>
-                  <dd>{formatTimestamp(selectedIncident.resolvedAt)}</dd>
+                  <dd>{formatTimestamp(selectedIncident!.resolvedAt)}</dd>
                   <dt>Duration</dt>
-                  <dd>{formatDuration(selectedIncident.durationSeconds)}</dd>
+                  <dd>{formatDuration(selectedIncident!.durationSeconds)}</dd>
                   <dt>Metadata</dt>
-                  <dd>{formatMap(selectedIncident.metadata)}</dd>
+                  <dd>{formatMap(selectedIncident!.metadata)}</dd>
                 </dl>
               </div>
             </div>
           ) : null}
         </section>
       ) : activeView === "alerts" ? (
+        <OperationalWorkspace {...operationalProps} view="alerts" />
+      ) : false ? (
         <section className="content-grid alerts-grid">
           <PageHeader
             title="Alerts"
@@ -5244,6 +5436,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
             </div>
           </div> : null}
         </section>
+      ) : activeView === "events" ? (
+        <OperationalWorkspace {...operationalProps} view="events" />
       ) : (
         <section className="content-grid events-grid">
           <PageHeader
@@ -5447,6 +5641,30 @@ function formatPolicyScope(policy: AlertPolicy) {
   return "No scope";
 }
 
+const serviceTabs = ["overview", "instances", "health", "incidents", "events"] as const;
+type ServiceTabPath = (typeof serviceTabs)[number];
+
+function parseApplicationPath(pathname: string): { view: ActiveView; serviceId: string; serviceTab: ServiceTabPath } {
+  const parts = pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
+  const view = parts[0] as ActiveView | undefined;
+  if (view === "services") {
+    const serviceTab = parts[2] === "availability" ? "health" : serviceTabs.includes(parts[2] as ServiceTabPath) ? parts[2] as ServiceTabPath : "overview";
+    return { view, serviceId: parts[1] ?? "", serviceTab };
+  }
+  return {
+    view: view && ["dashboard", "environments", "health", "incidents", "alerts", "security", "events"].includes(view) ? view : "dashboard",
+    serviceId: "",
+    serviceTab: "overview",
+  };
+}
+
+function applicationPath(view: ActiveView, serviceId: string, serviceTab: ServiceTabPath | "availability") {
+  if (view === "services") {
+    return serviceId ? `/services/${encodeURIComponent(serviceId)}/${serviceTab === "availability" ? "health" : serviceTab}` : "/services";
+  }
+  return `/${view}`;
+}
+
 function serviceOperationalStatus(service: Service, incidents: Incident[]) {
   const hasOpenIncident = incidents.some(
     (incident) =>
@@ -5482,11 +5700,11 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: UserAccount, m
       <section className="auth-card" aria-labelledby="login-title">
         <div className="brand-lockup auth-brand"><div className="brand-mark" aria-hidden="true">A</div><div><h1>Alauda</h1><p>Service Registry</p></div></div>
         <h2 id="login-title">Sign in to Alauda</h2>
-        <form className="form-panel" onSubmit={submit}>
-          <label>Username<input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
-          <label>Password<input autoComplete="current-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
-          {error ? <p className="error" role="alert">{error}</p> : null}
-          <button disabled={saving} type="submit">{saving ? "Signing in" : "Sign in"}</button>
+        <form className="alauda-auth-form" onSubmit={submit}>
+          <FormField label="Username"><Input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></FormField>
+          <FormField label="Password"><PasswordInput autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></FormField>
+          {error ? <Alert tone="danger" title={error} /> : null}
+          <FormButton variant="primary" disabled={saving} aria-busy={saving} type="submit">{saving ? "Signing in" : "Sign in"}</FormButton>
         </form>
       </section>
     </main>
@@ -5519,11 +5737,11 @@ function PasswordChangePage({ onComplete }: { onComplete: () => void }) {
         <div className="brand-lockup auth-brand"><div className="brand-mark" aria-hidden="true">A</div><div><h1>Alauda</h1><p>Service Registry</p></div></div>
         <h2 id="password-title">Set a new password</h2>
         <p>For security, replace the temporary administrator password before continuing.</p>
-        <form className="form-panel" onSubmit={submit}>
-          <label>New password<input autoComplete="new-password" minLength={12} type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
-          <label>Confirm password<input autoComplete="new-password" minLength={12} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required /></label>
-          {error ? <p className="error" role="alert">{error}</p> : null}
-          <button disabled={saving} type="submit">{saving ? "Updating" : "Update password"}</button>
+        <form className="alauda-auth-form" onSubmit={submit}>
+          <FormField label="New password" hint="At least 12 characters"><PasswordInput autoComplete="new-password" minLength={12} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></FormField>
+          <FormField label="Confirm password"><PasswordInput autoComplete="new-password" minLength={12} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required /></FormField>
+          {error ? <Alert tone="danger" title={error} /> : null}
+          <FormButton variant="primary" disabled={saving} aria-busy={saving} type="submit">{saving ? "Updating" : "Update password"}</FormButton>
         </form>
       </section>
     </main>
