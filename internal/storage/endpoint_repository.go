@@ -48,11 +48,31 @@ func (r *EndpointRepository) Create(ctx context.Context, req *registryv1.CreateE
 		return nil, fmt.Errorf("failed to clear existing primary endpoint: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO endpoints (id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, id, req.GetInstanceId(), req.GetName(), int32(req.GetProtocol()),
-		req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), req.GetPrimary(), now, now)
+	// Deleted rows retain their unique name; restore them without changing identity.
+	var deletedID string
+	err = tx.QueryRowContext(ctx, `
+		SELECT id FROM endpoints
+		WHERE instance_id = ? AND name = ? AND deleted_at IS NOT NULL
+	`, req.GetInstanceId(), req.GetName()).Scan(&deletedID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to find deleted endpoint: %w", err)
+	}
+	if err == nil {
+		id = deletedID
+		_, err = tx.ExecContext(ctx, `
+			UPDATE endpoints
+			SET protocol = ?, port = ?, path = ?, enabled = ?, tags = ?, metadata = ?,
+			    primary_endpoint = ?, deleted_at = NULL, updated_at = ?
+			WHERE id = ? AND deleted_at IS NOT NULL
+		`, int32(req.GetProtocol()), req.GetPort(), req.GetPath(), req.GetEnabled(),
+			string(tagsJSON), string(metadataJSON), req.GetPrimary(), now, id)
+	} else {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO endpoints (id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, id, req.GetInstanceId(), req.GetName(), int32(req.GetProtocol()),
+			req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), req.GetPrimary(), now, now)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create endpoint: %w", err)
 	}
