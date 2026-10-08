@@ -199,8 +199,11 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 		}
 	}
 	fields := map[string][]string{}
-	if err := address.ValidateHost(instance.Address); err != nil {
+	normalizedAddress, err := address.NormalizeHost(instance.Address)
+	if err != nil {
 		fields["instance.address"] = []string{err.Error()}
+	} else {
+		instance.Address = normalizedAddress
 	}
 	for i, ep := range merged.Endpoints {
 		prefix := fmt.Sprintf("endpoints[%d]", i)

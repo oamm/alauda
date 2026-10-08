@@ -81,3 +81,36 @@ func TestPublicRegistrationAndDiscoveryUseHumanReadableKeys(t *testing.T) {
 	}
 	_ = env
 }
+
+func TestPublicRegistrationNormalizesConfluentCloudAddress(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.NewDatabase(ctx, fixtureDatabasePath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.RunMigrations(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewEnvironmentRepository(db).Create(ctx, &registryv1.CreateEnvironmentRequest{Key: "stg", Name: "Staging"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewServiceRepository(db).Create(ctx, &registryv1.CreateServiceRequest{Name: "Kafka", DisplayName: "Kafka"}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, db)
+	body := []byte(`{"environment":"stg","instance":{"name":"broker","address":"https://pkc-lgk0v.us-west1.gcp.confluent.cloud:9092/"},"endpoints":[{"name":"default","protocol":"tcp","port":9092}]}`)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/api/v1/services/Kafka/instances", bytes.NewReader(body)))
+	if res.Code != http.StatusOK {
+		t.Fatalf("register status=%d body=%s", res.Code, res.Body.String())
+	}
+	var registered publicRegistrationResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &registered); err != nil {
+		t.Fatal(err)
+	}
+	if registered.Instance.Address != "pkc-lgk0v.us-west1.gcp.confluent.cloud" {
+		t.Fatalf("address = %q, want normalized Confluent hostname", registered.Instance.Address)
+	}
+}

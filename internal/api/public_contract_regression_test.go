@@ -266,7 +266,7 @@ func TestPublicDiscoveryEndpointEligibilityAndFallback(t *testing.T) {
 			t.Fatalf("%d %s", w.Code, w.Body.String())
 		}
 	}
-	resolve("", 200, `"address":"http://[::1]:81/"`)
+	resolve("", 200, `"address":"http://[::1]:81"`)
 	requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one"},"endpoints":[{"name":"z-primary","primary":false}]}`))
 	resolve("", 200, `"endpoint":"a-secondary"`)
 	requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one"},"endpoints":[{"name":"a-secondary","enabled":false}]}`))

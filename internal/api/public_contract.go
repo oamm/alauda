@@ -209,8 +209,11 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 		fields["instance.address"] = []string{"Address must not be empty."}
 	}
 	if input.Instance.Address != nil {
-		if err := address.ValidateHost(*input.Instance.Address); err != nil {
+		normalized, err := address.NormalizeHost(*input.Instance.Address)
+		if err != nil {
 			fields["instance.address"] = []string{err.Error()}
+		} else {
+			input.Instance.Address = &normalized
 		}
 	}
 	if input.Mode != "" && input.Mode != "upsert" {

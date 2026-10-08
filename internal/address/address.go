@@ -11,6 +11,29 @@ import (
 	"unicode"
 )
 
+func NormalizeHost(value string) (string, error) {
+	host := strings.TrimSpace(value)
+	if host == "" {
+		return "", fmt.Errorf("address must be a bare DNS name or IP address without scheme, port or path")
+	}
+	if strings.Contains(host, "://") {
+		parsed, err := url.Parse(host)
+		if err != nil || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
+			return "", fmt.Errorf("address must be a bare DNS name or IP address without scheme, port or path")
+		}
+		host = parsed.Hostname()
+	}
+	if strings.Contains(host, ":") && net.ParseIP(host) == nil {
+		if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+			host = parsedHost
+		}
+	}
+	if err := ValidateHost(host); err != nil {
+		return "", err
+	}
+	return host, nil
+}
+
 func ValidateHost(host string) error {
 	if host == "" || strings.TrimSpace(host) != host || strings.ContainsAny(host, "/\\?#@[]") || strings.Contains(host, "://") {
 		return fmt.Errorf("address must be a bare DNS name or IP address without scheme, port or path")
@@ -57,10 +80,7 @@ func Build(protocol, host string, port int32, path string) (string, error) {
 	protocol = strings.ToLower(protocol)
 	switch protocol {
 	case "http", "https":
-		if path == "" {
-			path = "/"
-		}
-		if !strings.HasPrefix(path, "/") {
+		if path != "" && !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
 	case "grpc", "tcp", "udp":
