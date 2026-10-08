@@ -209,3 +209,45 @@ func TestRegisterRuntimeEndpointEnabledAndPrimarySemantics(t *testing.T) {
 		}
 	}
 }
+
+func TestRegisterRuntimeUpsertAdaptsRuntimeRequestToPublicRegistration(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDatabase(t)
+	defer db.Close()
+	seed := createEndpointTestInstance(t, ctx, db)
+	deployment, err := NewDeploymentRepository(db).Get(ctx, seed.GetDeploymentId())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := NewRuntimeRepository(db).RegisterRuntimeUpsert(ctx, &registryv1.RegisterRuntimeRequest{
+		ServiceId:     deployment.GetServiceId(),
+		EnvironmentId: deployment.GetEnvironmentId(),
+		Instance: &registryv1.RuntimeInstanceRegistration{
+			Name:        "upserted",
+			Address:     "upserted.internal",
+			Description: "runtime adapter",
+			Enabled:     true,
+			Tags:        map[string]string{"team": "platform"},
+			Metadata:    map[string]string{"version": "1"},
+		},
+		Endpoints: []*registryv1.RuntimeEndpointRegistration{
+			{Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 8080, Path: "/ready", Primary: true, Enabled: true, Tags: map[string]string{"kind": "traffic"}, Metadata: map[string]string{"probe": "ready"}},
+			{Name: "metrics", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 9090, Path: "/metrics", Enabled: true},
+		},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.GetInstance().GetName() != "upserted" || resp.GetInstance().GetAddress() != "upserted.internal" {
+		t.Fatalf("instance = %+v", resp.GetInstance())
+	}
+	if len(resp.GetEndpoints()) != 2 {
+		t.Fatalf("endpoints = %d, want 2", len(resp.GetEndpoints()))
+	}
+	for _, endpoint := range resp.GetEndpoints() {
+		if endpoint.GetName() == "http" && (!endpoint.GetPrimary() || endpoint.GetPath() != "/ready" || endpoint.GetTags()["kind"] != "traffic" || endpoint.GetMetadata()["probe"] != "ready") {
+			t.Fatalf("http endpoint = %+v", endpoint)
+		}
+	}
+}

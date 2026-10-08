@@ -167,6 +167,187 @@ func TestAuthRESTUserAndTokenManagement(t *testing.T) {
 	}
 }
 
+func TestAuthRESTSessionPasswordAndApplicationKeys(t *testing.T) {
+	ctx := context.Background()
+	db := newAPITestDB(t, ctx)
+	repo := auth.NewRepository(db)
+	service := auth.NewService(repo, time.Hour)
+	admin, err := repo.CreateUser(ctx, auth.CreateUserInput{
+		Username:    "admin",
+		Email:       "admin@example.test",
+		DisplayName: "Admin",
+		Password:    "temporary-password",
+		Role:        auth.RoleAdministrator,
+	})
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	session, err := repo.CreateSession(ctx, admin.ID, time.Hour, "unit-test", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	principal := &auth.Principal{
+		UserID:    admin.ID,
+		Username:  admin.Username,
+		Role:      admin.Role,
+		SessionID: session.Session.ID,
+		Scopes:    auth.RoleScopes(admin.Role),
+	}
+	mux := http.NewServeMux()
+	registerAuthREST(mux, authHandler{service: service, repo: repo, cookieName: "test_session"})
+
+	listSessions := httptest.NewRecorder()
+	mux.ServeHTTP(listSessions, httptest.NewRequest(http.MethodGet, "/api/v1/auth/sessions", nil))
+	if listSessions.Code != http.StatusOK {
+		t.Fatalf("list sessions status = %d, want %d: %s", listSessions.Code, http.StatusOK, listSessions.Body.String())
+	}
+
+	appKeyBody := bytes.NewBufferString(`{"name":"ci","scopes":["read"],"environmentIds":["prod"]}`)
+	createKey := httptest.NewRecorder()
+	mux.ServeHTTP(createKey, httptest.NewRequest(http.MethodPost, "/api/v1/auth/application-keys", appKeyBody).WithContext(auth.WithPrincipal(ctx, principal)))
+	if createKey.Code != http.StatusCreated {
+		t.Fatalf("create application key status = %d, want %d: %s", createKey.Code, http.StatusCreated, createKey.Body.String())
+	}
+	var createdKey auth.CreatedApplicationKey
+	if err := json.NewDecoder(createKey.Body).Decode(&createdKey); err != nil {
+		t.Fatalf("decode application key: %v", err)
+	}
+	if createdKey.Secret == "" || createdKey.Key.ID == "" {
+		t.Fatalf("expected application key secret and id, got %#v", createdKey)
+	}
+
+	listKeys := httptest.NewRecorder()
+	mux.ServeHTTP(listKeys, httptest.NewRequest(http.MethodGet, "/api/v1/auth/application-keys", nil).WithContext(auth.WithPrincipal(ctx, principal)))
+	if listKeys.Code != http.StatusOK {
+		t.Fatalf("list application keys status = %d, want %d: %s", listKeys.Code, http.StatusOK, listKeys.Body.String())
+	}
+
+	revokeKey := httptest.NewRecorder()
+	mux.ServeHTTP(revokeKey, httptest.NewRequest(http.MethodDelete, "/api/v1/auth/application-keys/"+createdKey.Key.ID, nil))
+	if revokeKey.Code != http.StatusNoContent {
+		t.Fatalf("revoke application key status = %d, want %d: %s", revokeKey.Code, http.StatusNoContent, revokeKey.Body.String())
+	}
+
+	password := httptest.NewRecorder()
+	passwordBody := bytes.NewBufferString(`{"newPassword":"new-secure-password","confirmPassword":"new-secure-password"}`)
+	mux.ServeHTTP(password, httptest.NewRequest(http.MethodPost, "/api/v1/auth/password", passwordBody).WithContext(auth.WithPrincipal(ctx, principal)))
+	if password.Code != http.StatusNoContent {
+		t.Fatalf("password status = %d, want %d: %s", password.Code, http.StatusNoContent, password.Body.String())
+	}
+	if _, err := service.AuthenticateSession(ctx, session.Secret); err == nil {
+		t.Fatal("password change left current session active")
+	}
+
+	secondSession, err := repo.CreateSession(ctx, admin.ID, time.Hour, "unit-test", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("create second session: %v", err)
+	}
+	logoutPrincipal := *principal
+	logoutPrincipal.SessionID = secondSession.Session.ID
+	logout := httptest.NewRecorder()
+	mux.ServeHTTP(logout, httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil).WithContext(auth.WithPrincipal(ctx, &logoutPrincipal)))
+	if logout.Code != http.StatusNoContent {
+		t.Fatalf("logout status = %d, want %d: %s", logout.Code, http.StatusNoContent, logout.Body.String())
+	}
+
+	thirdSession, err := repo.CreateSession(ctx, admin.ID, time.Hour, "unit-test", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("create third session: %v", err)
+	}
+	deleteSession := httptest.NewRecorder()
+	mux.ServeHTTP(deleteSession, httptest.NewRequest(http.MethodDelete, "/api/v1/auth/sessions/"+thirdSession.Session.ID, nil))
+	if deleteSession.Code != http.StatusNoContent {
+		t.Fatalf("delete session status = %d, want %d: %s", deleteSession.Code, http.StatusNoContent, deleteSession.Body.String())
+	}
+
+	missingSession := httptest.NewRecorder()
+	mux.ServeHTTP(missingSession, httptest.NewRequest(http.MethodDelete, "/api/v1/auth/sessions/missing", nil))
+	if missingSession.Code != http.StatusNotFound {
+		t.Fatalf("missing session status = %d, want %d: %s", missingSession.Code, http.StatusNotFound, missingSession.Body.String())
+	}
+}
+
+func TestAuthRESTRejectsInvalidSessionPasswordAndApplicationKeyRequests(t *testing.T) {
+	ctx := context.Background()
+	db := newAPITestDB(t, ctx)
+	repo := auth.NewRepository(db)
+	mux := http.NewServeMux()
+	registerAuthREST(mux, authHandler{service: auth.NewService(repo, time.Hour), repo: repo})
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		want   int
+	}{
+		{name: "sessions method", method: http.MethodPost, path: "/api/v1/auth/sessions", want: http.StatusMethodNotAllowed},
+		{name: "session id required", method: http.MethodDelete, path: "/api/v1/auth/sessions/", want: http.StatusBadRequest},
+		{name: "password unauthenticated", method: http.MethodPost, path: "/api/v1/auth/password", body: `{}`, want: http.StatusUnauthorized},
+		{name: "password method", method: http.MethodGet, path: "/api/v1/auth/password", want: http.StatusMethodNotAllowed},
+		{name: "token method", method: http.MethodGet, path: "/api/v1/auth/tokens/token-id", want: http.StatusMethodNotAllowed},
+		{name: "token id required", method: http.MethodDelete, path: "/api/v1/auth/tokens/", want: http.StatusBadRequest},
+		{name: "application key name", method: http.MethodPost, path: "/api/v1/auth/application-keys", body: `{"name":" "}`, want: http.StatusBadRequest},
+		{name: "application key method", method: http.MethodPatch, path: "/api/v1/auth/application-keys", want: http.StatusMethodNotAllowed},
+		{name: "application key id required", method: http.MethodDelete, path: "/api/v1/auth/application-keys/", want: http.StatusBadRequest},
+		{name: "application key not found", method: http.MethodDelete, path: "/api/v1/auth/application-keys/missing", want: http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, httptest.NewRequest(tt.method, tt.path, bytes.NewBufferString(tt.body)))
+			if rec.Code != tt.want {
+				t.Fatalf("status = %d, want %d: %s", rec.Code, tt.want, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestAuthRESTRejectsInvalidAuthenticatedMutations(t *testing.T) {
+	ctx := context.Background()
+	db := newAPITestDB(t, ctx)
+	repo := auth.NewRepository(db)
+	admin, err := repo.CreateUser(ctx, auth.CreateUserInput{
+		Username:    "admin",
+		Email:       "admin@example.test",
+		DisplayName: "Admin",
+		Password:    "temporary-password",
+		Role:        auth.RoleAdministrator,
+	})
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	principal := &auth.Principal{UserID: admin.ID, Username: admin.Username, Role: admin.Role, Scopes: auth.RoleScopes(admin.Role)}
+	mux := http.NewServeMux()
+	registerAuthREST(mux, authHandler{service: auth.NewService(repo, time.Hour), repo: repo})
+
+	tests := []struct {
+		name string
+		path string
+		body string
+		want int
+	}{
+		{name: "password json", path: "/api/v1/auth/password", body: `{`, want: http.StatusBadRequest},
+		{name: "password mismatch", path: "/api/v1/auth/password", body: `{"newPassword":"short","confirmPassword":"different"}`, want: http.StatusBadRequest},
+		{name: "token json", path: "/api/v1/auth/tokens", body: `{`, want: http.StatusBadRequest},
+		{name: "token missing fields", path: "/api/v1/auth/tokens", body: `{"name":""}`, want: http.StatusBadRequest},
+		{name: "application key forbidden", path: "/api/v1/auth/application-keys", body: `{"name":"ci"}`, want: http.StatusForbidden},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewBufferString(tt.body)).WithContext(auth.WithPrincipal(ctx, principal))
+			if tt.name == "application key forbidden" {
+				req = httptest.NewRequest(http.MethodPost, tt.path, bytes.NewBufferString(tt.body))
+			}
+			mux.ServeHTTP(rec, req)
+			if rec.Code != tt.want {
+				t.Fatalf("status = %d, want %d: %s", rec.Code, tt.want, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestEventHandlerListEventsAppliesFiltersAndPagination(t *testing.T) {
 	ctx := context.Background()
 	db := newAPITestDB(t, ctx)
