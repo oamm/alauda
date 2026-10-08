@@ -1,4 +1,5 @@
 export * from "./badge";
+export * from "./action-menu";
 export * from "./button";
 export * from "./controls";
 export * from "./dialog";

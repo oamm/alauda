@@ -321,9 +321,36 @@ textarea.alauda-control:read-only {
   border-bottom: 1px solid var(--border);
 }
 .alauda-filter-bar > label,
-.alauda-filter-bar > .alauda-field {
+.alauda-filter-bar > .alauda-field,
+.alauda-filter-advanced > .alauda-field {
   flex: 1 1 160px;
   min-width: 0;
+}
+.alauda-filter-advanced {
+  display: contents;
+}
+.alauda-filter-bar[data-density="compact"] > .alauda-field {
+  flex: 0 1 180px;
+}
+.alauda-menu-item {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  outline: none;
+  font-size: 13px;
+}
+.alauda-menu-item[data-highlighted] {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+.alauda-menu-item[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (max-width: 767px) {
+  .alauda-filter-advanced[data-expanded="false"] {
+    display: none;
+  }
 }
 .alauda-stat {
   min-width: 0;
@@ -415,7 +442,7 @@ textarea.alauda-control:read-only {
 }
 .alauda-stat-group {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--stat-columns, 4), minmax(0, 1fr));
   padding: var(--space-2) 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
@@ -430,10 +457,13 @@ textarea.alauda-control:read-only {
   border-left: 0;
 }
 .alauda-stat-group[data-columns="3"] {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  --stat-columns: 3;
 }
 .alauda-stat-group[data-columns="2"] {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  --stat-columns: 2;
+}
+.alauda-stat-group[data-columns="5"] {
+  --stat-columns: 5;
 }
 .alauda-stat dd.alauda-stat-detail {
   font-size: 12px;
@@ -473,7 +503,7 @@ textarea.alauda-control:read-only {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3) 0;
   }
-  .alauda-stat-group[data-columns="4"] > .alauda-stat:nth-child(odd) {
+  .alauda-stat-group > .alauda-stat:nth-child(odd) {
     border-left: 0;
   }
   .alauda-activity-list > li {

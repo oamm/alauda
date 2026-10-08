@@ -48,6 +48,8 @@ type Props = {
   onEdit: (check: HealthCheck) => void;
   onDelete: (check: HealthCheck) => void;
   onInstances: () => void;
+  onResults: (checkId?: string) => void;
+  showAvailability?: boolean;
 };
 
 function checkType(check: HealthCheck) {
@@ -65,7 +67,7 @@ function resultObservation(result: HealthResult) {
 
 export function ServiceHealthView(props: Props) {
   const [selection, setSelection] = useState("");
-  const [history, setHistory] = useState(false);
+
   const [results, setResults] = useState<HealthResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [resultsError, setResultsError] = useState("");
@@ -173,7 +175,12 @@ export function ServiceHealthView(props: Props) {
               title={formatTimestamp(result.timestamp)}
               description={
                 <>
-                  <span>{check?.name || "Health check"}</span>
+                  <span>
+                    {check?.name || "Health check"} ·{" "}
+                    {props.instances.find(
+                      (instance) => instance.id === result.instanceId,
+                    )?.name || "Instance unavailable"}
+                  </span>
                   <span>{resultObservation(result)}</span>
                 </>
               }
@@ -208,35 +215,37 @@ export function ServiceHealthView(props: Props) {
           </p>
         ) : null}
       </Section>
-      <Section title="Availability">
-        <StatGroup label="Availability windows" columns={3}>
-          {windows.map(([label, summary]) => (
-            <Stat
-              key={label}
-              label={label}
-              value={
-                typeof summary?.availabilityPercent === "number"
-                  ? `${summary.availabilityPercent.toFixed(2)}%`
-                  : "No data"
-              }
-              detail={
-                summary &&
-                typeof summary.incidentCount === "number" &&
-                typeof summary.downtimeSeconds === "number"
-                  ? `${pluralize(summary.incidentCount, "incident")} · ${Math.round(summary.downtimeSeconds / 60)}m downtime`
-                  : undefined
-              }
-            />
-          ))}
-        </StatGroup>
-        {!windows.some(
-          ([, summary]) => typeof summary?.availabilityPercent === "number",
-        ) ? (
-          <p className="mt-2 text-xs text-[var(--text-muted)]">
-            Availability data will appear after health results are collected.
-          </p>
-        ) : null}
-      </Section>
+      {props.showAvailability !== false ? (
+        <Section title="Availability">
+          <StatGroup label="Availability windows" columns={3}>
+            {windows.map(([label, summary]) => (
+              <Stat
+                key={label}
+                label={label}
+                value={
+                  typeof summary?.availabilityPercent === "number"
+                    ? `${summary.availabilityPercent.toFixed(2)}%`
+                    : "No data"
+                }
+                detail={
+                  summary &&
+                  typeof summary.incidentCount === "number" &&
+                  typeof summary.downtimeSeconds === "number"
+                    ? `${pluralize(summary.incidentCount, "incident")} · ${Math.round(summary.downtimeSeconds / 60)}m downtime`
+                    : undefined
+                }
+              />
+            ))}
+          </StatGroup>
+          {!windows.some(
+            ([, summary]) => typeof summary?.availabilityPercent === "number",
+          ) ? (
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              Availability data will appear after health results are collected.
+            </p>
+          ) : null}
+        </Section>
+      ) : null}
       <Section
         title="Health checks"
         action={
@@ -323,11 +332,9 @@ export function ServiceHealthView(props: Props) {
         <Section
           title="Recent results"
           action={
-            results.length > 5 ? (
-              <Button size="sm" variant="link" onClick={() => setHistory(true)}>
-                View all results
-              </Button>
-            ) : undefined
+            <Button size="sm" variant="link" onClick={() => props.onResults()}>
+              View all results
+            </Button>
           }
         >
           {loading ? (
@@ -353,11 +360,10 @@ export function ServiceHealthView(props: Props) {
         </Section>
       ) : null}
       <Drawer
-        open={!!selected || history}
+        open={!!selected}
         onOpenChange={(open) => {
           if (!open) {
             setSelection("");
-            setHistory(false);
           }
         }}
       >
@@ -426,7 +432,18 @@ export function ServiceHealthView(props: Props) {
                     </dd>
                   </DefinitionList>
                 </Section>
-                <Section title="Recent executions">
+                <Section
+                  title="Recent executions"
+                  action={
+                    <Button
+                      size="sm"
+                      variant="link"
+                      onClick={() => props.onResults(selected.id)}
+                    >
+                      View all results
+                    </Button>
+                  }
+                >
                   {results.filter(
                     (result) => result.healthCheckId === selected.id,
                   ).length ? (
@@ -435,7 +452,7 @@ export function ServiceHealthView(props: Props) {
                         .filter(
                           (result) => result.healthCheckId === selected.id,
                         )
-                        .slice(0, 10),
+                        .slice(0, 3),
                     )
                   ) : (
                     <p className="text-xs text-[var(--text-muted)]">
@@ -444,15 +461,7 @@ export function ServiceHealthView(props: Props) {
                   )}
                 </Section>
               </div>
-            ) : (
-              <>
-                <p className="mb-3 text-xs text-[var(--text-muted)]">
-                  Up to 20 recent results per check, as provided by the existing
-                  API.
-                </p>
-                {historyContent(results)}
-              </>
-            )}
+            ) : null}
           </DialogBody>
           <DialogFooter>
             {selected ? (
@@ -485,7 +494,6 @@ export function ServiceHealthView(props: Props) {
             <Button
               onClick={() => {
                 setSelection("");
-                setHistory(false);
               }}
             >
               Done

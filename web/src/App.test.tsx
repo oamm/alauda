@@ -177,10 +177,65 @@ describe("App", () => {
       address: "10.0.0.2",
     });
     expect(body.endpoints[0]).toMatchObject({
-      name: "http",
+      name: "default",
       port: 8080,
       primary: true,
     });
+  });
+
+  it("uses the shared endpoint fields for named, disabled registration drafts", async () => {
+    render(<App />);
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", {name:"Services"}));
+    fireEvent.click(screen.getByRole("tab", {name:"Instances"}));
+    fireEvent.click(screen.getByRole("button", {name:"Add instance"}));
+    const dialog = screen.getByRole("dialog", {name:"Add instance"});
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("default");
+    expect(within(dialog).getByRole("switch", {name:"Enabled"})).toBeChecked();
+    fireEvent.change(within(dialog).getByLabelText("Instance name"), {target:{value:"new-instance"}});
+    fireEvent.change(within(dialog).getByLabelText("Address / hostname"), {target:{value:"host.example"}});
+    fireEvent.click(within(dialog).getByRole("button", {name:"Add endpoint"}));
+    expect(within(dialog).getByLabelText("Endpoint 2 name")).toHaveValue("default-2");
+    fireEvent.click(within(dialog).getByRole("button", {name:"Add endpoint"}));
+    expect(within(dialog).getByLabelText("Endpoint 3 name")).toHaveValue("default-3");
+    expect((await axe.run(dialog, {runOnly:{type:"tag",values:["wcag2a","wcag2aa"]}})).violations).toEqual([]);
+    fireEvent.click(within(dialog).getAllByRole("button", {name:"Remove endpoint"})[2]);
+    fireEvent.change(within(dialog).getByLabelText("Endpoint 2 name"), {target:{value:"default"}});
+    expect(within(dialog).getByLabelText("Endpoint 2 name")).toHaveAttribute("aria-invalid", "true");
+    fireEvent.click(within(dialog).getByRole("button", {name:"Add instance"}));
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => url.toString().includes("RegisterRuntime"))).toHaveLength(0);
+    fireEvent.change(within(dialog).getByLabelText("Endpoint 2 name"), {target:{value:"metrics"}});
+    fireEvent.click(within(dialog).getByRole("switch", {name:"Endpoint 2 primary"}));
+    expect(within(dialog).getByRole("switch", {name:"Endpoint 1 primary"})).not.toBeChecked();
+    fireEvent.click(within(dialog).getByRole("switch", {name:"Endpoint 2 enabled"}));
+    fireEvent.click(within(dialog).getByRole("button", {name:"Add instance"}));
+    await screen.findByText("Instance added");
+    const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("RegisterRuntime"));
+    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}").endpoints).toEqual([
+      {name:"default",protocol:"PROTOCOL_HTTP",port:8080,path:"/",enabled:true,primary:false},
+      {name:"metrics",protocol:"PROTOCOL_HTTP",port:8080,path:"/",enabled:false,primary:true},
+    ]);
+  });
+
+  it("allows endpoint-free registration and restores first-draft defaults", async () => {
+    render(<App />);
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", {name:"Services"}));
+    fireEvent.click(screen.getByRole("tab", {name:"Instances"}));
+    fireEvent.click(screen.getByRole("button", {name:"Add instance"}));
+    const dialog = screen.getByRole("dialog", {name:"Add instance"});
+    fireEvent.click(within(dialog).getByRole("button", {name:"Remove endpoint"}));
+    expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", {name:"Add endpoint"}));
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("default");
+    expect(within(dialog).getByRole("switch", {name:"Primary"})).toBeChecked();
+    fireEvent.click(within(dialog).getByRole("button", {name:"Remove endpoint"}));
+    fireEvent.change(within(dialog).getByLabelText("Instance name"), {target:{value:"no-endpoints"}});
+    fireEvent.change(within(dialog).getByLabelText("Address / hostname"), {target:{value:"host.example"}});
+    fireEvent.click(within(dialog).getByRole("button", {name:"Add instance"}));
+    await screen.findByText("Instance added");
+    const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("RegisterRuntime"));
+    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}").endpoints).toEqual([]);
   });
 
   it("scopes instance creation to the selected service workspace", async () => {
@@ -248,16 +303,17 @@ describe("App", () => {
     });
     fireEvent.click(addInstanceButtons[addInstanceButtons.length - 1]);
     await screen.findByRole("heading", { name: "Instance added" });
-    expect(screen.getByText("checkout-prod-02")).toBeInTheDocument();
-    expect(screen.getByText("10.0.0.2")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", {name:"Instance added"})).toHaveAccessibleDescription(/checkout-prod-02.*10.0.0.2/);
     fireEvent.click(screen.getByRole("button", { name: "Configure health" }));
-    expect(screen.getByText("Check type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Type")).toBeInTheDocument();
     expect(screen.getByText("Interval (seconds)")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(window.location.pathname).toBe("/services/svc-1/instances");
-    fireEvent.click(screen.getByRole("button", { name: "Save health monitoring" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create health check" }));
     await screen.findByText(/Health monitoring could not be configured/);
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.filter(([url]) => url.toString().includes("CreateHealthCheck"))).toHaveLength(2));
     expect(
       vi.mocked(fetch).mock.calls.filter(([input]) =>
         input.toString().includes("RegisterRuntime"),
@@ -305,12 +361,15 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "View details for checkout-a" }));
     fireEvent.click(screen.getByRole("button", { name: "Add endpoint" }));
     const editor = screen.getByRole("dialog", { name: "Add endpoint" });
+    expect(within(editor).getByLabelText("Name")).toHaveValue("default");
     expect(within(editor).getByRole("switch", { name: "Primary" })).not.toBeChecked();
+    fireEvent.change(within(editor).getByLabelText("Name"), {target:{value:"admin"}});
+    fireEvent.click(within(editor).getByRole("switch", {name:"Enabled"}));
     fireEvent.change(within(editor).getByLabelText("Port"), {target:{value:"9090"}});
     fireEvent.click(within(editor).getByRole("button", { name: "Save" }));
     await screen.findByRole("dialog", { name: "checkout-a" });
     const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("CreateEndpoint"));
-    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({instanceId:"inst-1",port:9090,primary:false,enabled:true});
+    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({instanceId:"inst-1",name:"admin",port:9090,primary:false,enabled:false});
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => url.toString().includes("RegisterRuntime"))).toHaveLength(0);
   });
 
@@ -354,17 +413,19 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", {name:"View details for checkout-a"}));
     fireEvent.click(screen.getByRole("button", {name:"Edit endpoint healthz"}));
     const editor = screen.getByRole("dialog", {name:"Edit endpoint"});
+    expect(within(editor).getByLabelText("Name")).toHaveValue("healthz");
+    fireEvent.change(within(editor).getByLabelText("Name"), {target:{value:"readiness"}});
     expect(within(editor).getByRole("switch", {name:"Primary"})).toBeChecked();
     fireEvent.click(within(editor).getByRole("switch", {name:"Enabled"}));
     fireEvent.click(within(editor).getByRole("button", {name:"Save"}));
     await screen.findByRole("dialog", {name:"checkout-a"});
     const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("UpdateEndpoint"));
-    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({id:"end-1",name:"healthz",primary:true,enabled:false,port:8080,path:"/healthz"});
+    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({id:"end-1",name:"readiness",primary:true,enabled:false,port:8080,path:"/healthz"});
   });
 
   it("suggests an unused endpoint name and rejects duplicates within the instance", async () => {
     const original = vi.mocked(fetch).getMockImplementation()!;
-    vi.mocked(fetch).mockImplementation(async (input, init) => input.toString().includes("ListEndpoints") ? new Response(JSON.stringify({ endpoints: [{id:"end-1",instanceId:"inst-1",name:"http",protocol:"PROTOCOL_HTTP",port:8080,path:"/",primary:true,enabled:true}] }), {status:200}) : original(input, init));
+    vi.mocked(fetch).mockImplementation(async (input, init) => input.toString().includes("ListEndpoints") ? new Response(JSON.stringify({ endpoints: [{id:"end-1",instanceId:"inst-1",name:"default",protocol:"PROTOCOL_HTTP",port:8080,path:"/",primary:true,enabled:true}] }), {status:200}) : original(input, init));
     render(<App />);
     await screen.findByText("Checkout service created");
     fireEvent.click(screen.getByRole("button", {name:"Services"}));
@@ -373,16 +434,43 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", {name:"Add endpoint"}));
     const editor = screen.getByRole("dialog", {name:"Add endpoint"});
     const name = within(editor).getByRole("textbox", {name:"Name"});
-    expect(name).toHaveValue("http-2");
-    fireEvent.change(name, {target:{value:"http"}});
+    expect(name).toHaveValue("default-2");
+    fireEvent.change(name, {target:{value:"default"}});
     fireEvent.click(within(editor).getByRole("button", {name:"Save"}));
     expect(name).toHaveAttribute("aria-invalid", "true");
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => url.toString().includes("CreateEndpoint"))).toHaveLength(0);
-    fireEvent.change(name, {target:{value:"http-2"}});
+    fireEvent.change(name, {target:{value:"default-2"}});
     fireEvent.click(within(editor).getByRole("button", {name:"Save"}));
     await screen.findByRole("dialog", {name:"checkout-a"});
     const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("CreateEndpoint"));
-    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({name:"http-2",instanceId:"inst-1"});
+    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({name:"default-2",instanceId:"inst-1"});
+  });
+
+  it("rejects duplicate endpoint renames while excluding the current endpoint", async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => input.toString().includes("ListEndpoints") ? new Response(JSON.stringify({endpoints:[
+      {id:"end-1",instanceId:"inst-1",name:"default",protocol:"PROTOCOL_HTTP",port:8080,path:"/",enabled:true,primary:true},
+      {id:"end-2",instanceId:"inst-1",name:"metrics",protocol:"PROTOCOL_HTTP",port:8081,path:"/metrics",enabled:true,primary:false},
+    ]}), {status:200}) : original(input, init));
+    render(<App />);
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", {name:"Services"}));
+    fireEvent.click(screen.getByRole("tab", {name:"Instances"}));
+    fireEvent.click(screen.getByRole("button", {name:"View details for checkout-a"}));
+    fireEvent.click(screen.getByRole("button", {name:"Edit endpoint default"}));
+    const editor = screen.getByRole("dialog", {name:"Edit endpoint"});
+    const name = within(editor).getByLabelText("Name");
+    expect(name).toHaveValue("default");
+    expect(name).not.toHaveAttribute("aria-invalid", "true");
+    fireEvent.change(name, {target:{value:"metrics"}});
+    fireEvent.click(within(editor).getByRole("button", {name:"Save"}));
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => url.toString().includes("UpdateEndpoint"))).toHaveLength(0);
+    fireEvent.change(name, {target:{value:"admin"}});
+    fireEvent.click(within(editor).getByRole("button", {name:"Save"}));
+    await screen.findByRole("dialog", {name:"checkout-a"});
+    const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("UpdateEndpoint"));
+    expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({id:"end-1",name:"admin"});
   });
 
   it("explains backend endpoint-name conflicts without discarding the form", async () => {
@@ -397,7 +485,7 @@ describe("App", () => {
     const editor = screen.getByRole("dialog", {name:"Add endpoint"});
     fireEvent.click(within(editor).getByRole("button", {name:"Save"}));
     await waitFor(() => expect(within(editor).getByRole("alert")).toHaveTextContent("Choose a different name"));
-    expect(within(editor).getByRole("textbox", {name:"Name"})).toHaveValue("http");
+    expect(within(editor).getByRole("textbox", {name:"Name"})).toHaveValue("default");
     expect(editor).not.toHaveTextContent("UNIQUE constraint");
   });
 
@@ -429,6 +517,12 @@ describe("App", () => {
     const dialog = screen.getByRole("dialog", { name: "checkout-a" });
     expect(within(dialog).getByText("No endpoints yet")).toBeInTheDocument();
     expect(within(dialog).getAllByRole("button", {name:"Add endpoint"})).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole("button", {name:"Add endpoint"}));
+    const endpointEditor = screen.getByRole("dialog", {name:"Add endpoint"});
+    expect(within(endpointEditor).getByLabelText("Name")).toHaveValue("default");
+    expect(within(endpointEditor).getByRole("switch", {name:"Primary"})).toBeChecked();
+    expect(within(endpointEditor).getByRole("switch", {name:"Enabled"})).toBeChecked();
+    fireEvent.click(within(endpointEditor).getByRole("button", {name:"Cancel"}));
     fireEvent.click(within(dialog).getByRole("tab", {name:"Monitoring"}));
     expect(within(dialog).getByText("No monitoring configured")).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", {name:"Configure health"}));
@@ -481,7 +575,7 @@ describe("App", () => {
     const dialog = screen.getByRole("dialog", {name:"Configure health"});
     expect(within(dialog).getByRole("combobox", {name:"Instance"})).toHaveValue("inst-1");
     fireEvent.change(within(dialog).getByLabelText("Check name"), {target:{value:"readiness"}});
-    fireEvent.click(within(dialog).getByRole("button", {name:"Save health check"}));
+    fireEvent.click(within(dialog).getByRole("button", {name:"Create health check"}));
     await waitFor(() => expect(screen.queryByRole("dialog", {name:"Configure health"})).not.toBeInTheDocument());
     const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("CreateHealthCheck"));
     expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({instanceId:"inst-1",name:"readiness"});
@@ -505,9 +599,9 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", {name:"HTTP health"}));
     fireEvent.click(screen.getByRole("button", {name:"Edit check"}));
     const dialog = screen.getByRole("dialog", {name:"Edit health check"});
-    fireEvent.change(within(dialog).getByLabelText("Interval seconds"), {target:{value:"30"}});
+    fireEvent.change(within(dialog).getByLabelText("Interval (seconds)"), {target:{value:"30"}});
     fireEvent.click(within(dialog).getByRole("switch", {name:"Enabled"}));
-    fireEvent.click(within(dialog).getByRole("button", {name:"Save health check"}));
+    fireEvent.click(within(dialog).getByRole("button", {name:"Save changes"}));
     await waitFor(() => expect(screen.queryByRole("dialog", {name:"Edit health check"})).not.toBeInTheDocument());
     const call = vi.mocked(fetch).mock.calls.find(([url]) => url.toString().includes("UpdateHealthCheck"));
     expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}")).toMatchObject({id:"hc-1",intervalSeconds:30,enabled:false});
@@ -532,8 +626,11 @@ describe("App", () => {
     await screen.findByRole("button", {name:"View all results"});
     expect(within(screen.getByRole("list", {name:"Health results"})).getAllByRole("listitem")).toHaveLength(5);
     fireEvent.click(screen.getByRole("button", {name:"View all results"}));
-    const history = screen.getByRole("dialog", {name:"Result history"});
-    expect(within(history).getAllByRole("listitem")).toHaveLength(6);
+    await screen.findByRole("heading", {name:"Health results"});
+    expect(window.location.pathname).toBe("/health/results");
+    expect(new URLSearchParams(window.location.search).get("serviceId")).toBe("svc-1");
+    await screen.findByText("No health results found");
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => url.toString().includes("/api/v1/health/results?serviceId=svc-1"))).toBe(true);
   });
 
   it("provides an accessible health-check drawer with Escape focus restoration", async () => {

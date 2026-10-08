@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { EnvironmentsWorkspace } from "./EnvironmentsWorkspace";
 import {
   AlertPolicy,
   AvailabilitySummary,
@@ -50,12 +51,6 @@ import {
 } from "./ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
-type EnvironmentForm = {
-  key: string;
-  name: string;
-  tier: string;
-  description: string;
-};
 type PolicyForm = {
   environmentId: string;
   deploymentId: string;
@@ -105,12 +100,10 @@ type OperationalWorkspaceProps = {
   eventTypes: string[];
   eventResourceTypes: string[];
   alertsSection: "policies" | "channels";
-  environmentForm: EnvironmentForm;
   policyForm: PolicyForm;
   channelForm: ChannelForm;
   editingPolicyId: string;
   editingChannelId: string;
-  savingEnvironment: boolean;
   savingPolicy: boolean;
   savingChannel: boolean;
   testingChannelId: string;
@@ -121,10 +114,13 @@ type OperationalWorkspaceProps = {
   onEventResourceFilter: (value: string) => void;
   onEventSearch: (value: string) => void;
   onAlertsSection: (value: "policies" | "channels") => void;
-  onEnvironmentForm: (value: EnvironmentForm) => void;
+  onEnvironmentSaved: (
+    environment: Environment,
+    created: boolean,
+  ) => Promise<void>;
+  onViewEnvironmentServices: (environmentId: string) => void;
   onPolicyForm: (value: PolicyForm) => void;
   onChannelForm: (value: ChannelForm) => void;
-  onCreateEnvironment: (event: FormEvent<HTMLFormElement>) => void;
   onCreatePolicy: (event: FormEvent<HTMLFormElement>) => void;
   onCreateChannel: (event: FormEvent<HTMLFormElement>) => void;
   onCancelPolicy: () => void;
@@ -145,7 +141,16 @@ const muted = "text-xs text-[var(--text-muted)]";
 
 export function OperationalWorkspace(props: OperationalWorkspaceProps) {
   if (props.view === "dashboard") return <Dashboard {...props} />;
-  if (props.view === "environments") return <Environments {...props} />;
+  if (props.view === "environments")
+    return (
+      <EnvironmentsWorkspace
+        environments={props.environments}
+        loading={props.loading}
+        selectedEnvironmentId={props.selectedEnvironmentId}
+        onSaved={props.onEnvironmentSaved}
+        onViewServices={props.onViewEnvironmentServices}
+      />
+    );
   if (props.view === "incidents") return <Incidents {...props} />;
   if (props.view === "alerts") return <Alerts {...props} />;
   return <Events {...props} />;
@@ -295,14 +300,12 @@ function Dashboard({
               />
             ) : (
               <ActivityList
-                items={events
-                  .slice(0, 8)
-                  .map((event) => ({
-                    id: event.id,
-                    time: formatActivityTimestamp(event.timestamp),
-                    event: formatEventType(event.type),
-                    context: event.message,
-                  }))}
+                items={events.slice(0, 8).map((event) => ({
+                  id: event.id,
+                  time: formatActivityTimestamp(event.timestamp),
+                  event: formatEventType(event.type),
+                  context: event.message,
+                }))}
               />
             )}
           </Section>
@@ -334,180 +337,6 @@ function Summary({
         </span>
       }
     />
-  );
-}
-
-function Environments({
-  environments,
-  deployments,
-  instances,
-  loading,
-  environmentForm,
-  onEnvironmentForm,
-  onCreateEnvironment,
-  savingEnvironment,
-  selectedEnvironmentId,
-}: OperationalWorkspaceProps) {
-  return (
-    <div className="grid gap-5">
-      <PageHeader
-        title="Environments"
-        description="Manage the scopes used to organize services, incidents, alerts, and events."
-        action={
-          <Button
-            onClick={() =>
-              document.getElementById("create-environment-key")?.focus()
-            }
-          >
-            Create environment
-          </Button>
-        }
-      />
-      <Card>
-        <SectionHeader
-          title="Environment scopes"
-          description={`${environments.length} configured`}
-        />
-        {loading ? (
-          <div className="p-5 text-sm text-[var(--text-muted)]">
-            Loading environments...
-          </div>
-        ) : environments.length === 0 ? (
-          <EmptyState
-            title="No environments yet"
-            description="Create an environment to establish the first operational scope."
-            action={
-              <Button
-                onClick={() =>
-                  document.getElementById("create-environment-key")?.focus()
-                }
-              >
-                Create environment
-              </Button>
-            }
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead>Tier</TableHead>
-                <TableHead>Services</TableHead>
-                <TableHead>Instances</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {environments.map((environment) => {
-                const scopedDeployments = deployments.filter(
-                  (deployment) => deployment.environmentId === environment.id,
-                );
-                const serviceCount = new Set(
-                  scopedDeployments.map((deployment) => deployment.serviceId),
-                ).size;
-                const instanceCount = instances.filter((instance) =>
-                  scopedDeployments.some(
-                    (deployment) => deployment.id === instance.deploymentId,
-                  ),
-                ).length;
-                return (
-                  <TableRow
-                    key={environment.id}
-                    className={
-                      environment.id === selectedEnvironmentId
-                        ? "bg-[var(--surface-muted)]"
-                        : ""
-                    }
-                  >
-                    <TableCell>
-                      <strong className="font-medium">
-                        {environment.name}
-                      </strong>
-                      <div className={muted}>
-                        {environment.description || "No description"}
-                      </div>
-                    </TableCell>
-                    <TableCell>{environment.key}</TableCell>
-                    <TableCell>{environment.tier || "Untiered"}</TableCell>
-                    <TableCell>{serviceCount}</TableCell>
-                    <TableCell>{instanceCount}</TableCell>
-                    <TableCell>
-                      <StatusBadge
-                        status={environment.enabled ? "enabled" : "disabled"}
-                      />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
-      <Card id="create-environment">
-        <SectionHeader
-          title="Create environment"
-          description="Add a new environment scope."
-        />
-        <form
-          className="alauda-settings-form sm:grid-cols-2"
-          onSubmit={onCreateEnvironment}
-        >
-          <FormField label="Key">
-            <Input
-              id="create-environment-key"
-              required
-              value={environmentForm.key}
-              onChange={(event) =>
-                onEnvironmentForm({
-                  ...environmentForm,
-                  key: event.target.value,
-                })
-              }
-            />
-          </FormField>
-          <FormField label="Name">
-            <Input
-              required
-              value={environmentForm.name}
-              onChange={(event) =>
-                onEnvironmentForm({
-                  ...environmentForm,
-                  name: event.target.value,
-                })
-              }
-            />
-          </FormField>
-          <FormField label="Tier">
-            <Input
-              value={environmentForm.tier}
-              onChange={(event) =>
-                onEnvironmentForm({
-                  ...environmentForm,
-                  tier: event.target.value,
-                })
-              }
-            />
-          </FormField>
-          <FormField label="Description">
-            <Textarea
-              value={environmentForm.description}
-              onChange={(event) =>
-                onEnvironmentForm({
-                  ...environmentForm,
-                  description: event.target.value,
-                })
-              }
-            />
-          </FormField>
-          <div className="flex justify-end sm:col-span-2">
-            <Button type="submit" loading={savingEnvironment}>
-              {savingEnvironment ? "Creating" : "Create environment"}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
   );
 }
 

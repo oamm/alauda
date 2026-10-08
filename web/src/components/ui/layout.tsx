@@ -1,5 +1,7 @@
 import { cn } from "../../lib/utils";
-import { useId } from "react";
+import { Children, useId, useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
+import { Button } from "./button";
 
 export function Workspace({
   className,
@@ -94,7 +96,7 @@ export function StatGroup({
 }: {
   children: React.ReactNode;
   label?: string;
-  columns?: 2 | 3 | 4;
+  columns?: 2 | 3 | 4 | 5;
 }) {
   return (
     <div
@@ -190,8 +192,49 @@ export function SectionHeader({
     </div>
   );
 }
-export function FilterBar({ children }: { children: React.ReactNode }) {
-  return <div className="alauda-filter-bar">{children}</div>;
+export function FilterBar({
+  children,
+  collapseAfter,
+  activeAdvanced = 0,
+  compact = false,
+}: {
+  children: React.ReactNode;
+  collapseAfter?: number;
+  activeAdvanced?: number;
+  compact?: boolean;
+}) {
+  const id = useId();
+  const [expanded, setExpanded] = useState(false);
+  const controls = Children.toArray(children);
+  return (
+    <div
+      className="alauda-filter-bar"
+      data-density={compact ? "compact" : undefined}
+    >
+      {collapseAfter ? controls.slice(0, collapseAfter) : children}
+      {collapseAfter ? (
+        <>
+          <Button
+            className="md:hidden"
+            variant="ghost"
+            aria-controls={id}
+            aria-expanded={expanded}
+            onClick={() => setExpanded(!expanded)}
+          >
+            <SlidersHorizontal size={14} /> More filters
+            {activeAdvanced ? ` (${activeAdvanced})` : ""}
+          </Button>
+          <div
+            id={id}
+            className="alauda-filter-advanced"
+            data-expanded={expanded}
+          >
+            {controls.slice(collapseAfter)}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
 }
 export function ActionGroup({ children }: { children: React.ReactNode }) {
   return (

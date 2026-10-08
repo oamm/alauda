@@ -1,4 +1,5 @@
 export function mockResponse(path: string, init?: RequestInit) {
+  if (path.includes("/api/v1/health/results")) return { results: [], nextPageToken: "" };
   if (
     path.includes("CreateHealthCheck") ||
     path.includes("UpdateHealthCheck")

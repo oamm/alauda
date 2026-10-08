@@ -224,10 +224,6 @@ export type ApplicationKey = {
   createdBy: string;
 };
 
-type ListEnvironmentsResponse = {
-  environments?: Environment[];
-};
-
 type ListServicesResponse = {
   services?: Service[];
 };
@@ -426,14 +422,9 @@ async function authenticatedFetch(input: RequestInfo | URL, init?: RequestInit) 
 }
 
 export async function listEnvironments(): Promise<Environment[]> {
-  const response = await connectRequest<ListEnvironmentsResponse>(
-    "/registry.v1.EnvironmentService/ListEnvironments",
-    {
-      includeDisabled: true,
-      pagination: { pageSize: 100 },
-    },
+  return listTopologyPages<Environment>(
+    "/registry.v1.EnvironmentService/ListEnvironments", "environments", { includeDisabled: true },
   );
-  return response.environments ?? [];
 }
 
 export async function createEnvironment(input: {
@@ -450,6 +441,43 @@ export async function createEnvironment(input: {
     throw new Error("CreateEnvironment returned no environment");
   }
   return response.environment;
+}
+
+export async function updateEnvironment(input: {
+  id: string; name: string; tier: string; description: string;
+  enabled: boolean; tags: Record<string, string>;
+}): Promise<Environment> {
+  const response = await connectRequest<CreateEnvironmentResponse>(
+    "/registry.v1.EnvironmentService/UpdateEnvironment", input,
+  );
+  if (!response.environment) throw new Error("UpdateEnvironment returned no environment");
+  return response.environment;
+}
+
+async function listTopologyPages<T>(
+  path: string, field: string, input: Record<string, unknown> = {},
+): Promise<T[]> {
+  const items: T[] = [];
+  const seen = new Set<string>();
+  let pageToken = "";
+  do {
+    if (seen.has(pageToken)) throw new Error("The resource list could not finish loading. Try refreshing.");
+    seen.add(pageToken);
+    const response = await connectRequest<Record<string, unknown> & {
+      pagination?: { nextPageToken?: string };
+    }>(path, { ...input, pagination: { pageSize: 100, pageToken: pageToken || undefined } });
+    items.push(...((response[field] as T[] | undefined) || []));
+    pageToken = response.pagination?.nextPageToken || "";
+  } while(pageToken);
+  return items;
+}
+
+export async function listEnvironmentTopology() {
+  const [deployments, instances] = await Promise.all([
+    listTopologyPages<ServiceDeployment>("/registry.v1.DeploymentService/ListDeployments", "deployments"),
+    listTopologyPages<ServiceInstance>("/registry.v1.InstanceService/ListInstances", "instances"),
+  ]);
+  return { deployments, instances };
 }
 
 export async function listServices(environmentId?: string): Promise<Service[]> {
@@ -784,6 +812,19 @@ export async function listHealthResults(
     },
   );
   return response.results ?? [];
+}
+
+export type HealthResultRecord = {
+  id:string;timestamp:string;serviceId:string;service:string;environmentId:string;environment:string;instanceId:string;instance:string;
+  endpointId:string;endpoint:string;protocol:number;port:number;address:string;checkId:string;check:string;type:string;path:string;expectedStatus:string;
+  success:boolean;latencyMs:number|null;statusCode:number|null;errorType:string;errorMessage:string;
+};
+export async function queryHealthResults(params:URLSearchParams, signal?:AbortSignal):Promise<{results:HealthResultRecord[];nextPageToken:string}>{
+  const response=await authenticatedFetch(`${apiBaseUrl}/api/v1/health/results?${params}`,{headers:authHeaders(),signal});
+  if(!response.ok)throw new Error((await response.text())||"Unable to query health results");
+  const payload = await response.json();
+  if (!payload || !Array.isArray(payload.results)) throw new Error("Invalid health results response. Refresh or try again later.");
+  return { results: payload.results, nextPageToken: typeof payload.nextPageToken === "string" ? payload.nextPageToken : "" };
 }
 
 export async function listIncidents(input: {

@@ -22,15 +22,19 @@ export function DialogContent({
   placement?: "center" | "right";
 }) {
   const opener = useRef<HTMLElement | null>(null);
+  // Capture the external opener before nested focus scopes or autoFocus fields move focus.
+  const activeElement = document.activeElement;
+  if (
+    activeElement instanceof HTMLElement &&
+    activeElement !== document.body &&
+    !activeElement.closest('[role="dialog"], [role="menu"]')
+  )
+    opener.current = activeElement;
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/35" />
       <DialogPrimitive.Content
         onOpenAutoFocus={(event) => {
-          opener.current =
-            document.activeElement instanceof HTMLElement
-              ? document.activeElement
-              : null;
           onOpenAutoFocus?.(event);
         }}
         onCloseAutoFocus={(event) => {

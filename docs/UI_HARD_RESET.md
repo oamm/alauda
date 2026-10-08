@@ -169,8 +169,9 @@ The target token scale is intentionally small: spacing 4/8/12/16/24/32; control 
 | Service detail / Health | Separate sparse operational screens replaced | Checks, run, results, state, edit/delete, availability | Sections + resource rows + check drawer | VERIFIED |
 | Service detail / Incidents | Detail/list mixed with local dialog styles | Incident filtering, detail, resolve | List/Detail | AUDITED |
 | Service detail / Events | History and navigation use local rows | Event filtering and resource links | Table + filters | AUDITED |
-| Environments | List/detail/create composition and raw controls | Environment selection and create | ResourceList + focused form | AUDITED |
-| Health | Extracted view still uses panel/raw dialog patterns | Overview/checks/results and create/run/edit | List/Detail | AUDITED |
+| Environments | Inline creation and scope-dependent counts replaced | List/create/edit, key immutability, environment selection | Workspace table/mobile list + canonical dialog form | VERIFIED |
+| Health | Legacy inline history and duplicated forms replaced | Overview/checks/results and create/run/edit | Shared operational sections + canonical editor/history | VERIFIED |
+| Health results | Previously only bounded RPC fragments, no history browser | Scoped execution observations and result semantics | Server-query table/list + details drawer | VERIFIED |
 | Incidents | Dense list/detail and screen-local actions | Filtering, resolve, navigation | ResourceList + detail | AUDITED |
 | Alerts | Policy/channel modes and local forms | CRUD and channel test | Settings tabs + tables | AUDITED |
 | Events | Filtered history and local table patterns | Filters, streaming, navigation | Table + filters | AUDITED |
@@ -203,7 +204,9 @@ Information-architecture decisions recorded during audit:
 | `RuntimeTopology` | `ServiceInstancesView` | Services detail | PLANNED |
 | `AddRuntimeDialog` | Instance creation flow | Services detail | PLANNED |
 | `DashboardView` | `OperationalWorkspace` dashboard summary | Dashboard | REMOVED |
-| `HealthWorkspace` | Health page module | Health | PLANNED |
+| `HealthWorkspace` | Shared sections, resource rows, canonical form/history navigation | Global Health | RECREATED / VERIFIED |
+| Global/Service/post-registration health forms | `HealthCheckForm` + shared defaults/Zod schema | Global, Service, Instance, Edit, registration follow-up | REPLACED / VERIFIED |
+| Inline result-history drawer | `HealthResultsPage` | Global and Service Health | REPLACED / VERIFIED |
 | Monolithic `App.tsx` view branches | Screen modules plus orchestration hooks | Entire app | IN PROGRESS |
 
 ## Migration phases
@@ -616,7 +619,7 @@ Former Availability tab: **MERGED INTO HEALTH**. Existing `/services/:id/availab
 - Current status uses a compact StatGroup: instances, monitored instances (enabled checks), healthy and unhealthy. Missing instance state is explicitly Unknown, not inferred from enabled state, lack of incidents, or old results.
 - Availability uses the existing 24-hour/7-day/30-day queries, environment scope, percentage formatting, downtime and incident semantics. Three compact windows share one no-data explanation.
 - Health checks use wrapping resource rows with distinct identity/type, interval, human-readable instance/endpoint target, Enabled/Disabled, latest observation and Run action. Creation is a focused Dialog, not a permanent form.
-- Recent results show at most five observations on the main surface. View all results opens the available recent-history drawer; check selection opens configuration, counters and recent executions. Unsupported or missing data is not fabricated.
+- Recent results show at most five observations on the main surface. View all results navigates to the canonical `/health/results` search page; check selection opens configuration, counters and a three-execution preview with a check-scoped history link. Unsupported or missing data is not fabricated.
 - Instances retain monitoring counts/not-configured summaries. Instance detail Monitoring provides enabled/configured counts and a Service Health link, not duplicated check configuration or Run actions. Topology and endpoint mutations remain in Instances.
 
 ### Component Migration and Behavioral Parity
@@ -626,9 +629,9 @@ Former Availability tab: **MERGED INTO HEALTH**. Existing `/services/:id/availab
 | ServiceAvailability presentation and tab | ServiceHealthView Availability section | REMOVE / MERGED INTO HEALTH |
 | ServiceHealth presentation | ServiceHealthView resource rows, results and drawer | REPLACED / VERIFIED |
 | Instance inline check/run list | Monitoring summary and Health handoff | REPLACED / VERIFIED |
-| HealthDialog bound to creation state during edit | Focused create/edit form bound to the correct state | RECREATED / VERIFIED |
+| HealthDialog bound to creation state during edit | Canonical HealthCheckForm with actual persisted check values | RECREATED / VERIFIED |
 | Availability API/calculation helpers | Same helpers passed into Health | KEEP |
-| Unreachable rollback Availability JSX in App | No live consumer; Phase 6 cleanup | TEMPORARY |
+| Unreachable rollback Services/Availability/Health JSX in App | Removed after shared view/form parity tests | REMOVED |
 
 - Removed dead Availability/old-health list CSS only after checking live consumers. Overview's availability presentation remains intact.
 - Shared Drawer wraps the canonical Radix Dialog with right-edge placement, preserving focus trap, Escape and restoration. DialogHeader reserves close-control space. ResourceList/ResourceRow provide semantic, wrapping operational rows. StatGroup adds reusable two/three/four-column support.
@@ -655,3 +658,145 @@ Status: VERIFIED in repository tests; deployment requires the updated backend. F
 - No schema migration, manual deletion, API payload change, authentication/authorization change or frontend visual change. Existing deployed tombstones are handled when CreateEndpoint is retried against the updated backend. Backend rebuild/restart or redeployment is required; refreshing the frontend alone cannot apply this fix.
 - Regression tests cover an empty visible list after deletion, repeated restoration, replacement of stale settings/tags/metadata, primary and non-primary restoration, active duplicate rejection with primary rollback, and instance isolation.
 - Gates: `go test ./...` PASS (including storage/API/integration); `npm test -- --run` PASS (37/37); `npm run build` PASS (includes TypeScript); `git diff --check` PASS. No running backend was modified or production database mutated. Lint remains UNAVAILABLE - no ESLint configuration exists.
+
+## Endpoint Creation Semantics and Shared Form
+
+Status: AUDITED -> DESIGNED -> IN PROGRESS -> MIGRATED -> VERIFIED for the shared editor and tested contracts, subject to fixture verification limits below. Audit: endpoint storage already enforces case-sensitive `UNIQUE(instance_id, name)`, not global/service-wide uniqueness. Both create/update payloads support Name, Protocol, Port, Path, Primary and Enabled. Registration's presentation omitted Name/Enabled and hardcoded Enabled=true; its endpoint storage also coerced false to true.
+
+- One controlled EndpointEditor owns all six fields in the same order and responsive one/two-column grid. Add Instance, Add Endpoint and Edit Endpoint consume it; flow wrappers own submission/footer and collections, not independent field markup. Canonical FormField/Input/Select/Switch/IconButton preserve labels, validation association, dimensions and compact rhythm. Endpoint dialogs use md; repeated registration uses lg.
+- One EndpointFormValue and Zod schema own required trimmed names, supported protocols, integer ports 1-65535, optional string path, and boolean primary/enabled. Instance-local existingNames exclude the edited endpoint. Collection validation uses the same schema plus at-most-one-primary. No protocol/port/path uniqueness rule is invented; distinct names may share an address.
+- Names default to editable `default`, then the first unused `default-2`, `default-3`, etc. Names from other instances never influence suggestions/validation. Backend duplicate responses attach an actionable name error rather than exposing constraint text. Concurrent active creation still relies on server uniqueness.
+- Newly created endpoints default Enabled=true in both frontend flows. Registration submits the selected enabled value; the backend no longer forces false to true. This is an intentional correction to respect the existing boolean request, not a schema/API change. Omitted proto3 enabled also evaluates false; clients requiring enabled endpoints should send true explicitly.
+- Primary defaults true for the first endpoint, false for additions. Selecting another registration draft clears other primaries. Backend allows at most one primary, not exactly one in all cases; registration auto-promotes a sole endpoint as before, so its single-draft primary switch is locked on. Standalone create/edit preserve the existing optional-primary semantics and backend transactional reassignment. Zero endpoints are allowed by registration: final draft removal is available; recreating the first draft restores default primary. Path remains optional/unrestricted as supported by the API; no HTTP-only requirement is imposed on TCP/UDP/gRPC.
+- Removed duplicate standalone/registration field JSX, raw primary radio, and obsolete endpoint-draft card/grid CSS. Health dialogs continue to use the same underlying form primitives without unrelated changes.
+- No uniqueness migration required. Existing endpoint soft-delete restoration remains intact. Endpoint update-handler uniqueness errors now use the existing `already_exists` mapping, matching create errors so concurrent rename conflicts receive the same field-level message. Backend redeployment is needed for registration Enabled=false support and the error mapping.
+
+### Endpoint Form Verification
+
+- Shared validation/default tests cover deterministic suggestions, name trimming/case sensitivity/instance scope, required name, supported protocols, integer ports, boolean values, optional paths, same-address distinct names, at-most-one-primary and empty collections.
+- App tests cover registration editable names/unique defaults/multiple drafts/removal/primary reassignment/Enabled=false/duplicate prevention; first-draft recreation and endpoint-free registration; standalone default/custom name and Enabled=false; editable current name, own-name exclusion and duplicate rename rejection; server collision field errors; existing Escape/focus behavior. Existing health follow-up and endpoint-restoration tests remain intact.
+- Backend tests verify two instances each registering `default`, disabled/enabled values persisted, primary behavior retained, and duplicate endpoint rename returning `already_exists`. No backend validation tests were weakened.
+- Repeated Add Instance editor passes automated axe WCAG 2A/AA checks. Field errors remain associated through FormField; all six controls and remove actions have names. Standalone Name receives initial focus.
+- Rendered fixture DOM/CSS measurements at 1920, 1440, 1280, 1024, 768 and 390px found no horizontal page/dialog overflow in registration and standalone editors. Desktop dialog widths are bounded at 672px/512px respectively; both measured 358px wide at 390px. Active previews also had no dialog overflow at 466px (registration) and 218px (standalone). This is fixture/layout review, not complete production screenshots/zoom QA. Browser mocks were in memory only and removed by reload; no backend mutation was made.
+- Final gates: `npm test -- --run` PASS (44/44); `go test ./...` PASS; `npm run build` PASS (includes TypeScript); `git diff --check` PASS. Lint: UNAVAILABLE - no ESLint configuration exists.
+- Nonfatal Vite/jsdom/line-ending warnings remain. Zod inclusion brings the current JS bundle just above Vite's 500kB warning threshold; route-level code splitting is follow-up performance debt, not a reason to duplicate validation. Portal dark-theme inheritance and full live zoom verification remain existing debt. API path-update clearing behavior remains unchanged by this presentation migration.
+
+## Direct Frontend URL Serving
+
+Status: VERIFIED in handler and real HTTP server tests. Direct browser requests to `/services/:id/health` previously reached a plain Go FileServer and returned 404 because frontend routes are not disk files. Navigation from the loaded index worked because the client owned navigation.
+
+- The server now uses a frontendHandler that serves existing assets normally and returns the application entry page for missing known frontend routes on GET/HEAD, without redirecting or mutating the requested URL. Service deep links, including the Availability compatibility alias, and existing dashboard/environment/health/incident/alert/event/security routes are covered.
+- Route fallback is restricted to known frontend roots and excludes file extensions. Unknown routes, missing assets and unknown RPC/API paths are not converted to HTML. Registered API/infrastructure handlers retain mux priority and their existing authentication/authorization semantics. Unsupported methods on frontend assets/routes return 405 with Allow: GET, HEAD.
+- Reuses Go FileServer for index serving, content types, HEAD and asset handling; no frontend/router/API contract or new dependency changes. Future top-level frontend routes must be added to the explicit fallback allowlist.
+- Tests exercise the exact reported deep link, root/list/detail/trailing-slash/query URLs, legacy Availability link, all frontend roots, HEAD, JavaScript assets, missing assets/API/RPC routes, original URL preservation and unsupported methods. A started-server test verifies real HTTP deep linking, missing assets/RPC routes, and that unauthenticated API requests still return 401.
+- Deployment requires rebuilding/restarting the backend that serves port 9700. No running production server or database was modified. Gates: `go test ./...` PASS; `npm test -- --run` PASS (44/44); `npm run build` PASS (includes TypeScript); `git diff --check` PASS. Existing nonfatal build/test warnings remain. Lint: UNAVAILABLE - no ESLint configuration exists.
+
+## Health Results and Canonical Check Management
+
+Status: AUDITED -> DESIGNED -> IN PROGRESS -> MIGRATED -> VERIFIED (behavior, design-system compliance, accessibility tests and fixture/layout review; live-data zoom certification remains explicit debt).
+
+Audit: ListHealthResults filters only check/instance with newest-first numeric-offset pagination; frontend retrieves 20/check and discards pagination. Persistence has check/time and instance/time indexes, but no global chronological index. Global Health mixes legacy metric cards, duplicate Health/resource context, raw-reference forms and a separate results feed. Service Health has a five-result preview but expands available history in a drawer. Registration follow-up has another field/default/validation model. UpdateHealthCheck accepts enabled/timing/thresholds/description only: identity, target, type and metadata must remain immutable during edit.
+
+Design: canonical `/health/results` with URL query state; authenticated read-only `/api/v1/health/results` with date bounds, service/environment/instance/endpoint/port/type/check/outcome, newest/oldest order, bounded page sizes and numeric-offset tokens. One joined current-catalog projection avoids per-row API calls and preserves soft-deleted relationships; it is not an execution-time target snapshot. Existing RPC remains compatible. One chronological expression index supports global date ordering; existing relational indexes remain.
+
+Canonical HealthCheckForm owns defaults, Zod validation, human-readable dependent targets, mutation/loading/error states and Create/Edit actions. Global, Service, Instance and post-registration follow-up reuse it. Service preview remains five rows and links to the dedicated results page. No extra Health heading is added inside the Service tab. Dead forms/history markup have been removed after consumers migrated.
+
+### Health Result History
+
+- Canonical frontend route: `/health/results`. Service/check/environment scope is carried by optional `serviceId`, `checkId`, `environmentId` query parameters. Global Results and Service/check View all results use the same page. Back to Health returns to the selected service when service scope exists; browser Back/Forward restores query state. The existing SPA fallback covers direct result URLs and now has an explicit deep-link regression test.
+- Read-only backend route: `GET /api/v1/health/results`, inside the existing authentication/read-scope/audit/rate-limit middleware. Application-key environment restrictions are applied in SQL and cannot be bypassed by choosing an unauthorized environment filter. Existing Connect RPC and execution/state/availability semantics remain unchanged.
+- Optional filters: `from`, `to` (inclusive RFC3339 instants), `serviceId`, `environmentId`, `instanceId`, `endpointId`, `port` (1-65535), `type` (all known non-unspecified backend enums, including retained UDP/heartbeat checks), `checkId`, `status` (healthy/unhealthy execution outcome). These are parameterized server-side predicates, not browser-only filtering of all history. Result success does not override instance threshold-based current state.
+- Ordering: `sort=newest` by default or `sort=oldest`, with stable result-ID tie-breaking. Pagination follows existing numeric-offset tokens: `pageSize` (25/50/100 UI options, backend maximum 100) and `pageToken`; server fetches one extra row to determine Next. No unbounded history fetch or total-count query.
+- URL preserves filters, sort and pagination; date controls show local time but serialize UTC instants so shared links preserve the same interval across time zones. Dependent selections clear stale instance/endpoint/check filters; changing filters resets pagination. Invalid dates/inverted ranges and server validation failures have explicit errors, not render crashes. Cancelled queries cannot overwrite a newer search.
+- Joined projection returns names/context, endpoint protocol/port, check type, target address/path/expected status and observed outcome/duration/failure/status code without per-result requests or arbitrary response metadata. Results table is compact, mobile uses the same data as resource rows, and details use the shared Drawer. Failure reason is a separate labeled property, not concatenated status text. Missing durations remain Not recorded.
+- Migration `023_health_results_chronology.sql` adds one chronological expression index on `julianday(timestamp), id`, matching date/order predicates. Existing check/time, instance/time and catalog indexes remain; no new entity, uniqueness constraint or execution mutation is introduced.
+- Shared FilterBar adds optional responsive progressive disclosure: desktop exposes all filters; mobile keeps the first four controls visible and exposes the rest through an accessible More filters button with applied-filter count. Existing FilterBar consumers are unchanged. No page-specific filter CSS or new library.
+
+### Health Check Form
+
+- Canonical component: `HealthCheckForm`; shared defaults/validation: `lib/health-check-form.ts`. Consumers: global Health, Service Health, Instance-context handoff, Edit, and optional post-registration monitoring.
+- Fields: name, instance, endpoint (optional instance-address fallback), supported type, path, expected HTTP status/range, interval, timeout, failure/recovery thresholds, Enabled and description. Known service/environment/instance selectors are omitted; global selection is dependent and human-readable. Defaults are readiness, HTTP, /healthz, expected 200-299, interval 10s, timeout 3s, failure threshold 3, recovery threshold 2, Enabled true.
+- Create and Edit share field order, control family, validation, loading/error presentation and actions. The unchanged Update RPC supports Enabled, timings, thresholds and description only. Name/target/type/path/status configuration are read-only on Edit rather than advertising unsupported changes. Same-instance endpoint selection is validated; names, types, HTTP status ranges and positive integer timing/threshold values use one schema.
+- Edit validates only the supported mutable payload, so a stored UDP/heartbeat check or immutable legacy metadata cannot block a valid settings update. Such stored types remain visible/read-only and searchable; new creation offers only the four types the existing executor supports. Execution semantics are unchanged.
+- Optional monitoring begins only after instance/endpoints exist. Failed health mutation Retry invokes only CreateHealthCheck, never RegisterRuntime. A successful mutation followed by failed refresh is marked saved and cannot be resubmitted; it presents a refresh instruction instead. Success callbacks close the editor or return to the registration success state before refreshing catalog data.
+- Removed three presentation/form models: global legacy create JSX, Service HealthDialog fields/edit bindings, and registration follow-up fields. Removed corresponding App creation/update/follow-up handlers, duplicate defaults and validation, unreachable rollback Services/Availability/Health branches, inline full-history drawer, and dead health-config/health-result-row/hero-health-card/runtime-health CSS rules. API helpers remain compatible. HealthDialog is now only a context/surface wrapper, not a second form implementation.
+
+### Header Rules
+
+- One primary heading per surface. Global Health has one PageHeader; Service Health starts with actual operational sections beneath the service resource header/tabs. Health-check/result drawers use one resource title. History has one Health results heading and a contextual Back action; no duplicate breadcrumb/category/Health title stack.
+- Overview presentation, canonical Service tabs, instance endpoint ownership, availability calculations, manual execution and authorization remain unchanged. Instances retain monitoring summary/handoff only, not embedded history or configuration forms.
+
+### Verification and Debt
+
+| Surface | Status | Verified scope |
+| --- | --- | --- |
+| Global Health | VERIFIED | Shared primitives, one header, scoped overview/checks, canonical Results navigation and shared editor |
+| Service Health | VERIFIED | Unchanged availability/current-state semantics, five-result preview, scoped canonical history and check drawer |
+| Health results | VERIFIED | Server filters/order/pages, URL state/dependent controls, empty/error/details and responsive resource rows |
+| HealthCheckForm | VERIFIED | Global/scoped create, immutable-context edit, defaults/validation, loading, health-only retry and saved-refresh failure |
+| Responsive/accessibility review | VERIFIED within fixture/review scope | Labeled controls/status text, WCAG 2A/AA axe tests, inherited Radix focus/keyboard behavior and viewport measurements |
+
+- Final checkpoint: `npm test -- --run` PASS (57/57); `go test ./...` PASS; `npm run build` PASS (includes TypeScript); `git diff --check` PASS. Lint: UNAVAILABLE - no ESLint configuration exists. No dependency or browser-runner additions. Existing nonfatal Vite/Zod/jsdom and bundle-size warnings remain.
+- Repository tests cover each query dimension, inclusive timezone-aware date ranges, combined filters, newest/oldest order, continuation/final page, readable target projection, no matches, allowed/disallowed environment scope, authentication and invalid query bounds. Frontend tests cover query serialization/history entry/navigation, page-size reset, filter disclosure, structured details/errors, canonical create/edit/defaults/scoped selectors, loading, duplicate-name error, optional retry and refresh failure without duplicate creation. Existing Run/state/availability, instance/endpoint, focus and authorization tests remain passing.
+- DOM/CSS fixture review at 1920/1440/1280/1024/768/390px found no page overflow in history or horizontal form overflow in the shared Service editor. Editor widths were bounded at 672px desktop and 358px at 390px. Mobile history filter height fell from 846px to 291px with advanced filters collapsed. Live 466px fixture history also had no page overflow. These are rendered layout measurements, not full production screenshots or browser-zoom certification.
+- Remaining debt: historical context is joined from current retained catalog rows, not immutable execution-time target snapshots; target changes may alter displayed historical address/path/port. Existing offset pagination can shift under concurrent insertions. Main previews still use bounded legacy RPC pages per configured check (five rendered rows), so high check-count preview fan-out can later be replaced with the new query. Full live-data/zoom QA, portal dark-theme inheritance, and route-level code splitting for the existing 500kB bundle warning remain follow-ups.
+- Deployment requires rebuilding/restarting the backend to register the new query and apply migration 023 through normal startup migrations. No production database or running backend was modified during fixture QA.
+
+## Environments and Global Health Refinement Audit
+
+Status: AUDITED -> DESIGNED -> IN PROGRESS -> MIGRATED -> VERIFIED within the regression, accessibility and rendered-fixture scope below.
+
+- At audit time, Environments rendered OperationalWorkspace -> local Environments -> PageHeader + titled table Card + permanent create Card; the action only focused the inline key field. Its counts used shell-scoped topology, incorrectly suggesting zero resources in other environments. A dead App rollback branch duplicated the form.
+- Contract: Environment has immutable unique Key, Name, optional Description, free-form string Tier, Enabled and Tags. Create accepts Key/Name/Tier/Description/Tags and always enables the environment. Update accepts Name/Description/Tier/Enabled/Tags, not Key. No enum, key regex or description length limit exists; frontend will not invent one. Numeric tiers will display as Tier N, blank as Untiered, other labels retain their meaning. Enabled is editable only in Edit; tags are preserved.
+- Replacement: EnvironmentsWorkspace -> PageHeader + compact search/status filters + one Workspace table/mobile ResourceList + overflow actions (Edit and View services). Create/Edit share EnvironmentForm with centralized defaults/Zod validation, field errors and loading/API-error handling inside the shared Dialog. No permanently visible form or redundant Environment scopes heading. Counts load all authorized topology pages independently of the selected shell environment; failed counts remain unavailable, not zero.
+- At audit time, Global Health rendered an unframed instance ResourceList with name/address only, four metrics and one full-width Status select. Service/Environment relationships were already available in deployments; check counts/Enabled and current-state timestamps were also available. No state may be inferred from result absence when the backend state is unavailable.
+- Replacement: shared Workspace -> five-value StatGroup -> compact FilterBar (Status, Service, Environment, Search) -> structured instance table/mobile rows + overflow actions. Unknown explanation distinguishes no checks, disabled monitoring, returned state awaiting transition, or current state unavailable; no invented Never executed/No recent result claim. Rows link to the existing Service Health and scoped canonical result search; monitoring actions reuse HealthCheckForm. Checks and Results remain canonical and no new history/detail model is introduced.
+- Shared refinements: opt-in bounded FilterBar controls and five-column StatGroup, with responsive wrapping. Existing consumers keep their behavior. Delete local Environment presentation/form and dead rollback markup only after replacements have coverage. No backend/entity/schema/authorization rewrite is needed.
+
+### Environments
+
+- Primary view: EnvironmentsWorkspace is a resource management list, with compact Search/Status filters, desktop Table and mobile ResourceList. Name is primary; immutable Key and description are secondary metadata. Tier displays free-form labels unchanged, numeric values as Tier N and blank values as Untiered. Canonical StatusBadge represents Enabled/Disabled; the selected shell scope has a restrained neutral row background.
+- Create/Edit: one EnvironmentForm, one Zod schema and one defaults function. The shared md Dialog contains aligned fields and common footer actions. Create sends the existing request and relies on the backend Enabled=true default; Edit offers Switch, keeps Key read-only and retains Tags. There is no fabricated tier enum, key regex, length constraint or create-time enabled flag.
+- Inline create form: REMOVED. The PageHeader owns Create; the empty state provides the only Create action when no rows exist. Overflow actions own Edit and View services. View services changes shell environment and navigates to the canonical catalog; successful creation still selects the new environment before reloading its catalog.
+- Counts use all pages of authorized instances/deployments, independently of the selected shell scope, with deduplicated service counts per environment. ListEnvironments also follows continuation tokens including disabled rows. Loading/failure counts are explicitly Loading/Unavailable, with Retry, not fabricated zeroes. Concurrent key collisions receive a field-level error; success followed by refresh failure cannot recreate the environment.
+
+### Global Health
+
+- Overview: one PageHeader and workspace surface; five compact stats (Instances, Healthy, Unhealthy, Unknown, Checks), a bounded FilterBar and structured rows. Desktop columns are Instance/address, Service, Environment, Monitoring, Status and Actions; tablet/mobile use the same contextual data in ResourceRows. Rows are locally paginated at 25 within the existing loaded catalog; historical results retain server pagination.
+- Overview filters: Status, Service, Environment and Search (instance/address/service/environment). Stats describe the service/environment/search scope before the Status subset so the distribution remains useful. Filter changes reset paging; changing the shell environment clears stale local service/environment filters. Overview filters do not silently change the Checks tab's existing shell-scoped catalog.
+- Unknown explanation is metadata, not a new badge language: No health check configured, Monitoring disabled, Instance disabled, Awaiting health transition when returned state has a timestamp, or Current state unavailable. No recent/never-executed claims are inferred without supporting data. Threshold-based current state is never substituted with a last execution result.
+- Instance links and View service health reuse Service > Health. View results carries instance/service/environment scope into the existing canonical Results page. Run check is available for an enabled instance with exactly one enabled check; multiple-check workflows remain in Service Health. Configure monitoring passes known instance/service/environment to HealthCheckForm without redundant selectors.
+- Checks: unchanged canonical ServiceHealthView/HealthCheckForm management, including edit and existing API contracts. Results: unchanged canonical HealthResultsPage at `/health/results`. The navigation button sits alongside, not inside, the ARIA tablist because it opens a route rather than a tab panel. No second form/history implementation was added.
+
+### Shared Components and Removals
+
+| Component | Decision | Consumers / removal condition | Status |
+| --- | --- | --- | --- |
+| Local OperationalWorkspace Environments and App rollback form | REMOVE | No remaining consumers; canonical flow covered by tests | REMOVED |
+| EnvironmentForm + environment-form defaults/schema | KEEP | Create and Edit | VERIFIED |
+| EnvironmentsWorkspace | KEEP | Canonical environment route | VERIFIED |
+| HealthWorkspace old flat overview | RECREATE | Contextual operational overview; retains canonical checks/history | VERIFIED |
+| ActionMenu | KEEP | Shared Radix menu with Lucide trigger; releases menu focus before opening a subsequent surface | VERIFIED |
+| IconButton forwardRef | REFINED | Accessible Radix asChild trigger | VERIFIED |
+| FilterBar compact density | REFINED | Opt-in 180px bounded fields; wraps without stretching one filter across the workspace | VERIFIED |
+| StatGroup columns | REFINED | Supports 2/3/4/5 related stats; mobile two-column rhythm retained | VERIFIED |
+| DialogContent opener handling | REFINED | Capture external focus before nested scopes/autoFocus; Escape returns to connected trigger | VERIFIED |
+| Legacy environment-overview-row styles | REMOVE | No live consumers; seven dead selector occurrences/rules removed | REMOVED |
+
+- Existing shared form controls, Table, ResourceList, Workspace, StatusBadge, Skeleton, EmptyState, Alert and Radix dialogs are reused. No dependency, backend, schema, authorization, route contract or new UI framework changes in this pass.
+
+### Refinement Verification and Remaining Debt
+
+| Surface | Status | Verified scope |
+| --- | --- | --- |
+| Environments list / filters / counts | VERIFIED | Empty/status/tier/context, scope-independent continuation pages, count failure, navigation |
+| EnvironmentForm Create/Edit | VERIFIED | Required fields, duplicates/local and server, immutable Key, Tags, Enabled, success/loading and keyboard focus |
+| Global Health Overview | VERIFIED | Stats, combined filters, context, truthful Unknown explanations, loaded-catalog pagination, scoped actions |
+| Global Health Checks / Results | VERIFIED | Canonical shared create/edit and history navigation preserved |
+| Responsive / accessibility review | VERIFIED within fixture/test scope | Viewport measurements, labels/errors/status text, menu keyboard operation, focus return and axe WCAG 2A/AA |
+
+- Added 24 regression tests. The new axe overview test found and fixed an invalid button inside a tablist; menu-to-dialog focus timing and Environment autoFocus/opener handling were corrected, not hidden by assertions. Initial test/build issues were assertion timing/label and unsupported Testing Library option types; all corrected without weakening behavior checks.
+- Rendered fixture DOM/CSS review at 1920/1440/1280/1024/768/390px found no horizontal page overflow in Environments or Health. Environment dialog stays bounded at 512px desktop and fits mobile without internal horizontal overflow. Health filter selects measure 180px rather than full workspace width. Five-stat desktop layout becomes two columns on mobile; tables become contextual rows at their breakpoints.
+- Live fixture keyboard review verifies menu Enter, dialog initial field focus, Escape and focus return to the visible menu trigger. Automated WCAG 2A/AA checks cover the Environment form with errors and Health Overview; existing shared dialog/tab and canonical check/history tests remain intact. Fixtures were in memory only, removed by reload, and did not mutate the backend.
+- Gates: `npm test -- --run` PASS (81/81); `npm run build` PASS (includes TypeScript); `go test ./...` PASS; `git diff --check` PASS. Lint: UNAVAILABLE - no ESLint configuration exists. Existing nonfatal Vite/Zod/jsdom/line-ending and >500kB bundle warnings remain.
+- Remaining debt: full production-data screenshot/zoom QA is not certified; portal dark-theme inheritance and route-level code splitting remain follow-ups. The existing catalog loader still omits unavailable GetInstanceHealthState calls, so states remain explicitly Unknown until supported state data arrives (for example a manual run). Global Health summarizes the currently loaded authorized catalog, not a new server aggregation; large-catalog pagination/aggregation beyond existing loader limits is follow-up data-flow work. Environment counts are fully paged and not affected by those loader limits. No unsupported environment Delete workflow was introduced.

@@ -1,5 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { ServiceHealthView } from "./ServiceHealthView";
+import { HealthCheckForm } from "./HealthCheckForm";
+import { EndpointEditor } from "./EndpointEditor";
+import {
+  validateEndpointCollection,
+  type EndpointFormValue,
+} from "../lib/endpoint-form";
 import { Copy, MoreHorizontal, Plus, Trash2, Pencil } from "lucide-react";
 
 import {
@@ -71,21 +77,7 @@ type RegistrationFormState = {
   instanceName: string;
   address: string;
   description: string;
-  endpoints: Array<{
-    name: string;
-    protocol: string;
-    port: number;
-    path: string;
-    primary: boolean;
-  }>;
-  configureHealth: boolean;
-  healthName: string;
-  healthType: string;
-  healthPath: string;
-  healthIntervalSeconds: number;
-  healthTimeoutSeconds: number;
-  healthFailuresBeforeUnhealthy: number;
-  healthSuccessesBeforeHealthy: number;
+  endpoints: EndpointFormValue[];
 };
 type ServiceForm = { name: string; displayName: string; description: string };
 type InstanceEditForm = {
@@ -93,29 +85,12 @@ type InstanceEditForm = {
   description: string;
   enabled: boolean;
 };
-type EndpointEditForm = {
-  name: string;
-  protocol: string;
-  port: number;
-  path: string;
-  enabled: boolean;
-  primary: boolean;
-};
-type HealthForm = {
-  instanceId: string;
-  endpointId: string;
-  name: string;
-  type: string;
-  path: string;
-  expectedStatus: string;
-  intervalSeconds: number;
-  timeoutSeconds: number;
-  failuresBeforeUnhealthy: number;
-  successesBeforeHealthy: number;
-  description: string;
-};
+type EndpointEditForm = EndpointFormValue;
 
 type ServicesWorkspaceProps = {
+  onHealthSaved: () => Promise<void>;
+  onHealthResults: (serviceId?: string, checkId?: string) => void;
+  onConfigureInstance?: (instance: ServiceInstance) => void;
   loading: boolean;
   error: string;
   environments: Environment[];
@@ -186,20 +161,11 @@ type ServicesWorkspaceProps = {
   handleRegisterInstance: (event: FormEvent<HTMLFormElement>) => void;
   closeRuntimeDialog: () => void;
   registeredRuntime?: {
+    instanceId: string;
     name: string;
     address: string;
-    endpoints: Array<{
-      id: string;
-      protocol: string;
-      port: number;
-      path: string;
-      primary: boolean;
-    }>;
+    endpoints: Endpoint[];
   };
-  healthFollowUpError: string;
-  healthFollowUpConfigured: boolean;
-  savingHealthFollowUp: boolean;
-  handleCreateRegisteredHealth: () => void;
   editingInstanceId: string;
   setEditingInstanceId: (value: string) => void;
   instanceEditForm: InstanceEditForm;
@@ -218,37 +184,18 @@ type ServicesWorkspaceProps = {
   handleDeleteEndpoint: (endpoint: Endpoint) => void;
   editingHealthCheckId: string;
   setEditingHealthCheckId: (value: string) => void;
-  healthForm: HealthForm;
-  setHealthForm: React.Dispatch<React.SetStateAction<HealthForm>>;
-  handleUpdateHealthCheck: (event: FormEvent<HTMLFormElement>) => void;
+  healthTargetInstanceId: string;
+  setHealthTargetInstanceId: (id: string) => void;
   handleDeleteHealthCheck: (check: HealthCheck) => void;
   savingHealthCheck: boolean;
   handleRunHealthCheck: (id: string) => Promise<void>;
   startEditHealthCheck: (check: HealthCheck) => void;
-  healthEditForm: Pick<
-    HealthCheck,
-    | "enabled"
-    | "intervalSeconds"
-    | "timeoutSeconds"
-    | "failuresBeforeUnhealthy"
-    | "successesBeforeHealthy"
-  > & { description: string };
-  setHealthEditForm: React.Dispatch<
-    React.SetStateAction<ServicesWorkspaceProps["healthEditForm"]>
-  >;
   testResult: string;
   setError: (value: string) => void;
 };
 
-const protocolOptions = [
-  ["PROTOCOL_HTTP", "HTTP"],
-  ["PROTOCOL_HTTPS", "HTTPS"],
-  ["PROTOCOL_GRPC", "gRPC"],
-  ["PROTOCOL_TCP", "TCP"],
-  ["PROTOCOL_UDP", "UDP"],
-];
-
 export function ServicesWorkspace(props: ServicesWorkspaceProps) {
+  const [healthInstanceContext, setHealthInstanceContext] = useState<string>();
   const [activeTab, setActiveTab] = useState(props.serviceTab);
   useEffect(() => setActiveTab(props.serviceTab), [props.serviceTab]);
   const selectedService = props.services.find(
@@ -485,6 +432,9 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                   <ServiceInstances
                     {...props}
                     service={selectedService}
+                    onConfigureInstance={(instance) =>
+                      setHealthInstanceContext(instance.id)
+                    }
                     deployments={selectedDeployments}
                     instances={selectedInstances}
                     endpoints={selectedEndpoints}
@@ -495,6 +445,9 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                 <TabsContent value="health">
                   <ServiceHealthView
                     key={selectedService.id}
+                    onResults={(checkId) =>
+                      props.onHealthResults(selectedService.id, checkId)
+                    }
                     checks={selectedHealthChecks}
                     states={props.healthStates}
                     instances={selectedInstances}
@@ -507,12 +460,10 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                     onDelete={props.handleDeleteHealthCheck}
                     onRun={props.handleRunHealthCheck}
                     onConfigure={(instance) => {
+                      setHealthInstanceContext(undefined);
+                      props.onConfigureInstance?.(instance);
                       props.setEditingHealthCheckId("new");
-                      props.setHealthForm((current) => ({
-                        ...current,
-                        instanceId: instance.id,
-                        endpointId: "",
-                      }));
+                      props.setHealthTargetInstanceId(instance.id);
                     }}
                   />
                 </TabsContent>
@@ -566,6 +517,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
         <HealthDialog
           {...props}
           instances={selectedInstances}
+          lockedInstanceId={healthInstanceContext}
           endpoints={selectedEndpoints}
         />
       ) : null}
@@ -962,7 +914,8 @@ function InstanceDetails(
   function configureHealth() {
     props.onClose();
     props.setServiceTab("health");
-    props.setHealthForm((current) => ({ ...current, instanceId: instance.id }));
+    props.onConfigureInstance?.(instance);
+    props.setHealthTargetInstanceId(instance.id);
     props.setEditingHealthCheckId("new");
   }
   return (
@@ -975,7 +928,7 @@ function InstanceDetails(
         }
       }}
     >
-      <DialogContent size="lg">
+      <DialogContent size={editorOpen ? "md" : "lg"}>
         <DialogHeader>
           <DialogTitle>
             {editorOpen
@@ -989,9 +942,12 @@ function InstanceDetails(
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
-          {props.error ? <Alert tone="danger" title={props.error} /> : null}
+          {props.error &&
+          !(editorOpen && props.error.startsWith("An endpoint named")) ? (
+            <Alert tone="danger" title={props.error} />
+          ) : null}
           {editorOpen ? (
-            <EndpointEditor {...props} onClose={closeEditor} />
+            <EndpointForm {...props} onClose={closeEditor} />
           ) : (
             <>
               <Inline>
@@ -1241,120 +1197,42 @@ function InstanceDetails(
   );
 }
 
-function EndpointEditor(
+function EndpointForm(
   props: ServicesWorkspaceProps & {
-    endpoint?: Endpoint;
     onClose: () => void;
-    service: Service;
-    deployments: ServiceDeployment[];
-    instances: ServiceInstance[];
     endpoints: Endpoint[];
-    healthChecks: HealthCheck[];
-    environments: Environment[];
   },
 ) {
   const instanceId =
     props.addingEndpointInstanceId ||
     props.endpoints.find((endpoint) => endpoint.id === props.editingEndpointId)
       ?.instanceId;
-  const duplicateName = props.endpoints.some(
-    (endpoint) =>
-      endpoint.instanceId === instanceId &&
-      endpoint.id !== props.editingEndpointId &&
-      endpoint.name === props.endpointEditForm.name.trim(),
-  );
+  const existingNames = props.endpoints
+    .filter(
+      (endpoint) =>
+        endpoint.instanceId === instanceId &&
+        endpoint.id !== props.editingEndpointId,
+    )
+    .map((endpoint) => endpoint.name);
+  const nameError =
+    props.error.startsWith("An endpoint named") &&
+    props.error.includes(`"${props.endpointEditForm.name.trim()}"`)
+      ? props.error
+      : undefined;
   return (
-    <form
-      className="grid gap-3 sm:grid-cols-2"
-      onSubmit={props.handleUpdateEndpoint}
-    >
-      <FormField
-        label="Name"
-        hint="Unique within this instance."
-        error={
-          duplicateName
-            ? "An endpoint with this name already exists on this instance."
-            : undefined
-        }
-      >
-        <Input
-          required
-          autoFocus
-          value={props.endpointEditForm.name}
-          onChange={(event) =>
-            props.setEndpointEditForm((current) => ({
-              ...current,
-              name: event.target.value,
-            }))
-          }
-        />
-      </FormField>
-      <FormField label="Protocol">
-        <Select
-          value={props.endpointEditForm.protocol}
-          onChange={(event) =>
-            props.setEndpointEditForm((current) => ({
-              ...current,
-              protocol: event.target.value,
-            }))
-          }
-        >
-          {protocolOptions.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </Select>
-      </FormField>
-      <FormField label="Port">
-        <Input
-          max={65535}
-          min={1}
-          required
-          type="number"
-          value={props.endpointEditForm.port}
-          onChange={(event) =>
-            props.setEndpointEditForm((current) => ({
-              ...current,
-              port: Number(event.target.value),
-            }))
-          }
-        />
-      </FormField>
-      <FormField label="Path">
-        <Input
-          value={props.endpointEditForm.path}
-          onChange={(event) =>
-            props.setEndpointEditForm((current) => ({
-              ...current,
-              path: event.target.value,
-            }))
-          }
-        />
-      </FormField>
-      <FormField label="Primary">
-        <Switch
-          checked={props.endpointEditForm.primary}
-          onCheckedChange={(checked) =>
-            props.setEndpointEditForm((current) => ({
-              ...current,
-              primary: checked,
-            }))
-          }
-        />
-      </FormField>
-      <FormField label="Enabled">
-        <Switch
-          checked={props.endpointEditForm.enabled}
-          onCheckedChange={(checked) =>
-            props.setEndpointEditForm((current) => ({
-              ...current,
-              enabled: checked,
-            }))
-          }
-        />
-      </FormField>
-      <Inline>
+    <form className="grid gap-3" onSubmit={props.handleUpdateEndpoint}>
+      <EndpointEditor
+        value={props.endpointEditForm}
+        onChange={props.setEndpointEditForm}
+        existingNames={existingNames}
+        errors={nameError ? { name: nameError } : {}}
+        autoFocus
+        disabled={props.savingRuntimeEdit}
+      />
+      <ActionGroup>
+        <Button onClick={props.onClose} type="button" variant="ghost">
+          Cancel
+        </Button>
         <Button
           disabled={props.savingRuntimeEdit}
           type="submit"
@@ -1362,10 +1240,7 @@ function EndpointEditor(
         >
           Save
         </Button>
-        <Button onClick={props.onClose} type="button" variant="ghost">
-          Cancel
-        </Button>
-      </Inline>
+      </ActionGroup>
     </form>
   );
 }
@@ -1589,7 +1464,7 @@ function AddInstanceDialog(
               </FormField>
               <FormSection
                 title="Endpoints"
-                description="Choose one primary endpoint."
+                description="Names are unique within this instance. At most one endpoint can be primary."
               >
                 <div className="endpoint-editor-section-new">
                   <ActionGroup>
@@ -1603,72 +1478,36 @@ function AddInstanceDialog(
                     </Button>
                   </ActionGroup>
                   {props.registrationForm.endpoints.map((endpoint, index) => (
-                    <div className="endpoint-draft-new" key={index}>
-                      <FormField label="Protocol">
-                        <Select
-                          aria-label={`Endpoint ${index + 1} protocol`}
-                          value={endpoint.protocol}
-                          onChange={(event) =>
-                            props.updateRegistrationEndpoint(index, {
-                              protocol: event.target.value,
-                            })
-                          }
-                        >
-                          {protocolOptions.map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormField>
-                      <FormField label="Port">
-                        <Input
-                          aria-label={`Endpoint ${index + 1} port`}
-                          max={65535}
-                          min={1}
-                          required
-                          type="number"
-                          value={endpoint.port}
-                          onChange={(event) =>
-                            props.updateRegistrationEndpoint(index, {
-                              port: Number(event.target.value),
-                            })
-                          }
-                        />
-                      </FormField>
-                      <FormField label="Path">
-                        <Input
-                          aria-label={`Endpoint ${index + 1} path`}
-                          value={endpoint.path}
-                          onChange={(event) =>
-                            props.updateRegistrationEndpoint(index, {
-                              path: event.target.value,
-                            })
-                          }
-                        />
-                      </FormField>
-                      <FormField label="Primary">
-                        <input
-                          className="alauda-radio"
-                          aria-label={`Endpoint ${index + 1} primary`}
-                          checked={endpoint.primary}
-                          name="primary-endpoint"
-                          type="radio"
-                          onChange={() =>
-                            props.setPrimaryRegistrationEndpoint(index)
-                          }
-                        />
-                      </FormField>
-                      <IconButton
-                        disabled={props.registrationForm.endpoints.length === 1}
-                        label="Remove endpoint"
-                        onClick={() => props.removeRegistrationEndpoint(index)}
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Trash2 size={14} />
-                      </IconButton>
-                    </div>
+                    <fieldset
+                      className="min-w-0 border-t border-[var(--border)] pt-3"
+                      key={index}
+                      aria-label={`Endpoint ${index + 1}`}
+                    >
+                      <EndpointEditor
+                        value={endpoint}
+                        labelPrefix={
+                          props.registrationForm.endpoints.length > 1
+                            ? `Endpoint ${index + 1}`
+                            : ""
+                        }
+                        existingNames={props.registrationForm.endpoints
+                          .filter((_, other) => other !== index)
+                          .map((value) => value.name.trim())}
+                        errors={
+                          validateEndpointCollection(
+                            props.registrationForm.endpoints,
+                          )[index]
+                        }
+                        disabled={props.savingRegistration}
+                        primaryLocked={
+                          props.registrationForm.endpoints.length === 1
+                        }
+                        onChange={(value) =>
+                          props.updateRegistrationEndpoint(index, value)
+                        }
+                        onRemove={() => props.removeRegistrationEndpoint(index)}
+                      />
+                    </fieldset>
                   ))}
                 </div>
               </FormSection>
@@ -1679,10 +1518,8 @@ function AddInstanceDialog(
               ) : null}
               {props.registeredRuntime ? (
                 <p className="form-success-new" role="status">
-                  Instance added.{" "}
-                  {props.healthFollowUpConfigured
-                    ? "Health monitoring configured."
-                    : "Health monitoring can be configured from Health."}
+                  Instance added. Health monitoring can be configured from
+                  Health.
                 </p>
               ) : null}
             </div>
@@ -1714,383 +1551,122 @@ function RegisteredInstanceSuccess(
   props: ServicesWorkspaceProps & { service: Service },
 ) {
   const [configuring, setConfiguring] = useState(false);
+  const [configured, setConfigured] = useState(false);
   const runtime = props.registeredRuntime;
   if (!runtime) return null;
+  const instance = props.instances.find((i) => i.id === runtime.instanceId) || {
+    id: runtime.instanceId,
+    name: runtime.name,
+    address: runtime.address,
+    deploymentId: "",
+    port: runtime.endpoints[0]?.port || 0,
+    enabled: true,
+  };
   return (
-    <Dialog open onOpenChange={(value) => !value && props.closeRuntimeDialog()}>
-      <DialogContent size="md">
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) props.closeRuntimeDialog();
+      }}
+    >
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Instance added</DialogTitle>
           <DialogDescription>
-            The instance and its endpoints are ready.
+            {runtime.name} · {runtime.address}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <div className="success-summary-new">
-            <strong>{runtime.name}</strong>
-            <span>{runtime.address}</span>
-            <div>
-              <span>Endpoints</span>
-              {runtime.endpoints.map((endpoint) => (
-                <span key={endpoint.id}>
-                  {formatProtocol(endpoint.protocol)} :{endpoint.port}
-                  {endpoint.path || ""}
+          {!configuring ? (
+            <div className="grid gap-2">
+              <strong>Endpoints</strong>
+              {runtime.endpoints.map((e) => (
+                <span key={e.id}>
+                  {e.name} · {formatProtocol(e.protocol)} :{e.port}
+                  {e.path || ""}
                 </span>
               ))}
+              <p role="status">
+                {configured
+                  ? "Health monitoring configured."
+                  : "Health monitoring is not configured."}
+              </p>
             </div>
-          </div>
-          {configuring && !props.healthFollowUpError ? (
-            <div className="form-grid-new">
-              <FormField label="Check name">
-                <Input
-                  required
-                  value={props.registrationForm.healthName}
-                  onChange={(event) =>
-                    props.setRegistrationForm((current) => ({
-                      ...current,
-                      healthName: event.target.value,
-                    }))
-                  }
-                />
-              </FormField>
-              <FormField label="Check type">
-                <Select
-                  value={props.registrationForm.healthType}
-                  onChange={(event) =>
-                    props.setRegistrationForm((current) => ({
-                      ...current,
-                      healthType: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
-                  <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
-                  <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
-                  <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
-                </Select>
-              </FormField>
-              <FormField label="Interval (seconds)">
-                <Input
-                  min={1}
-                  type="number"
-                  value={props.registrationForm.healthIntervalSeconds}
-                  onChange={(event) =>
-                    props.setRegistrationForm((current) => ({
-                      ...current,
-                      healthIntervalSeconds: Number(event.target.value),
-                    }))
-                  }
-                />
-              </FormField>
-              <FormField label="Timeout (seconds)">
-                <Input
-                  min={1}
-                  type="number"
-                  value={props.registrationForm.healthTimeoutSeconds}
-                  onChange={(event) =>
-                    props.setRegistrationForm((current) => ({
-                      ...current,
-                      healthTimeoutSeconds: Number(event.target.value),
-                    }))
-                  }
-                />
-              </FormField>
-            </div>
-          ) : null}
-          {props.healthFollowUpError ? (
-            <Alert
-              tone="danger"
-              title="Health monitoring could not be configured."
-            >
-              The instance and its endpoints already exist.
-            </Alert>
-          ) : props.healthFollowUpConfigured ? (
-            <p className="form-success-new" role="status">
-              Health monitoring configured.
-            </p>
           ) : (
-            <p>Health monitoring is not configured.</p>
+            <HealthCheckForm
+              instances={[instance]}
+              endpoints={runtime.endpoints}
+              instanceId={instance.id}
+              endpointId={
+                runtime.endpoints.find((e) => e.primary)?.id ||
+                runtime.endpoints[0]?.id
+              }
+              onCancel={() => setConfiguring(false)}
+              onSaved={async () => {
+                setConfigured(true);
+                setConfiguring(false);
+                await props.onHealthSaved();
+              }}
+            />
           )}
         </DialogBody>
-        <DialogFooter>
-          {configuring && !props.healthFollowUpError ? (
-            <>
-              <Button
-                onClick={() => setConfiguring(false)}
-                type="button"
-                variant="ghost"
-              >
-                Cancel
+        {!configuring ? (
+          <DialogFooter>
+            {!configured ? (
+              <Button onClick={() => setConfiguring(true)}>
+                Configure health
               </Button>
-              <Button
-                disabled={props.savingHealthFollowUp}
-                loading={props.savingHealthFollowUp}
-                onClick={props.handleCreateRegisteredHealth}
-                type="button"
-                variant="primary"
-              >
-                Save health monitoring
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                onClick={() => setConfiguring(true)}
-                type="button"
-                variant="secondary"
-              >
-                {props.healthFollowUpError ? "Retry" : "Configure health"}
-              </Button>
-              <Button
-                onClick={props.closeRuntimeDialog}
-                type="button"
-                variant="primary"
-              >
-                Done
-              </Button>
-            </>
-          )}
-        </DialogFooter>
+            ) : null}
+            <Button variant="primary" onClick={props.closeRuntimeDialog}>
+              Done
+            </Button>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
 }
 
-function HealthDialog(props: ServicesWorkspaceProps) {
-  const editing = props.editingHealthCheckId !== "new";
+function HealthDialog(
+  props: ServicesWorkspaceProps & { lockedInstanceId?: string },
+) {
   const check = props.healthChecks.find(
-    (check) => check.id === props.editingHealthCheckId,
+    (c) => c.id === props.editingHealthCheckId,
   );
-  const values = editing ? props.healthEditForm : props.healthForm;
-  function timing(
-    key:
-      | "intervalSeconds"
-      | "timeoutSeconds"
-      | "failuresBeforeUnhealthy"
-      | "successesBeforeHealthy",
-    value: number,
-  ) {
-    if (editing)
-      props.setHealthEditForm((current) => ({ ...current, [key]: value }));
-    else props.setHealthForm((current) => ({ ...current, [key]: value }));
-  }
   return (
     <Dialog
       open
-      onOpenChange={(open) => !open && props.setEditingHealthCheckId("")}
+      onOpenChange={(open) => {
+        if (!open) props.setEditingHealthCheckId("");
+      }}
     >
       <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>
-            {editing ? "Edit health check" : "Configure health"}
+            {check ? "Edit health check" : "Configure health"}
           </DialogTitle>
-          <DialogDescription>
-            {editing
-              ? check?.name || "Health check"
-              : "Monitor an instance or one of its endpoints."}
-          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={props.handleUpdateHealthCheck}>
-          <DialogBody>
-            {props.error ? <Alert tone="danger" title={props.error} /> : null}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {!editing ? (
-                <>
-                  <FormField label="Instance">
-                    <Select
-                      required
-                      value={props.healthForm.instanceId}
-                      onChange={(event) =>
-                        props.setHealthForm((current) => ({
-                          ...current,
-                          instanceId: event.target.value,
-                          endpointId: "",
-                        }))
-                      }
-                    >
-                      <option value="">Select instance</option>
-                      {props.instances.map((instance) => (
-                        <option key={instance.id} value={instance.id}>
-                          {instance.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-                  <FormField label="Endpoint">
-                    <Select
-                      value={props.healthForm.endpointId}
-                      onChange={(event) =>
-                        props.setHealthForm((current) => ({
-                          ...current,
-                          endpointId: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Instance address</option>
-                      {props.endpoints
-                        .filter(
-                          (endpoint) =>
-                            endpoint.instanceId === props.healthForm.instanceId,
-                        )
-                        .map((endpoint) => (
-                          <option key={endpoint.id} value={endpoint.id}>
-                            {endpoint.name} ·{" "}
-                            {formatProtocol(endpoint.protocol)} :{endpoint.port}
-                          </option>
-                        ))}
-                    </Select>
-                  </FormField>
-                  <FormField label="Check name">
-                    <Input
-                      required
-                      value={props.healthForm.name}
-                      onChange={(event) =>
-                        props.setHealthForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                    />
-                  </FormField>
-                  <FormField label="Type">
-                    <Select
-                      value={props.healthForm.type}
-                      onChange={(event) =>
-                        props.setHealthForm((current) => ({
-                          ...current,
-                          type: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
-                      <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
-                      <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
-                      <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
-                    </Select>
-                  </FormField>
-                  <FormField label="Path">
-                    <Input
-                      value={props.healthForm.path}
-                      onChange={(event) =>
-                        props.setHealthForm((current) => ({
-                          ...current,
-                          path: event.target.value,
-                        }))
-                      }
-                    />
-                  </FormField>
-                  <FormField label="Expected status">
-                    <Input
-                      value={props.healthForm.expectedStatus}
-                      onChange={(event) =>
-                        props.setHealthForm((current) => ({
-                          ...current,
-                          expectedStatus: event.target.value,
-                        }))
-                      }
-                    />
-                  </FormField>
-                </>
-              ) : (
-                <FormField label="Enabled">
-                  <Switch
-                    checked={props.healthEditForm.enabled}
-                    onCheckedChange={(enabled) =>
-                      props.setHealthEditForm((current) => ({
-                        ...current,
-                        enabled,
-                      }))
-                    }
-                  />
-                </FormField>
-              )}
-              <FormField label="Interval seconds">
-                <Input
-                  required
-                  min={1}
-                  type="number"
-                  value={values.intervalSeconds}
-                  onChange={(event) =>
-                    timing("intervalSeconds", Number(event.target.value))
-                  }
-                />
-              </FormField>
-              <FormField label="Timeout seconds">
-                <Input
-                  required
-                  min={1}
-                  type="number"
-                  value={values.timeoutSeconds}
-                  onChange={(event) =>
-                    timing("timeoutSeconds", Number(event.target.value))
-                  }
-                />
-              </FormField>
-              <FormField label="Failures before unhealthy">
-                <Input
-                  required
-                  min={1}
-                  type="number"
-                  value={values.failuresBeforeUnhealthy}
-                  onChange={(event) =>
-                    timing(
-                      "failuresBeforeUnhealthy",
-                      Number(event.target.value),
-                    )
-                  }
-                />
-              </FormField>
-              <FormField label="Successes before healthy">
-                <Input
-                  required
-                  min={1}
-                  type="number"
-                  value={values.successesBeforeHealthy}
-                  onChange={(event) =>
-                    timing("successesBeforeHealthy", Number(event.target.value))
-                  }
-                />
-              </FormField>
-              <FormField label="Description">
-                <Textarea
-                  value={values.description}
-                  onChange={(event) =>
-                    editing
-                      ? props.setHealthEditForm((current) => ({
-                          ...current,
-                          description: event.target.value,
-                        }))
-                      : props.setHealthForm((current) => ({
-                          ...current,
-                          description: event.target.value,
-                        }))
-                  }
-                />
-              </FormField>
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => props.setEditingHealthCheckId("")}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={props.savingHealthCheck}
-              loading={props.savingHealthCheck}
-            >
-              Save health check
-            </Button>
-          </DialogFooter>
-        </form>
+        <DialogBody>
+          <HealthCheckForm
+            key={props.editingHealthCheckId}
+            check={check}
+            instances={props.instances}
+            endpoints={props.endpoints}
+            serviceId={props.selectedServiceId}
+            initialInstanceId={props.healthTargetInstanceId}
+            instanceId={props.lockedInstanceId}
+            environmentId={props.selectedEnvironmentId}
+            onCancel={() => props.setEditingHealthCheckId("")}
+            onSaved={async () => {
+              props.setEditingHealthCheckId("");
+              await props.onHealthSaved();
+            }}
+          />
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );
 }
-
 function serviceStatus(service: Service, incidents: Incident[]) {
   return incidents.some(
     (incident) =>
@@ -2102,8 +1678,8 @@ function serviceStatus(service: Service, incidents: Incident[]) {
 }
 function environmentName(environments: Environment[], id: string) {
   return (
-    environments.find((environment) => environment.id === id)?.name ??
-    `Environment ${id}`
+    environments.find((environment) => environment.id === id)?.name ||
+    "Unknown environment"
   );
 }
 function formatProtocol(value: string) {

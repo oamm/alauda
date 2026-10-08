@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
+import { newEndpoint, validateEndpoint, validateEndpointCollection, type EndpointFormValue } from "./lib/endpoint-form";
 import "./components/ui/ui.css";
 import { AppShell } from "./components/AppShell";
 import { FormField, Input, PasswordInput, Alert, Button as FormButton } from "./components/ui";
@@ -9,12 +10,9 @@ import {
   EmptyState,
   Button,
   IconButton,
-  LoadingRows,
-  Metadata,
   PageHeader,
   ResourceLink,
   StatusBadge,
-  Tabs,
 } from "./components/OperationsUI";
 import { ActiveView } from "./types";
 import {
@@ -26,6 +24,7 @@ import {
 } from "./utils/format";
 import { RuntimeTopology } from "./components/RuntimeTopology";
 import { HealthWorkspace } from "./views/HealthWorkspace";
+import { HealthResultsPage } from "./components/HealthResultsPage";
 import { ServicesWorkspace } from "./components/ServicesWorkspace";
 import { OperationalWorkspace } from "./components/OperationalWorkspace";
 import {
@@ -35,8 +34,6 @@ import {
   ApiToken,
   createApiToken,
   createApplicationKey,
-  createHealthCheck,
-  createEnvironment,
   createAlertPolicy,
   createEndpoint,
   createNotificationChannel,
@@ -51,7 +48,6 @@ import {
   Environment,
   EventRecord,
   HealthCheck,
-  HealthResult,
   HealthStateView,
   Incident,
   listApiTokens,
@@ -68,7 +64,6 @@ import {
   listHealthChecks,
   listEnvironments,
   listEvents,
-  listHealthResults,
   listIncidents,
   listInstances,
   listNotificationChannels,
@@ -89,19 +84,18 @@ import {
   testNotificationChannel,
   updateAlertPolicy,
   updateEndpoint,
-  updateHealthCheck,
   updateInstance,
   updateNotificationChannel,
   updateService,
   UserAccount,
 } from "./api";
 
-function endpointMutationError(error: unknown): string {
+function endpointMutationError(error: unknown, name: string): string {
   const message = error instanceof Error ? error.message : "Failed to update endpoint";
   try {
     const response = JSON.parse(message);
     if (response?.code === "already_exists") {
-      return "An endpoint with this name already exists on this instance. Choose a different name.";
+      return `An endpoint named "${name}" already exists in this instance. Choose a different name.`;
     }
     if (typeof response?.message === "string") return response.message;
   } catch {
@@ -110,28 +104,14 @@ function endpointMutationError(error: unknown): string {
   return message;
 }
 
-function newRegistrationEndpoint(
-  overrides: Partial<{
-    name: string;
-    protocol: string;
-    port: number;
-    path: string;
-    primary: boolean;
-  }> = {},
-) {
-  return {
-    name: "http",
-    protocol: "PROTOCOL_HTTP",
-    port: 8080,
-    path: "/",
-    primary: true,
-    ...overrides,
-  };
+function newRegistrationEndpoint(overrides: Partial<EndpointFormValue> = {}) {
+  return newEndpoint([], overrides);
 }
 
 function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const initialPath = parseApplicationPath(window.location.pathname);
   const [activeView, setActiveView] = useState<ActiveView>(initialPath.view);
+  const [healthResultsRoute,setHealthResultsRoute] = useState(window.location.pathname === "/health/results");
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [deployments, setDeployments] = useState<ServiceDeployment[]>([]);
@@ -139,7 +119,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [healthChecks, setHealthChecks] = useState<HealthCheck[]>([]);
   const [healthStates, setHealthStates] = useState<HealthStateView[]>([]);
-  const [healthResults, setHealthResults] = useState<HealthResult[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [notificationChannels, setNotificationChannels] = useState<
@@ -160,10 +139,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     availability7d?: AvailabilitySummary;
     availability30d?: AvailabilitySummary;
   }>({});
-  const [latestState, setLatestState] = useState<HealthStateView | null>(null);
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState("");
   const [selectedServiceId, setSelectedServiceId] = useState(initialPath.serviceId);
-  const [selectedHealthCheckId, setSelectedHealthCheckId] = useState("");
   const [serviceSearch, setServiceSearch] = useState("");
   const [serviceHealthFilter, setServiceHealthFilter] = useState("all");
   const [serviceTagFilter, setServiceTagFilter] = useState("");
@@ -174,10 +151,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [showCreateService, setShowCreateService] = useState(false);
   const [showAddRuntime, setShowAddRuntime] = useState(false);
   const [healthStatusFilter, setHealthStatusFilter] = useState("all");
-  const [healthSection, setHealthSection] = useState<
-    "overview" | "checks" | "results"
-  >("overview");
-  const [showCreateHealth, setShowCreateHealth] = useState(false);
   const [selectedBulkServiceIds, setSelectedBulkServiceIds] = useState<
     string[]
   >([]);
@@ -209,12 +182,10 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [savingService, setSavingService] = useState(false);
   const [savingRegistration, setSavingRegistration] = useState(false);
   const [savingRuntimeEdit, setSavingRuntimeEdit] = useState(false);
-  const [savingEnvironment, setSavingEnvironment] = useState(false);
   const [savingHealthCheck, setSavingHealthCheck] = useState(false);
   const [savingChannel, setSavingChannel] = useState(false);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [bulkActionRunning, setBulkActionRunning] = useState(false);
-  const [runningHealthCheck, setRunningHealthCheck] = useState(false);
   const [resolvingIncidentId, setResolvingIncidentId] = useState("");
   const [testingChannelId, setTestingChannelId] = useState("");
   const [testResult, setTestResult] = useState("");
@@ -226,11 +197,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     name: string;
     address: string;
     instanceId: string;
-    endpoints: Pick<Endpoint, "id" | "protocol" | "port" | "path" | "primary">[];
+    endpoints: Endpoint[];
   } | null>(null);
-  const [healthFollowUpError, setHealthFollowUpError] = useState("");
-  const [healthFollowUpConfigured, setHealthFollowUpConfigured] = useState(false);
-  const [savingHealthFollowUp, setSavingHealthFollowUp] = useState(false);
   const [serviceForm, setServiceForm] = useState({
     name: "",
     displayName: "",
@@ -248,14 +216,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     address: "",
     description: "",
     endpoints: [newRegistrationEndpoint()],
-    configureHealth: false,
-    healthName: "readiness",
-    healthType: "HEALTH_CHECK_TYPE_HTTP",
-    healthPath: "/healthz",
-    healthIntervalSeconds: 10,
-    healthTimeoutSeconds: 3,
-    healthFailuresBeforeUnhealthy: 3,
-    healthSuccessesBeforeHealthy: 2,
   });
   const [instanceEditForm, setInstanceEditForm] = useState({
     address: "",
@@ -270,33 +230,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     enabled: true,
     primary: false,
   });
-  const [environmentForm, setEnvironmentForm] = useState({
-    key: "",
-    name: "",
-    tier: "",
-    description: "",
-  });
-  const [healthForm, setHealthForm] = useState({
-    instanceId: "",
-    endpointId: "",
-    name: "",
-    type: "HEALTH_CHECK_TYPE_HTTP",
-    intervalSeconds: 10,
-    timeoutSeconds: 3,
-    failuresBeforeUnhealthy: 3,
-    successesBeforeHealthy: 2,
-    description: "",
-    path: "/healthz",
-    expectedStatus: "200-299",
-  });
-  const [healthEditForm, setHealthEditForm] = useState({
-    enabled: true,
-    intervalSeconds: 10,
-    timeoutSeconds: 3,
-    failuresBeforeUnhealthy: 3,
-    successesBeforeHealthy: 2,
-    description: "",
-  });
+  const [healthTargetInstanceId, setHealthTargetInstanceId] = useState("");
   const [channelForm, setChannelForm] = useState({
     type: "webhook",
     name: "",
@@ -352,21 +286,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showCreateApplicationKey, showCreateUser, showCreateApiToken]);
 
-  const selectedService = useMemo(
-    () => services.find((service) => service.id === selectedServiceId) ?? {
-      id: "",
-      name: "",
-      displayName: "",
-      description: "",
-      tags: {},
-      metadata: {},
-    },
-    [selectedServiceId, services],
-  );
-  const selectedHealthCheck = useMemo(
-    () => healthChecks.find((check) => check.id === selectedHealthCheckId),
-    [healthChecks, selectedHealthCheckId],
-  );
   const selectedServiceDeployments = useMemo(
     () =>
       deployments.filter(
@@ -419,22 +338,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       ),
     [selectedServiceInstances],
   );
-  const selectedServiceEndpoints = useMemo(() => {
-    const instanceIDs = new Set(
-      selectedServiceInstances.map((instance) => instance.id),
-    );
-    return endpoints.filter((endpoint) => instanceIDs.has(endpoint.instanceId));
-  }, [endpoints, selectedServiceInstances]);
-  const selectedServiceHealthChecks = useMemo(() => {
-    const instanceIDs = new Set(
-      selectedServiceInstances.map((instance) => instance.id),
-    );
-    return healthChecks.filter((check) => instanceIDs.has(check.instanceId));
-  }, [healthChecks, selectedServiceInstances]);
-  const selectedServiceEvents = useMemo(
-    () => events.filter((event) => event.serviceId === selectedServiceId),
-    [events, selectedServiceId],
-  );
   const servicePageSize = 10;
   const filteredServices = useMemo(() => {
     const query = serviceSearch.trim().toLowerCase();
@@ -479,22 +382,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     (servicePage - 1) * servicePageSize,
     servicePage * servicePageSize,
   );
-  const healthStateByInstanceId = useMemo(
-    () => new Map(healthStates.map((state) => [state.instanceId, state])),
-    [healthStates],
-  );
-  const filteredHealthInstances = useMemo(() => {
-    return instances.filter((instance) => {
-      if (healthStatusFilter === "all") {
-        return true;
-      }
-      const state = healthStateByInstanceId.get(instance.id);
-      const currentState =
-        state?.currentState?.replace("HEALTH_STATE_", "").toLowerCase() ??
-        "unknown";
-      return healthStatusFilter === currentState;
-    });
-  }, [healthStateByInstanceId, healthStatusFilter, instances]);
   const filteredIncidents = useMemo(() => {
     const query = incidentSearch.trim().toLowerCase();
     return incidents.filter((incident) => {
@@ -622,12 +509,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       }
       return nextServices[0]?.id ?? "";
     });
-    setSelectedHealthCheckId((current) => {
-      if (nextHealthChecks.some((check) => check.id === current)) {
-        return current;
-      }
-      return nextHealthChecks[0]?.id ?? "";
-    });
     setServicePage(1);
   }
 
@@ -696,6 +577,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     const handlePopState = () => {
       const path = parseApplicationPath(window.location.pathname);
       setActiveView(path.view);
+      setHealthResultsRoute(window.location.pathname === "/health/results");
       if (path.serviceId) setSelectedServiceId(path.serviceId);
       if (path.serviceTab) setServiceTab(path.serviceTab);
     };
@@ -704,18 +586,29 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }, []);
 
   useEffect(() => {
-    const nextPath = applicationPath(activeView, selectedServiceId, serviceTab);
+    const nextPath = activeView === "health" && healthResultsRoute ? "/health/results" : applicationPath(activeView, selectedServiceId, serviceTab);
     if (window.location.pathname !== nextPath) {
       window.history.replaceState({}, "", nextPath);
     }
-  }, [activeView, selectedServiceId, serviceTab]);
+  }, [activeView, selectedServiceId, serviceTab, healthResultsRoute]);
 
+  function navigateHealthResults(serviceId?:string,checkId?:string,instanceId?:string,environmentId=selectedEnvironmentId) {
+    const params=new URLSearchParams();if(serviceId)params.set("serviceId",serviceId);if(checkId)params.set("checkId",checkId);if(instanceId)params.set("instanceId",instanceId);if(environmentId)params.set("environmentId",environmentId);
+    setActiveView("health");setHealthResultsRoute(true);window.history.pushState({},"",`/health/results${params.size?`?${params}`:""}`);
+  }
   function navigateTo(view: ActiveView) {
+    setHealthResultsRoute(false);
     setActiveView(view);
     const nextPath = applicationPath(view, view === "services" ? selectedServiceId : "", serviceTab);
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, "", nextPath);
     }
+  }
+
+  async function navigateServiceHealth(serviceId:string,environmentId:string) {
+    if(environmentId!==selectedEnvironmentId)await handleEnvironmentChange(environmentId);
+    setSelectedServiceId(serviceId);setServiceTab("health");setHealthResultsRoute(false);setActiveView("services");
+    window.history.pushState({},"",`/services/${encodeURIComponent(serviceId)}/health`);
   }
 
   useEffect(() => {
@@ -889,14 +782,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     }
   }
 
-  function startEditService(service: Service) {
-    setEditingServiceId(service.id);
-    setServiceEditForm({
-      name: service.name,
-      displayName: service.displayName || service.name,
-      description: service.description ?? "",
-    });
-  }
 
   async function handleUpdateService(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -951,7 +836,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     setRegistrationForm((current) => ({
       ...current,
       endpoints: current.endpoints.map((endpoint, endpointIndex) =>
-        endpointIndex === index ? { ...endpoint, ...updates } : endpoint,
+        endpointIndex === index ? { ...endpoint, ...updates } :
+          updates.primary ? { ...endpoint, primary: false } : endpoint,
       ),
     }));
   }
@@ -961,10 +847,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       ...current,
       endpoints: [
         ...current.endpoints,
-        newRegistrationEndpoint({
-          name: "",
-          primary: current.endpoints.length === 0,
-        }),
+        newEndpoint(current.endpoints.map(endpoint => endpoint.name.trim())),
       ],
     }));
   }
@@ -1022,19 +905,12 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }
 
   function startAddEndpoint(instance: ServiceInstance) {
-    const names = new Set(endpoints.filter(endpoint => endpoint.instanceId === instance.id).map(endpoint => endpoint.name));
-    let name = "http";
-    for (let suffix = 2; names.has(name); suffix++) name = `http-${suffix}`;
+    const names = endpoints.filter(endpoint => endpoint.instanceId === instance.id).map(endpoint => endpoint.name);
     setEditingEndpointId("");
     setAddingEndpointInstanceId(instance.id);
-    setEndpointEditForm({
-      name,
-      protocol: "PROTOCOL_HTTP",
+    setEndpointEditForm(newEndpoint(names, {
       port: primaryEndpointForInstance(endpoints, instance.id)?.port || 8080,
-      path: "/",
-      enabled: true,
-      primary: !endpoints.some((endpoint) => endpoint.instanceId === instance.id),
-    });
+    }));
   }
 
   async function handleUpdateInstance(event: FormEvent<HTMLFormElement>) {
@@ -1111,12 +987,9 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     );
     const name = endpointEditForm.name.trim();
     const instanceId = addingEndpointInstanceId || current?.instanceId;
-    if (!name) {
-      setError("Endpoint name is required.");
-      return;
-    }
-    if (endpoints.some(endpoint => endpoint.instanceId === instanceId && endpoint.id !== editingEndpointId && endpoint.name === name)) {
-      setError("An endpoint with this name already exists on this instance. Choose a different name.");
+    const validation = validateEndpoint(endpointEditForm, endpoints.filter(endpoint => endpoint.instanceId === instanceId && endpoint.id !== editingEndpointId).map(endpoint => endpoint.name));
+    if (Object.keys(validation).length) {
+      setError(Object.values(validation)[0] || "Check endpoint details.");
       return;
     }
     setSavingRuntimeEdit(true);
@@ -1150,7 +1023,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       await loadCatalog(selectedEnvironmentId);
     } catch (err) {
       setError(
-        endpointMutationError(err),
+        endpointMutationError(err, name),
       );
     } finally {
       setSavingRuntimeEdit(false);
@@ -1159,71 +1032,9 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
 
   function startEditHealthCheck(check: HealthCheck) {
     setEditingHealthCheckId(check.id);
-    setHealthEditForm({
-      enabled: check.enabled,
-      intervalSeconds: check.intervalSeconds,
-      timeoutSeconds: check.timeoutSeconds,
-      failuresBeforeUnhealthy: check.failuresBeforeUnhealthy,
-      successesBeforeHealthy: check.successesBeforeHealthy,
-      description: check.description ?? "",
-    });
   }
 
-  function startConfigureHealth(instance: ServiceInstance, endpoint?: Endpoint) {
-    setEditingHealthCheckId("new");
-    setHealthForm((current) => ({
-      ...current,
-      instanceId: instance.id,
-      endpointId: endpoint?.id ?? "",
-      name: "readiness",
-      type: endpoint ? healthTypeForEndpoint(endpoint.protocol) : current.type,
-    }));
-  }
 
-  async function handleUpdateHealthCheck(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSavingHealthCheck(true);
-    setError("");
-    try {
-      if (editingHealthCheckId === "new") {
-        const check = await createHealthCheck({
-          instanceId: healthForm.instanceId,
-          endpointId: healthForm.endpointId,
-          name: healthForm.name,
-          type: healthForm.type,
-          enabled: true,
-          intervalSeconds: healthForm.intervalSeconds,
-          timeoutSeconds: healthForm.timeoutSeconds,
-          failuresBeforeUnhealthy: healthForm.failuresBeforeUnhealthy,
-          successesBeforeHealthy: healthForm.successesBeforeHealthy,
-          description: healthForm.description,
-          metadata: compactMap({
-            path: healthForm.path,
-            expectedStatus: healthForm.expectedStatus,
-          }),
-        });
-        setSelectedHealthCheckId(check.id);
-      } else {
-        await updateHealthCheck({
-          id: editingHealthCheckId,
-          enabled: healthEditForm.enabled,
-          intervalSeconds: healthEditForm.intervalSeconds,
-          timeoutSeconds: healthEditForm.timeoutSeconds,
-          failuresBeforeUnhealthy: healthEditForm.failuresBeforeUnhealthy,
-          successesBeforeHealthy: healthEditForm.successesBeforeHealthy,
-          description: healthEditForm.description,
-        });
-      }
-      setEditingHealthCheckId("");
-      await loadCatalog(selectedEnvironmentId);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save health check",
-      );
-    } finally {
-      setSavingHealthCheck(false);
-    }
-  }
 
   async function handleDeleteHealthCheck(check: HealthCheck) {
     const confirmed = window.confirm(`Delete health check ${check.name}?`);
@@ -1277,19 +1088,13 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     if (!serviceId) {
       return;
     }
-    const invalidEndpoint = registrationForm.endpoints.find(
-      (endpoint) => !endpoint.name.trim() || endpoint.port < 1 || endpoint.port > 65535,
-    );
-    if (
-      !registrationForm.environmentId ||
-      !registrationForm.instanceName.trim() ||
-      !registrationForm.address.trim() ||
-      registrationForm.endpoints.length === 0 ||
-      invalidEndpoint ||
-      !registrationForm.endpoints.some((endpoint) => endpoint.primary) ||
-      new Set(registrationForm.endpoints.map((endpoint) => `${endpoint.protocol}:${endpoint.port}:${endpoint.path}`)).size !== registrationForm.endpoints.length
-    ) {
-      setError("Choose an environment, enter instance details, and provide unique endpoints with a valid port and one primary endpoint.");
+    const endpointErrors = validateEndpointCollection(registrationForm.endpoints);
+    if (!registrationForm.environmentId || !registrationForm.instanceName.trim() || !registrationForm.address.trim()) {
+      setError("Choose an environment and enter instance details.");
+      return;
+    }
+    if (endpointErrors.some(errors => Object.keys(errors).length)) {
+      setError("Check the endpoint fields before adding this instance.");
       return;
     }
     setSavingRegistration(true);
@@ -1306,11 +1111,11 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
           enabled: true,
         },
         endpoints: registrationForm.endpoints.map((endpoint) => ({
-          name: endpoint.name,
+          name: endpoint.name.trim(),
           protocol: endpoint.protocol,
           port: endpoint.port,
           path: endpoint.path,
-          enabled: true,
+          enabled: endpoint.enabled,
           primary: endpoint.primary,
         })),
       });
@@ -1335,8 +1140,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
         instanceId: registration.instance.id,
         endpoints: registration.endpoints ?? [],
       });
-      setHealthFollowUpError("");
-      setHealthFollowUpConfigured(false);
       setRegistrationSuccess("Instance added successfully.");
       setAuthMessage(
         `Instance added successfully: ${registration.instance.name}.`,
@@ -1350,54 +1153,10 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     }
   }
 
-  async function handleCreateRegisteredHealth() {
-    if (!registeredRuntime) {
-      return;
-    }
-    if (
-      !registrationForm.healthName.trim() ||
-      registrationForm.healthIntervalSeconds < 1 ||
-      registrationForm.healthTimeoutSeconds < 1
-    ) {
-      setHealthFollowUpError("Health check name, interval, and timeout are required.");
-      return;
-    }
-    setSavingHealthFollowUp(true);
-    setHealthFollowUpError("");
-    try {
-      const endpoint = registeredRuntime.endpoints.find((item) => item.primary) ?? registeredRuntime.endpoints[0];
-      const check = await createHealthCheck({
-        instanceId: registeredRuntime.instanceId,
-        endpointId: endpoint?.id ?? "",
-        name: registrationForm.healthName,
-        type: registrationForm.healthType,
-        enabled: true,
-        intervalSeconds: registrationForm.healthIntervalSeconds,
-        timeoutSeconds: registrationForm.healthTimeoutSeconds,
-        failuresBeforeUnhealthy: registrationForm.healthFailuresBeforeUnhealthy,
-        successesBeforeHealthy: registrationForm.healthSuccessesBeforeHealthy,
-        description: "Created after instance registration",
-        metadata: { path: endpoint?.path || "/", expectedStatus: "200-299" },
-      });
-      setSelectedHealthCheckId(check.id);
-      setHealthFollowUpConfigured(true);
-      await loadCatalog(selectedEnvironmentId);
-    } catch (err) {
-      setHealthFollowUpError(
-        err instanceof Error
-          ? `Health monitoring could not be configured: ${err.message}`
-          : "Health monitoring could not be configured.",
-      );
-    } finally {
-      setSavingHealthFollowUp(false);
-    }
-  }
 
   function closeRuntimeDialog() {
     setShowAddRuntime(false);
     setRegisteredRuntime(null);
-    setHealthFollowUpError("");
-    setHealthFollowUpConfigured(false);
     setRegistrationSuccess("");
   }
 
@@ -1457,88 +1216,26 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     );
   }
 
-  async function handleCreateEnvironment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSavingEnvironment(true);
-    setError("");
-    try {
-      const environment = await createEnvironment(environmentForm);
-      setEnvironmentForm({ key: "", name: "", tier: "", description: "" });
-      await loadCatalog(selectedEnvironmentId);
-      setSelectedEnvironmentId(environment.id);
-      setActiveView("environments");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create environment",
-      );
-    } finally {
-      setSavingEnvironment(false);
-    }
-  }
 
-  async function handleCreateHealthCheck(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSavingHealthCheck(true);
-    setError("");
-    try {
-      const check = await createHealthCheck({
-        instanceId: healthForm.instanceId,
-        endpointId: healthForm.endpointId,
-        name: healthForm.name,
-        type: healthForm.type,
-        enabled: true,
-        intervalSeconds: healthForm.intervalSeconds,
-        timeoutSeconds: healthForm.timeoutSeconds,
-        failuresBeforeUnhealthy: healthForm.failuresBeforeUnhealthy,
-        successesBeforeHealthy: healthForm.successesBeforeHealthy,
-        description: healthForm.description,
-        metadata: {
-          path: healthForm.path,
-          expectedStatus: healthForm.expectedStatus,
-        },
-      });
-      setSelectedHealthCheckId(check.id);
-      setShowCreateHealth(false);
-      setHealthSection("checks");
-      setActiveView("health");
-      await loadCatalog(selectedEnvironmentId);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create health check",
-      );
-    } finally {
-      setSavingHealthCheck(false);
-    }
-  }
 
-  async function handleRunHealthCheck(id = selectedHealthCheckId) {
+  async function handleRunHealthCheck(id: string) {
     if (!id) {
       return;
     }
-    setRunningHealthCheck(true);
     setError("");
     try {
       const response = await runHealthCheck(id);
-      setLatestState(response.state ?? null);
       if (response.state) {
         const state = response.state;
         setHealthStates(current => [...current.filter(item => item.instanceId !== state.instanceId), state]);
       }
-      setHealthResults(await listHealthResults(id));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to run health check",
       );
-    } finally {
-      setRunningHealthCheck(false);
     }
   }
 
-  async function handleSelectHealthCheck(id: string) {
-    setSelectedHealthCheckId(id);
-    setLatestState(null);
-    setHealthResults(await listHealthResults(id));
-  }
 
   async function handleResolveIncident(id: string) {
     setResolvingIncidentId(id);
@@ -1743,15 +1440,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const degradedServiceCount = services.filter(
     (service) => serviceOperationalStatus(service, incidents) === "degraded",
   ).length;
-  const selectedServiceRuntimeSummary = [
-    pluralize(selectedServiceDeployments.length, "environment"),
-    pluralize(selectedServiceInstances.length, "instance"),
-    pluralize(selectedServiceEndpoints.length, "endpoint"),
-  ].join(" · ");
-  const selectedServiceLastActivity =
-    selectedServiceEvents.length > 0
-      ? formatActivityTimestamp(selectedServiceEvents[0].timestamp)
-      : "No activity";
   void savingRuntimeEdit;
   void registrationSuccess;
   void registrationStep;
@@ -1797,12 +1485,10 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     eventTypes,
     eventResourceTypes,
     alertsSection,
-    environmentForm,
     policyForm,
     channelForm,
     editingPolicyId,
     editingChannelId,
-    savingEnvironment,
     savingPolicy,
     savingChannel,
     testingChannelId,
@@ -1813,10 +1499,17 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     onEventResourceFilter: setEventResourceFilter,
     onEventSearch: setEventSearch,
     onAlertsSection: setAlertsSection,
-    onEnvironmentForm: setEnvironmentForm,
+    onEnvironmentSaved: async (environment:Environment,created:boolean) => {
+      const scope=created?environment.id:selectedEnvironmentId;
+      if(created)setSelectedEnvironmentId(scope);
+      await loadCatalog(scope);
+    },
+    onViewEnvironmentServices: async (environmentId:string) => {
+      await handleEnvironmentChange(environmentId);
+      navigateTo("services");
+    },
     onPolicyForm: setPolicyForm,
     onChannelForm: setChannelForm,
-    onCreateEnvironment: handleCreateEnvironment,
     onCreatePolicy: handleCreatePolicy,
     onCreateChannel: handleCreateChannel,
     onCancelPolicy: cancelPolicyEdit,
@@ -1870,6 +1563,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
         <OperationalWorkspace {...operationalProps} view="dashboard" />
       ) : activeView === "services" ? (
         <ServicesWorkspace
+          onHealthSaved={()=>loadCatalog(selectedEnvironmentId)}
+          onHealthResults={navigateHealthResults}
           error={error}
           loading={loading}
           environments={environments}
@@ -1931,10 +1626,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
           handleRegisterInstance={handleRegisterInstance}
           closeRuntimeDialog={closeRuntimeDialog}
           registeredRuntime={registeredRuntime ?? undefined}
-          healthFollowUpError={healthFollowUpError}
-          healthFollowUpConfigured={healthFollowUpConfigured}
-          savingHealthFollowUp={savingHealthFollowUp}
-          handleCreateRegisteredHealth={handleCreateRegisteredHealth}
           editingInstanceId={editingInstanceId}
           setEditingInstanceId={setEditingInstanceId}
           instanceEditForm={instanceEditForm}
@@ -1953,2689 +1644,31 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
           handleDeleteEndpoint={handleDeleteEndpoint}
           editingHealthCheckId={editingHealthCheckId}
           setEditingHealthCheckId={setEditingHealthCheckId}
-          healthForm={healthForm}
-          setHealthForm={setHealthForm}
-          handleUpdateHealthCheck={handleUpdateHealthCheck}
+          healthTargetInstanceId={healthTargetInstanceId}
+          setHealthTargetInstanceId={setHealthTargetInstanceId}
           handleDeleteHealthCheck={handleDeleteHealthCheck}
           savingHealthCheck={savingHealthCheck}
           handleRunHealthCheck={handleRunHealthCheck}
           startEditHealthCheck={startEditHealthCheck}
-          healthEditForm={healthEditForm}
-          setHealthEditForm={setHealthEditForm}
           testResult={testResult}
           setError={setError}
         />
-      ) : false ? (
-        <section className="services-workflow">
-          <PageHeader
-            title="Services"
-            context={`${pluralize(filteredServices.length, "service")} ${
-              selectedEnvironmentId
-                ? `in ${currentEnvironmentName}`
-                : "across all environments"
-            }`}
-            description="Manage the service catalog and registered addresses."
-            action={
-              <button
-                className="button-primary"
-                type="button"
-                onClick={() => setShowCreateService(true)}
-              >
-                + Create service
-              </button>
-            }
-          />
-          <div className="panel services-master">
-            <div className="panel-heading">
-              <h2>Services</h2>
-              <span>
-                {loading
-                  ? "Loading"
-                  : `${filteredServices.length} of ${services.length}`}
-              </span>
-            </div>
-            <div className="service-filter-bar">
-              <label className="service-search">
-                <span>Search</span>
-                <input
-                  aria-label="Search services"
-                  placeholder="Search services..."
-                  value={serviceSearch}
-                  onChange={(event) => setServiceSearch(event.target.value)}
-                />
-              </label>
-              <div className="service-filter-row">
-                <label>
-                  <span>Health</span>
-                  <select
-                    value={serviceHealthFilter}
-                    onChange={(event) =>
-                      setServiceHealthFilter(event.target.value)
-                    }
-                  >
-                    <option value="all">All health</option>
-                    <option value="healthy">Healthy</option>
-                    <option value="degraded">Degraded</option>
-                  </select>
-                </label>
-                <label>
-                  <span>Tags</span>
-                  <input
-                    aria-label="Filter by tag"
-                    placeholder="Any tag"
-                    value={serviceTagFilter}
-                    onChange={(event) =>
-                      setServiceTagFilter(event.target.value)
-                    }
-                  />
-                </label>
-              </div>
-              {serviceSearch ||
-              serviceHealthFilter !== "all" ||
-              serviceTagFilter ? (
-                <button
-                  className="button-ghost clear-filters"
-                  type="button"
-                  onClick={() => {
-                    setServiceSearch("");
-                    setServiceHealthFilter("all");
-                    setServiceTagFilter("");
-                  }}
-                >
-                  Clear filters
-                </button>
-              ) : null}
-            </div>
-            {selectedBulkServiceIds.length > 0 ? (
-              <div className="bulk-bar">
-                <span>{selectedBulkServiceIds.length} selected</span>
-                <button type="button" onClick={selectVisibleServices}>
-                  Select visible
-                </button>
-                <button type="button" onClick={handleCopySelectedServiceIds}>
-                  Copy IDs
-                </button>
-                <button
-                  disabled={bulkActionRunning}
-                  type="button"
-                  onClick={handleDeleteSelectedServices}
-                >
-                  {bulkActionRunning ? "Deleting" : "Delete"}
-                </button>
-                <button
-                  className="button-ghost"
-                  type="button"
-                  onClick={() => setSelectedBulkServiceIds([])}
-                >
-                  Clear
-                </button>
-              </div>
-            ) : null}
-            {loading ? (
-              <LoadingRows rows={5} />
-            ) : filteredServices.length === 0 ? (
-              <EmptyState
-                title="No matching services"
-                description="No catalog services match the current search, health, and tag filters."
-              />
-            ) : (
-              <div className="service-list">
-                {visibleServices.map((service) => {
-                  const serviceDeployments = deployments.filter(
-                    (deployment) => deployment.serviceId === service.id,
-                  );
-                  const deploymentIds = new Set(
-                    serviceDeployments.map((deployment) => deployment.id),
-                  );
-                  const serviceInstanceCount = instances.filter((instance) =>
-                    deploymentIds.has(instance.deploymentId),
-                  ).length;
-                  const serviceStatus = serviceOperationalStatus(
-                    service,
-                    incidents,
-                  );
-
-                  return (
-                    <div
-                      className={
-                        service.id === selectedServiceId
-                          ? "service-row selected"
-                          : "service-row"
-                      }
-                      key={service.id}
-                    >
-                      <label className="inline-check service-row-check">
-                        <input
-                          aria-label={`Select ${service.displayName || service.name}`}
-                          checked={selectedBulkServiceIds.includes(service.id)}
-                          type="checkbox"
-                          onChange={() => toggleBulkService(service.id)}
-                        />
-                      </label>
-                      <button
-                        aria-pressed={service.id === selectedServiceId}
-                        type="button"
-                        onClick={() => setSelectedServiceId(service.id)}
-                      >
-                        <span className="service-row-title">
-                          <strong>{service.displayName || service.name}</strong>
-                          <StatusBadge status={serviceStatus} />
-                        </span>
-                        <Metadata>
-                          <span>{service.name}</span>
-                          <span>{pluralize(serviceInstanceCount, "instance")}</span>
-                        </Metadata>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className="pagination-bar">
-              <button
-                disabled={servicePage <= 1}
-                onClick={() => setServicePage((page) => page - 1)}
-                type="button"
-              >
-                Previous
-              </button>
-              <span>
-                Page {servicePage} of {servicePageCount}
-              </span>
-              <button
-                disabled={servicePage >= servicePageCount}
-                onClick={() => setServicePage((page) => page + 1)}
-                type="button"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-
-          <div className="panel service-workspace">
-            {selectedService ? (
-              <>
-                <div className="service-workspace-header">
-                  <div>
-                    <div className="breadcrumb">
-                      Services /{" "}
-                      {selectedService.displayName || selectedService.name}
-                    </div>
-                    <div className="service-title-line">
-                      <h2>
-                        {selectedService.displayName || selectedService.name}
-                      </h2>
-                      <StatusBadge
-                        status={serviceOperationalStatus(
-                          selectedService,
-                          incidents,
-                        )}
-                      />
-                    </div>
-                    {selectedService.description ? (
-                      <p>{selectedService.description}</p>
-                    ) : null}
-                    <span>
-                      {selectedService.name} · {selectedServiceRuntimeSummary}
-                    </span>
-                  </div>
-                  <details className="resource-menu">
-                    <summary aria-label="Service actions">...</summary>
-                    <div className="resource-menu-items">
-                      <button
-                        type="button"
-                        onClick={() => startEditService(selectedService)}
-                      >
-                        Edit service
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigator.clipboard
-                            .writeText(selectedService.id)
-                            .then(() => setTestResult("Service ID copied."))
-                            .catch(() =>
-                              setError("Failed to copy service ID."),
-                            )
-                        }
-                      >
-                        Copy service ID
-                      </button>
-                      <button
-                        className="button-danger"
-                        disabled={savingService}
-                        type="button"
-                        onClick={() => handleDeleteService(selectedService)}
-                      >
-                        Delete service
-                      </button>
-                    </div>
-                  </details>
-                </div>
-
-                <Tabs
-                  ariaLabel="Service sections"
-                  items={[
-                    { value: "overview", label: "Overview" },
-                    { value: "instances", label: "Instances" },
-                    { value: "availability", label: "Availability" },
-                    { value: "health", label: "Health" },
-                    { value: "incidents", label: "Incidents" },
-                    { value: "events", label: "Events" },
-                  ]}
-                  value={serviceTab}
-                  onChange={(value) => setServiceTab(value as typeof serviceTab)}
-                />
-
-                {serviceTab === "overview" ? (
-                  <div className="service-tab-panel">
-                    <div className="summary-strip">
-                      <div>
-                        <span>Instances</span>
-                        <strong>{selectedServiceRuntimeSummary}</strong>
-                      </div>
-                      <div>
-                        <span>Catalog key</span>
-                        <strong>{selectedService.name}</strong>
-                      </div>
-                      <div>
-                        <span>Last activity</span>
-                        <strong>{selectedServiceLastActivity}</strong>
-                      </div>
-                    </div>
-                    <section className="overview-section">
-                      <div className="tab-toolbar">
-                        <h3>Availability</h3>
-                      </div>
-                      <div className="availability-grid">
-                        <AvailabilityCard
-                          label="24 hours"
-                          summary={serviceAvailability.availability24h}
-                        />
-                        <AvailabilityCard
-                          label="7 days"
-                          summary={serviceAvailability.availability7d}
-                        />
-                        <AvailabilityCard
-                          label="30 days"
-                          summary={serviceAvailability.availability30d}
-                        />
-                      </div>
-                    </section>
-                    <div className="scoped-list">
-                      <h3>Recent activity</h3>
-                      {selectedServiceEvents.length === 0 ? (
-                        <EmptyState
-                          title="No recent activity"
-                          description="No events have been recorded for this service in the selected scope."
-                        />
-                      ) : (
-                        selectedServiceEvents.slice(0, 5).map((event) => (
-                          <div className="activity-row" key={event.id}>
-                            <time title={formatTimestamp(event.timestamp)}>
-                              {formatActivityTimestamp(event.timestamp)}
-                            </time>
-                            <div>
-                              <strong>{formatEventType(event.type)}</strong>
-                              <span>{event.message}</span>
-                            </div>
-                            <small>{event.resourceType}</small>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {serviceTab === "availability" ? (
-                  <div className="service-tab-panel">
-                    <div className="tab-toolbar">
-                      <div>
-                        <h3>Availability</h3>
-                        <span>Operational state across the selected environment scope.</span>
-                      </div>
-                    </div>
-                    <div className="availability-grid">
-                      <AvailabilityCard
-                        label="24 hours"
-                        summary={serviceAvailability.availability24h}
-                      />
-                      <AvailabilityCard
-                        label="7 days"
-                        summary={serviceAvailability.availability7d}
-                      />
-                      <AvailabilityCard
-                        label="30 days"
-                        summary={serviceAvailability.availability30d}
-                      />
-                    </div>
-                    {selectedServiceInstances.length === 0 ? (
-                      <EmptyState
-                        title="No availability data"
-                        description="This service does not currently have any registered instances in the selected scope. Manage instances from the Instances tab."
-                        action={<button type="button" onClick={() => setServiceTab("instances")}>Go to Instances</button>}
-                      />
-                    ) : (
-                      <div className="availability-instance-list">
-                        {selectedServiceDeployments.map((deployment) => {
-                          const deploymentInstances = selectedServiceInstances.filter(
-                            (instance) => instance.deploymentId === deployment.id,
-                          );
-                          return (
-                            <section className="runtime-environment" key={deployment.id}>
-                              <div className="runtime-environment-heading">
-                                <div>
-                                  <h3>{environmentName(environments, deployment.environmentId)}</h3>
-                                  <span>{pluralize(deploymentInstances.length, "instance")}</span>
-                                </div>
-                              </div>
-                              {deploymentInstances.map((instance) => {
-                                const state = healthStateByInstanceId.get(instance.id);
-                                const status = state?.currentState
-                                  ? formatHealthState(state.currentState)
-                                  : instance.enabled ? "enabled" : "disabled";
-                                return (
-                                  <div className="availability-instance-row" key={instance.id}>
-                                    <div>
-                                      <strong>{instance.name}</strong>
-                                      <span>{instance.address}</span>
-                                    </div>
-                                    <span>{pluralize(selectedServiceEndpoints.filter((endpoint) => endpoint.instanceId === instance.id).length, "endpoint")}</span>
-                                    <StatusBadge status={status} />
-                                  </div>
-                                );
-                              })}
-                            </section>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-
-                {serviceTab === "instances" ? (
-                  <div className="service-tab-panel">
-                    <div className="tab-toolbar">
-                      <div>
-                        <h3>Instances</h3>
-                        <span>
-                          {selectedEnvironmentId
-                            ? currentEnvironmentName
-                            : "Manage registered instances and endpoints by environment"}
-                        </span>
-                      </div>
-                      <button type="button" onClick={() => setShowAddRuntime(true)}>Add instance</button>
-                    </div>
-                    {selectedServiceDeployments.length === 0 ? (
-                      <EmptyState
-                        title="No instances"
-                        description={`${selectedService.displayName || selectedService.name} exists in the catalog but has no registered instance in this scope.`}
-                      />
-                    ) : (
-                      selectedServiceDeployments.map((deployment) => {
-                        const deploymentInstances =
-                          selectedServiceInstances.filter(
-                            (instance) =>
-                              instance.deploymentId === deployment.id,
-                          );
-                        const deploymentIncident = incidents.some(
-                          (incident) =>
-                            incident.deploymentId === deployment.id &&
-                            incident.state === "INCIDENT_STATE_OPEN",
-                        );
-                        return (
-                          <section
-                            className="runtime-environment"
-                            key={deployment.id}
-                          >
-                            <div className="runtime-environment-heading">
-                              <div>
-                                <h3>
-                                  {environmentName(
-                                    environments,
-                                    deployment.environmentId,
-                                  )}
-                                </h3>
-                                <span>{pluralize(deploymentInstances.length, "instance")}</span>
-                              </div>
-                              <StatusBadge
-                                status={
-                                  deploymentIncident ? "degraded" : "healthy"
-                                }
-                              />
-                            </div>
-                            {deploymentInstances.length === 0 ? (
-                              <EmptyState
-                                title="No instances"
-                                description="This environment has no instances yet."
-                              />
-                            ) : (
-                              deploymentInstances.map((instance) => {
-                                const instanceEndpoints =
-                                  selectedServiceEndpoints.filter(
-                                    (endpoint) =>
-                                      endpoint.instanceId === instance.id,
-                                  );
-                                const instanceChecks =
-                                  selectedServiceHealthChecks.filter(
-                                    (check) => check.instanceId === instance.id,
-                                  );
-                                const state = healthStateByInstanceId.get(
-                                  instance.id,
-                                );
-                                return (
-                                  <article
-                                    className="runtime-instance"
-                                    key={instance.id}
-                                  >
-                                    <div className="runtime-instance-header">
-                                      <div>
-                                        <strong>
-                                          {instance.name}
-                                        </strong>
-                                        <span>
-                                          {instance.address}:
-                                          {instance.port ||
-                                            primaryEndpointForInstance(
-                                              instanceEndpoints,
-                                              instance.id,
-                                            )?.port ||
-                                            "dynamic"}
-                                        </span>
-                                      </div>
-                                      <StatusBadge
-                                        status={
-                                          state?.currentState
-                                            ? formatHealthState(
-                                                state.currentState,
-                                              )
-                                            : instance.enabled
-                                              ? "enabled"
-                                              : "disabled"
-                                        }
-                                      />
-                                      <details className="resource-menu">
-                                        <summary
-                                          aria-label={`Instance actions for ${instance.name}`}
-                                        >
-                                          ...
-                                        </summary>
-                                        <div className="resource-menu-items">
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              startEditInstance(instance)
-                                            }
-                                          >
-                                            Edit instance
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              startAddEndpoint(instance)
-                                            }
-                                          >
-                                            Add endpoint
-                                          </button>
-                                          <button
-                                            className="button-danger"
-                                            disabled={savingRuntimeEdit}
-                                            type="button"
-                                            onClick={() =>
-                                              handleDeleteInstance(instance)
-                                            }
-                                          >
-                                            Remove instance
-                                          </button>
-                                        </div>
-                                      </details>
-                                    </div>
-                                    {editingInstanceId === instance.id ? (
-                                      <form
-                                        className="inline-edit-form runtime-edit-form"
-                                        onSubmit={handleUpdateInstance}
-                                      >
-                                        <label>
-                                          Address
-                                          <input
-                                            required
-                                            value={instanceEditForm.address}
-                                            onChange={(event) =>
-                                              setInstanceEditForm(
-                                                (current) => ({
-                                                  ...current,
-                                                  address: event.target.value,
-                                                }),
-                                              )
-                                            }
-                                          />
-                                        </label>
-                                        <label>
-                                          Description
-                                          <input
-                                            value={
-                                              instanceEditForm.description
-                                            }
-                                            onChange={(event) =>
-                                              setInstanceEditForm(
-                                                (current) => ({
-                                                  ...current,
-                                                  description:
-                                                    event.target.value,
-                                                }),
-                                              )
-                                            }
-                                          />
-                                        </label>
-                                        <label className="checkbox-label">
-                                          <input
-                                            checked={instanceEditForm.enabled}
-                                            type="checkbox"
-                                            onChange={(event) =>
-                                              setInstanceEditForm(
-                                                (current) => ({
-                                                  ...current,
-                                                  enabled:
-                                                    event.target.checked,
-                                                }),
-                                              )
-                                            }
-                                          />
-                                          Enabled
-                                        </label>
-                                        <button
-                                          disabled={savingRuntimeEdit}
-                                          type="submit"
-                                        >
-                                          Save
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setEditingInstanceId("")
-                                          }
-                                        >
-                                          Cancel
-                                        </button>
-                                      </form>
-                                    ) : null}
-                                    <div className="runtime-nested">
-                                      <div className="runtime-subheading">
-                                        <h4>Endpoints</h4>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            startAddEndpoint(instance)
-                                          }
-                                        >
-                                          + Add endpoint
-                                        </button>
-                                      </div>
-                                      {addingEndpointInstanceId ===
-                                      instance.id ? (
-                                        <form
-                                          className="inline-edit-form runtime-edit-form"
-                                          onSubmit={handleUpdateEndpoint}
-                                        >
-                                          <label>
-                                            Name
-                                            <input
-                                              required
-                                              value={endpointEditForm.name}
-                                              onChange={(event) =>
-                                                setEndpointEditForm(
-                                                  (current) => ({
-                                                    ...current,
-                                                    name: event.target.value,
-                                                  }),
-                                                )
-                                              }
-                                            />
-                                          </label>
-                                          <label>
-                                            Protocol
-                                            <select
-                                              value={endpointEditForm.protocol}
-                                              onChange={(event) =>
-                                                setEndpointEditForm(
-                                                  (current) => ({
-                                                    ...current,
-                                                    protocol:
-                                                      event.target.value,
-                                                  }),
-                                                )
-                                              }
-                                            >
-                                              <option value="PROTOCOL_HTTP">
-                                                HTTP
-                                              </option>
-                                              <option value="PROTOCOL_HTTPS">
-                                                HTTPS
-                                              </option>
-                                              <option value="PROTOCOL_GRPC">
-                                                gRPC
-                                              </option>
-                                              <option value="PROTOCOL_TCP">
-                                                TCP
-                                              </option>
-                                              <option value="PROTOCOL_UDP">
-                                                UDP
-                                              </option>
-                                            </select>
-                                          </label>
-                                          <label>
-                                            Port
-                                            <input
-                                              max="65535"
-                                              min="1"
-                                              required
-                                              type="number"
-                                              value={endpointEditForm.port}
-                                              onChange={(event) =>
-                                                setEndpointEditForm(
-                                                  (current) => ({
-                                                    ...current,
-                                                    port: Number(
-                                                      event.target.value,
-                                                    ),
-                                                  }),
-                                                )
-                                              }
-                                            />
-                                          </label>
-                                          <label>
-                                            Path
-                                            <input
-                                              value={endpointEditForm.path}
-                                              onChange={(event) =>
-                                                setEndpointEditForm(
-                                                  (current) => ({
-                                                    ...current,
-                                                    path: event.target.value,
-                                                  }),
-                                                )
-                                              }
-                                            />
-                                          </label>
-                                          <button
-                                            disabled={savingRuntimeEdit}
-                                            type="submit"
-                                          >
-                                            Add endpoint
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              setAddingEndpointInstanceId("")
-                                            }
-                                          >
-                                            Cancel
-                                          </button>
-                                        </form>
-                                      ) : null}
-                                      {instanceEndpoints.length === 0 ? (
-                                        <p>No endpoints attached.</p>
-                                      ) : (
-                                        instanceEndpoints.map((endpoint) => (
-                                          <div
-                                            className="runtime-child-row"
-                                            key={endpoint.id}
-                                          >
-                                            <strong>
-                                              {formatProtocol(
-                                                endpoint.protocol,
-                                              ).toUpperCase()}{" "}
-                                              · :{endpoint.port}
-                                              {endpoint.path || ""}
-                                            </strong>
-                                            <StatusBadge
-                                              status={
-                                                endpoint.enabled
-                                                  ? "enabled"
-                                                  : "disabled"
-                                              }
-                                            />
-                                            <details className="resource-menu">
-                                              <summary
-                                                aria-label={`Endpoint actions for ${endpoint.name}`}
-                                              >
-                                                ...
-                                              </summary>
-                                              <div className="resource-menu-items">
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    startEditEndpoint(endpoint)
-                                                  }
-                                                >
-                                                  Edit endpoint
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    startConfigureHealth(
-                                                      instance,
-                                                      endpoint,
-                                                    )
-                                                  }
-                                                >
-                                                  Configure health
-                                                </button>
-                                                <button
-                                                  className="button-danger"
-                                                  disabled={savingRuntimeEdit}
-                                                  type="button"
-                                                  onClick={() =>
-                                                    handleDeleteEndpoint(
-                                                      endpoint,
-                                                    )
-                                                  }
-                                                >
-                                                  Delete endpoint
-                                                </button>
-                                              </div>
-                                            </details>
-                                            {editingEndpointId ===
-                                            endpoint.id ? (
-                                              <form
-                                                className="inline-edit-form runtime-edit-form"
-                                                onSubmit={
-                                                  handleUpdateEndpoint
-                                                }
-                                              >
-                                                <label>
-                                                  Name
-                                                  <input
-                                                    required
-                                                    value={
-                                                      endpointEditForm.name
-                                                    }
-                                                    onChange={(event) =>
-                                                      setEndpointEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          name: event.target
-                                                            .value,
-                                                        }),
-                                                      )
-                                                    }
-                                                  />
-                                                </label>
-                                                <label>
-                                                  Protocol
-                                                  <select
-                                                    value={
-                                                      endpointEditForm.protocol
-                                                    }
-                                                    onChange={(event) =>
-                                                      setEndpointEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          protocol:
-                                                            event.target.value,
-                                                        }),
-                                                      )
-                                                    }
-                                                  >
-                                                    <option value="PROTOCOL_HTTP">
-                                                      HTTP
-                                                    </option>
-                                                    <option value="PROTOCOL_HTTPS">
-                                                      HTTPS
-                                                    </option>
-                                                    <option value="PROTOCOL_GRPC">
-                                                      gRPC
-                                                    </option>
-                                                    <option value="PROTOCOL_TCP">
-                                                      TCP
-                                                    </option>
-                                                    <option value="PROTOCOL_UDP">
-                                                      UDP
-                                                    </option>
-                                                  </select>
-                                                </label>
-                                                <label>
-                                                  Port
-                                                  <input
-                                                    max="65535"
-                                                    min="1"
-                                                    required
-                                                    type="number"
-                                                    value={
-                                                      endpointEditForm.port
-                                                    }
-                                                    onChange={(event) =>
-                                                      setEndpointEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          port: Number(
-                                                            event.target.value,
-                                                          ),
-                                                        }),
-                                                      )
-                                                    }
-                                                  />
-                                                </label>
-                                                <label>
-                                                  Path
-                                                  <input
-                                                    value={
-                                                      endpointEditForm.path
-                                                    }
-                                                    onChange={(event) =>
-                                                      setEndpointEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          path: event.target
-                                                            .value,
-                                                        }),
-                                                      )
-                                                    }
-                                                  />
-                                                </label>
-                                                <label className="checkbox-label">
-                                                  <input
-                                                    checked={
-                                                      endpointEditForm.enabled
-                                                    }
-                                                    type="checkbox"
-                                                    onChange={(event) =>
-                                                      setEndpointEditForm(
-                                                        (current) => ({
-                                                          ...current,
-                                                          enabled:
-                                                            event.target
-                                                              .checked,
-                                                        }),
-                                                      )
-                                                    }
-                                                  />
-                                                  Enabled
-                                                </label>
-                                                <button
-                                                  disabled={savingRuntimeEdit}
-                                                  type="submit"
-                                                >
-                                                  Save endpoint
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    setEditingEndpointId("")
-                                                  }
-                                                >
-                                                  Cancel
-                                                </button>
-                                              </form>
-                                            ) : null}
-                                          </div>
-                                        ))
-                                      )}
-                                      <h4>Health</h4>
-                                      {instanceChecks.length === 0 ? (
-                                        <div className="runtime-empty-action">
-                                          <p>No health monitoring configured.</p>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              startConfigureHealth(
-                                                instance,
-                                                primaryEndpointForInstance(
-                                                  instanceEndpoints,
-                                                  instance.id,
-                                                ),
-                                              )
-                                            }
-                                          >
-                                            Configure health
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        instanceChecks.map((check) => (
-                                          <div
-                                            className="runtime-child-row"
-                                            key={check.id}
-                                          >
-                                            <strong>
-                                              {formatCheckType(check.type)
-                                                .toUpperCase()}{" "}
-                                              {check.name} · every{" "}
-                                              {check.intervalSeconds}s
-                                            </strong>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                startEditHealthCheck(check)
-                                              }
-                                            >
-                                              Edit health check
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                handleRunHealthCheck(check.id)
-                                              }
-                                            >
-                                              Run check
-                                            </button>
-                                            <button
-                                              className="button-danger"
-                                              disabled={savingHealthCheck}
-                                              type="button"
-                                              onClick={() =>
-                                                handleDeleteHealthCheck(check)
-                                              }
-                                            >
-                                              Delete
-                                            </button>
-                                            {editingHealthCheckId ===
-                                            check.id ? (
-                                              <form
-                                                className="runtime-health-form"
-                                                onSubmit={
-                                                  handleUpdateHealthCheck
-                                                }
-                                              >
-                                                <h5>Health configuration</h5>
-                                                <div className="runtime-health-fields">
-                                                  <label>
-                                                    Interval seconds
-                                                    <input
-                                                      min="1"
-                                                      type="number"
-                                                      value={
-                                                        healthEditForm.intervalSeconds
-                                                      }
-                                                      onChange={(event) =>
-                                                        setHealthEditForm(
-                                                          (current) => ({
-                                                            ...current,
-                                                            intervalSeconds:
-                                                              Number(
-                                                                event.target
-                                                                  .value,
-                                                              ),
-                                                          }),
-                                                        )
-                                                      }
-                                                    />
-                                                  </label>
-                                                  <label>
-                                                    Timeout seconds
-                                                    <input
-                                                      min="1"
-                                                      type="number"
-                                                      value={
-                                                        healthEditForm.timeoutSeconds
-                                                      }
-                                                      onChange={(event) =>
-                                                        setHealthEditForm(
-                                                          (current) => ({
-                                                            ...current,
-                                                            timeoutSeconds:
-                                                              Number(
-                                                                event.target
-                                                                  .value,
-                                                              ),
-                                                          }),
-                                                        )
-                                                      }
-                                                    />
-                                                  </label>
-                                                  <label className="checkbox-label">
-                                                    <input
-                                                      checked={
-                                                        healthEditForm.enabled
-                                                      }
-                                                      type="checkbox"
-                                                      onChange={(event) =>
-                                                        setHealthEditForm(
-                                                          (current) => ({
-                                                            ...current,
-                                                            enabled:
-                                                              event.target
-                                                                .checked,
-                                                          }),
-                                                        )
-                                                      }
-                                                    />
-                                                    Enabled
-                                                  </label>
-                                                </div>
-                                                <div className="runtime-health-actions">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                      setEditingHealthCheckId("")
-                                                    }
-                                                  >
-                                                    Cancel
-                                                  </button>
-                                                  <button
-                                                    disabled={savingHealthCheck}
-                                                    type="submit"
-                                                  >
-                                                    Save health check
-                                                  </button>
-                                                </div>
-                                              </form>
-                                            ) : null}
-                                          </div>
-                                        ))
-                                      )}
-                                      {editingHealthCheckId === "new" &&
-                                      healthForm.instanceId === instance.id ? (
-                                        <form
-                                          className="runtime-health-form"
-                                          onSubmit={handleUpdateHealthCheck}
-                                        >
-                                          <h5>Health configuration</h5>
-                                          <div className="runtime-health-fields">
-                                            <label>
-                                              Check name
-                                              <input
-                                                required
-                                                value={healthForm.name}
-                                                onChange={(event) =>
-                                                  setHealthForm((current) => ({
-                                                    ...current,
-                                                    name: event.target.value,
-                                                  }))
-                                                }
-                                              />
-                                            </label>
-                                            <label>
-                                              Check type
-                                              <select
-                                                value={healthForm.type}
-                                                onChange={(event) =>
-                                                  setHealthForm((current) => ({
-                                                    ...current,
-                                                    type: event.target.value,
-                                                  }))
-                                                }
-                                              >
-                                                <option value="HEALTH_CHECK_TYPE_HTTP">
-                                                  HTTP
-                                                </option>
-                                                <option value="HEALTH_CHECK_TYPE_HTTPS">
-                                                  HTTPS
-                                                </option>
-                                                <option value="HEALTH_CHECK_TYPE_GRPC">
-                                                  gRPC
-                                                </option>
-                                                <option value="HEALTH_CHECK_TYPE_TCP">
-                                                  TCP
-                                                </option>
-                                                <option value="HEALTH_CHECK_TYPE_UDP">
-                                                  UDP
-                                                </option>
-                                              </select>
-                                            </label>
-                                            <label>
-                                              Interval seconds
-                                              <input
-                                                min="1"
-                                                type="number"
-                                                value={
-                                                  healthForm.intervalSeconds
-                                                }
-                                                onChange={(event) =>
-                                                  setHealthForm((current) => ({
-                                                    ...current,
-                                                    intervalSeconds: Number(
-                                                      event.target.value,
-                                                    ),
-                                                  }))
-                                                }
-                                              />
-                                            </label>
-                                            <label>
-                                              Timeout seconds
-                                              <input
-                                                min="1"
-                                                type="number"
-                                                value={
-                                                  healthForm.timeoutSeconds
-                                                }
-                                                onChange={(event) =>
-                                                  setHealthForm((current) => ({
-                                                    ...current,
-                                                    timeoutSeconds: Number(
-                                                      event.target.value,
-                                                    ),
-                                                  }))
-                                                }
-                                              />
-                                            </label>
-                                          </div>
-                                          <div className="runtime-health-actions">
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setEditingHealthCheckId("")
-                                              }
-                                            >
-                                              Cancel
-                                            </button>
-                                            <button
-                                              disabled={savingHealthCheck}
-                                              type="submit"
-                                            >
-                                              Save health check
-                                            </button>
-                                          </div>
-                                        </form>
-                                      ) : null}
-                                    </div>
-                                  </article>
-                                );
-                              })
-                            )}
-                          </section>
-                        );
-                      })
-                    )}
-                  </div>
-                ) : null}
-
-                {serviceTab === "health" ? (
-                  <div className="service-tab-panel">
-                    <div className="availability-grid">
-                      <AvailabilityCard
-                        label="24 hours"
-                        summary={serviceAvailability.availability24h}
-                      />
-                      <AvailabilityCard
-                        label="7 days"
-                        summary={serviceAvailability.availability7d}
-                      />
-                      <AvailabilityCard
-                        label="30 days"
-                        summary={serviceAvailability.availability30d}
-                      />
-                    </div>
-                    <div className="scoped-list">
-                      <h3>Health checks</h3>
-                      {selectedServiceHealthChecks.length === 0 ? (
-                        <EmptyState
-                          title="No health checks"
-                        description="No monitoring configuration is attached to a service instance yet."
-                        />
-                      ) : (
-                        selectedServiceHealthChecks.map((check) => (
-                          <div className="health-result-row" key={check.id}>
-                            <strong>{check.name}</strong>
-                            <span>{formatCheckType(check.type)}</span>
-                            <span>{check.intervalSeconds}s</span>
-                            <StatusBadge
-                              status={check.enabled ? "enabled" : "disabled"}
-                            />
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {serviceTab === "incidents" ? (
-                  <div className="service-tab-panel scoped-list">
-                    {filteredIncidents.filter(
-                      (incident) => incident.serviceId === selectedService.id,
-                    ).length === 0 ? (
-                      <EmptyState
-                        title="No service incidents"
-                        description="No incidents match this service and the current incident filters."
-                      />
-                    ) : (
-                      filteredIncidents
-                        .filter(
-                          (incident) =>
-                            incident.serviceId === selectedService.id,
-                        )
-                        .map((incident) => (
-                          <div className="incident-row" key={incident.id}>
-                            <div>
-                              <StatusBadge
-                                status={formatIncidentState(incident.state)}
-                              />
-                              <span>
-                                {incident.reason || "No reason recorded"}
-                              </span>
-                            </div>
-                            <span>{incident.instanceId}</span>
-                            <span>{formatTimestamp(incident.openedAt)}</span>
-                            <span>
-                              {incident.resolvedAt
-                                ? formatDuration(incident.durationSeconds)
-                                : "Open"}
-                            </span>
-                            <button
-                              disabled={
-                                incident.state !== "INCIDENT_STATE_OPEN" ||
-                                resolvingIncidentId === incident.id
-                              }
-                              onClick={() => handleResolveIncident(incident.id)}
-                              type="button"
-                            >
-                              {resolvingIncidentId === incident.id
-                                ? "Resolving"
-                                : "Resolve"}
-                            </button>
-                            <button
-                              onClick={() => setSelectedIncidentId(incident.id)}
-                              type="button"
-                            >
-                              Details
-                            </button>
-                          </div>
-                        ))
-                    )}
-                  </div>
-                ) : null}
-
-                {serviceTab === "events" ? (
-                  <div className="service-tab-panel scoped-list">
-                    {selectedServiceEvents.length === 0 ? (
-                      <EmptyState
-                        title="No service events"
-                        description="No recent changes have been recorded for this service in the selected scope."
-                      />
-                    ) : (
-                      selectedServiceEvents.map((event) => (
-                        <div className="event-row timeline-row" key={event.id}>
-                          <time title={formatTimestamp(event.timestamp)}>
-                            {formatActivityTimestamp(event.timestamp)}
-                          </time>
-                          <strong>{formatEventType(event.type)}</strong>
-                          <span>{event.message}</span>
-                          <span>
-                            {event.resourceType}:{event.resourceId}
-                          </span>
-                          <span>{event.actor}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <EmptyState
-                title="Select a service"
-                description="Choose a service from the catalog to inspect instances, health, incidents, and events in one workspace."
-              />
-            )}
-          </div>
-
-          {/*
-            <div className="legacy-service-stack" aria-hidden="true">
-
-            <div className="panel detail-panel">
-              <div className="panel-heading">
-                <h2>Service Detail</h2>
-              </div>
-              {selectedService ? (
-                <dl className="detail-list">
-                  <dt>ID</dt>
-                  <dd>{selectedService.id}</dd>
-                  <dt>Name</dt>
-                  <dd>{selectedService.name}</dd>
-                  <dt>Display name</dt>
-                  <dd>{selectedService.displayName}</dd>
-                  <dt>Description</dt>
-                  <dd>{selectedService.description || "None"}</dd>
-                  <dt>Tags</dt>
-                  <dd>{formatMap(selectedService.tags)}</dd>
-                  <dt>Metadata</dt>
-                  <dd>{formatMap(selectedService.metadata)}</dd>
-                  <dt>Status</dt>
-                  <dd>
-                    <StatusBadge
-                      status={serviceOperationalStatus(
-                        selectedService,
-                        incidents,
-                      )}
-                    />
-                  </dd>
-                  <dt>Environments</dt>
-                  <dd>{selectedServiceDeployments.length}</dd>
-                  <dt>Instances</dt>
-                  <dd>{selectedServiceInstances.length}</dd>
-                </dl>
-              ) : (
-                <EmptyState
-                  title="Select a service"
-                  description="Choose a service from the table to inspect its instances, health checks, incidents, and events."
-                />
-              )}
-            </div>
-
-            <div className="panel service-wide-panel">
-              <div className="panel-heading">
-                <h2>Environment Overview</h2>
-                <span>
-                  {selectedService ? selectedService.name : "No service"}
-                </span>
-              </div>
-              <div className="table">
-                {!selectedService || selectedServiceDeployments.length === 0 ? (
-                  <EmptyState
-                    title="No registered environments"
-                    description="This service has no instance in the selected environment scope yet."
-                  />
-                ) : (
-                  selectedServiceDeployments.map((deployment) => {
-                    const deploymentInstances = instances.filter(
-                      (instance) => instance.deploymentId === deployment.id,
-                    );
-                    const hasIncident = incidents.some(
-                      (incident) =>
-                        incident.deploymentId === deployment.id &&
-                        incident.state === "INCIDENT_STATE_OPEN",
-                    );
-                    return (
-                      <div
-                        className="environment-overview-row"
-                        key={deployment.id}
-                      >
-                        <strong>
-                          {environmentName(
-                            environments,
-                            deployment.environmentId,
-                          )}
-                        </strong>
-                        <span>
-                          {pluralize(deploymentInstances.length, "instance")}
-                        </span>
-                        <StatusBadge status={hasIncident ? "degraded" : "healthy"} />
-                        <span>{deployment.tags?.version ?? "n/a"}</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="panel service-wide-panel">
-              <div className="panel-heading">
-                          <h2>Instances</h2>
-                <span>
-                  Service / Environment / Address / Endpoint / Health monitoring
-                </span>
-              </div>
-              <RuntimeTopology
-                deployments={selectedServiceDeployments}
-                endpoints={selectedServiceEndpoints}
-                environments={environments}
-                healthChecks={selectedServiceHealthChecks}
-                incidents={incidents}
-                instances={selectedServiceInstances}
-                serviceName={selectedService?.name ?? "This service"}
-                onRegisterRuntime={focusRegistrationForm}
-                onRunHealthCheck={handleRunHealthCheck}
-              />
-            </div>
-
-            <div className="panel service-wide-panel">
-              <div className="panel-heading">
-                <h2>Availability</h2>
-                <span>
-                  {selectedService ? "Selected service" : "No service"}
-                </span>
-              </div>
-              <div className="availability-grid">
-                <AvailabilityCard
-                  label="24h"
-                  summary={serviceAvailability.availability24h}
-                />
-                <AvailabilityCard
-                  label="7d"
-                  summary={serviceAvailability.availability7d}
-                />
-                <AvailabilityCard
-                  label="30d"
-                  summary={serviceAvailability.availability30d}
-                />
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Instances</h2>
-                <span>
-                  {selectedEnvironment
-                    ? `${selectedEnvironmentInstances.length} in ${selectedEnvironment.name} / ${selectedServiceInstances.length} total`
-                    : `${selectedServiceInstances.length} total`}
-                </span>
-              </div>
-              <div className="table">
-                {selectedServiceInstances.length === 0 ? (
-                  <div className="empty-action">
-                    <strong>
-                      {selectedEnvironmentDeployment
-                        ? "No instances yet."
-                        : `${selectedService?.name ?? "This service"} has no instance in ${selectedEnvironment?.name ?? "this environment"}.`}
-                    </strong>
-                    <p>
-                      Alauda knows this service exists, but it does not yet know
-                      where this service is running.
-                    </p>
-                    <button type="button" onClick={focusRegistrationForm}>
-                      {selectedEnvironmentDeployment
-                        ? "Add first instance"
-                        : `Add instance in ${selectedEnvironment?.name ?? "environment"}`}
-                    </button>
-                  </div>
-                ) : (
-                  selectedServiceInstances.map((instance) => (
-                    <div className="instance-row" key={instance.id}>
-                      <div>
-                        <strong>{instance.name}</strong>
-                      </div>
-                      <span>{instance.address}</span>
-                      <span>
-                        {formatEndpointSummary(
-                          primaryEndpointForInstance(
-                            selectedServiceEndpoints,
-                            instance.id,
-                          ),
-                        )}
-                      </span>
-                      <StatusBadge
-                        status={instance.enabled ? "enabled" : "disabled"}
-                      />
-                      <span>{formatTimestamp(instance.lastSeenAt)}</span>
-                      <div className="row-actions">
-                        <button
-                          type="button"
-                          onClick={() => startEditInstance(instance)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          disabled={savingRuntimeEdit}
-                          type="button"
-                          onClick={() => handleDeleteInstance(instance)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      {editingInstanceId === instance.id ? (
-                        <form
-                          className="inline-edit-form"
-                          onSubmit={handleUpdateInstance}
-                        >
-                          <label>
-                            Address
-                            <input
-                              required
-                              value={instanceEditForm.address}
-                              onChange={(event) =>
-                                setInstanceEditForm((current) => ({
-                                  ...current,
-                                  address: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                          <label>
-                            Description
-                            <input
-                              value={instanceEditForm.description}
-                              onChange={(event) =>
-                                setInstanceEditForm((current) => ({
-                                  ...current,
-                                  description: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                          <label className="checkbox-label">
-                            <input
-                              checked={instanceEditForm.enabled}
-                              type="checkbox"
-                              onChange={(event) =>
-                                setInstanceEditForm((current) => ({
-                                  ...current,
-                                  enabled: event.target.checked,
-                                }))
-                              }
-                            />
-                            Enabled
-                          </label>
-                          <button disabled={savingRuntimeEdit} type="submit">
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingInstanceId("")}
-                          >
-                            Cancel
-                          </button>
-                        </form>
-                      ) : null}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Endpoints</h2>
-                <span>{selectedServiceEndpoints.length} total</span>
-              </div>
-              <div className="table">
-                {selectedServiceEndpoints.length === 0 ? (
-                  <EmptyState
-                    title="No endpoints"
-                    description="Instances exist, but no protocol/path endpoints are attached yet."
-                  />
-                ) : (
-                  selectedServiceEndpoints.map((endpoint) => {
-                    const instance = selectedServiceInstanceById.get(
-                      endpoint.instanceId,
-                    );
-                    return (
-                      <div className="endpoint-row" key={endpoint.id}>
-                        <div>
-                          <strong>{endpoint.name}</strong>
-                          <span>{endpoint.id}</span>
-                        </div>
-                        <span>{formatEndpointUrl(endpoint, instance)}</span>
-                        <span>
-                          {endpoint.primary ? "Primary " : ""}
-                          {formatProtocol(endpoint.protocol)}
-                        </span>
-                        <StatusBadge
-                          status={endpoint.enabled ? "enabled" : "disabled"}
-                        />
-                        <div className="row-actions">
-                          <button
-                            type="button"
-                            onClick={() => startEditEndpoint(endpoint)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            disabled={savingRuntimeEdit}
-                            type="button"
-                            onClick={() => handleDeleteEndpoint(endpoint)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                        {editingEndpointId === endpoint.id ? (
-                          <form
-                            className="inline-edit-form"
-                            onSubmit={handleUpdateEndpoint}
-                          >
-                            <label>
-                              Name
-                              <input
-                                required
-                                value={endpointEditForm.name}
-                                onChange={(event) =>
-                                  setEndpointEditForm((current) => ({
-                                    ...current,
-                                    name: event.target.value,
-                                  }))
-                                }
-                              />
-                            </label>
-                            <label>
-                              Protocol
-                              <select
-                                value={endpointEditForm.protocol}
-                                onChange={(event) =>
-                                  setEndpointEditForm((current) => ({
-                                    ...current,
-                                    protocol: event.target.value,
-                                  }))
-                                }
-                              >
-                                <option value="PROTOCOL_HTTP">HTTP</option>
-                                <option value="PROTOCOL_HTTPS">HTTPS</option>
-                                <option value="PROTOCOL_GRPC">gRPC</option>
-                                <option value="PROTOCOL_TCP">TCP</option>
-                                <option value="PROTOCOL_UDP">UDP</option>
-                              </select>
-                            </label>
-                            <label>
-                              Port
-                              <input
-                                max="65535"
-                                min="1"
-                                required
-                                type="number"
-                                value={endpointEditForm.port}
-                                onChange={(event) =>
-                                  setEndpointEditForm((current) => ({
-                                    ...current,
-                                    port: Number(event.target.value),
-                                  }))
-                                }
-                              />
-                            </label>
-                            <label>
-                              Path
-                              <input
-                                value={endpointEditForm.path}
-                                onChange={(event) =>
-                                  setEndpointEditForm((current) => ({
-                                    ...current,
-                                    path: event.target.value,
-                                  }))
-                                }
-                              />
-                            </label>
-                            <label className="checkbox-label">
-                              <input
-                                checked={endpointEditForm.primary}
-                                type="checkbox"
-                                onChange={(event) =>
-                                  setEndpointEditForm((current) => ({
-                                    ...current,
-                                    primary: event.target.checked,
-                                  }))
-                                }
-                              />
-                              Primary
-                            </label>
-                            <label className="checkbox-label">
-                              <input
-                                checked={endpointEditForm.enabled}
-                                type="checkbox"
-                                onChange={(event) =>
-                                  setEndpointEditForm((current) => ({
-                                    ...current,
-                                    enabled: event.target.checked,
-                                  }))
-                                }
-                              />
-                              Enabled
-                            </label>
-                            <button disabled={savingRuntimeEdit} type="submit">
-                              Save endpoint
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingEndpointId("")}
-                            >
-                              Cancel
-                            </button>
-                          </form>
-                        ) : null}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Health Checks</h2>
-                <span>{selectedServiceHealthChecks.length} total</span>
-              </div>
-              <div className="table">
-                {selectedServiceHealthChecks.length === 0 ? (
-                  <EmptyState
-                    title="No health checks"
-                        description="No monitoring configuration is attached to a service instance yet."
-                  />
-                ) : (
-                  selectedServiceHealthChecks.map((check) => (
-                    <div className="health-result-row" key={check.id}>
-                      <strong>{check.name}</strong>
-                      <span>{formatCheckType(check.type)}</span>
-                      <span>{check.intervalSeconds}s</span>
-                      <StatusBadge
-                        status={check.enabled ? "enabled" : "disabled"}
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-heading">
-                <h2>Recent Events</h2>
-                <span>{selectedServiceEvents.length} total</span>
-              </div>
-              <div className="table">
-                {selectedServiceEvents.length === 0 ? (
-                  <EmptyState
-                    title="No service events"
-                    description="No recent changes have been recorded for this service in the selected scope."
-                  />
-                ) : (
-                  selectedServiceEvents.slice(0, 8).map((event) => (
-                    <div className="timeline-row" key={event.id}>
-                      <time title={formatTimestamp(event.timestamp)}>
-                        {formatActivityTimestamp(event.timestamp)}
-                      </time>
-                      <strong>{formatEventType(event.type)}</strong>
-                      <span>{event.message}</span>
-                      <small>{event.resourceType}</small>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <form className="panel form-panel" onSubmit={handleCreateService}>
-              <div className="panel-heading">
-                <h2>Create Service</h2>
-              </div>
-              <label>
-                Name
-                <input
-                  required
-                  value={serviceForm.name}
-                  onChange={(event) =>
-                    setServiceForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Display name
-                <input
-                  required
-                  value={serviceForm.displayName}
-                  onChange={(event) =>
-                    setServiceForm((current) => ({
-                      ...current,
-                      displayName: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  value={serviceForm.description}
-                  onChange={(event) =>
-                    setServiceForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <button disabled={savingService} type="submit">
-                {savingService ? "Creating" : "Create service"}
-              </button>
-            </form>
-            </div>
-            */}
-
-          {showCreateService ? (
-            <div
-              aria-labelledby="create-service-title"
-              aria-modal="true"
-              className="modal-backdrop"
-              role="dialog"
-            >
-              <form
-                className="modal form-panel drawer-form"
-                onSubmit={handleCreateService}
-              >
-                <div className="modal-header">
-                  <h2 id="create-service-title">Create service</h2>
-                  <button
-                    aria-label="Close"
-                    className="icon-button"
-                    type="button"
-                    onClick={() => setShowCreateService(false)}
-                  >
-                    x
-                  </button>
-                </div>
-                <label>
-                  Name
-                  <input
-                    required
-                    value={serviceForm.name}
-                    onChange={(event) =>
-                      setServiceForm((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Display name
-                  <input
-                    required
-                    value={serviceForm.displayName}
-                    onChange={(event) =>
-                      setServiceForm((current) => ({
-                        ...current,
-                        displayName: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Description
-                  <textarea
-                    value={serviceForm.description}
-                    onChange={(event) =>
-                      setServiceForm((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <div className="drawer-actions">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateService(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button disabled={savingService} type="submit">
-                    {savingService ? "Creating" : "Create service"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : null}
-
-          {editingServiceId ? (
-            <div
-              aria-labelledby="edit-service-title"
-              aria-modal="true"
-              className="modal-backdrop"
-              role="dialog"
-            >
-              <form
-                className="modal form-panel drawer-form"
-                onSubmit={handleUpdateService}
-              >
-                <div className="modal-header">
-                  <div>
-                    <h2 id="edit-service-title">Edit service</h2>
-                    <span>{selectedService?.name}</span>
-                  </div>
-                  <button
-                    aria-label="Close"
-                    className="icon-button"
-                    type="button"
-                    onClick={() => setEditingServiceId("")}
-                  >
-                    x
-                  </button>
-                </div>
-                <label>
-                  Display name
-                  <input
-                    required
-                    value={serviceEditForm.displayName}
-                    onChange={(event) =>
-                      setServiceEditForm((current) => ({
-                        ...current,
-                        displayName: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  Description
-                  <textarea
-                    value={serviceEditForm.description}
-                    onChange={(event) =>
-                      setServiceEditForm((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <div className="drawer-actions">
-                  <button
-                    type="button"
-                    onClick={() => setEditingServiceId("")}
-                  >
-                    Cancel
-                  </button>
-                  <button disabled={savingService} type="submit">
-                    {savingService ? "Saving" : "Save service"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          ) : null}
-
-          {/* Legacy inline registration form consolidated into AddRuntimeDialog. */}
-          {/*
-            <div
-              aria-labelledby="add-instance-title"
-              aria-modal="true"
-              className="modal-backdrop"
-              role="dialog"
-            >
-              <form
-                className="modal form-panel drawer-form"
-                onSubmit={handleRegisterInstance}
-              >
-                <div className="modal-header">
-                  <div>
-                    <h2 id="add-instance-title">
-                      {selectedEnvironmentDeployment
-                        ? `Register service for ${selectedService!.displayName || selectedService!.name}`
-                        : "Register service"}
-                    </h2>
-                    <span>
-                      Service
-                    </span>
-                  </div>
-                  <button
-                    aria-label="Close"
-                    className="icon-button"
-                    type="button"
-                    onClick={() => setShowAddRuntime(false)}
-                  >
-                    x
-                  </button>
-                </div>
-                <div className="context-strip">
-                  <span>Service</span>
-                  <strong>{selectedService!.displayName || selectedService!.name}</strong>
-                </div>
-                <label>
-                  Environment
-                  <select
-                    required
-                    value={registrationForm.environmentId}
-                    onChange={(event) =>
-                      setRegistrationForm((current) => ({
-                        ...current,
-                        environmentId: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Select environment</option>
-                    {environments.map((environment) => (
-                      <option key={environment.id} value={environment.id}>
-                        {environment.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="form-fields-grid">
-                  <label>
-                    Name
-                    <input
-                      required
-                      data-registration-instance-name
-                      value={registrationForm.instanceName}
-                      onChange={(event) =>
-                        setRegistrationForm((current) => ({
-                          ...current,
-                          instanceName: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Address
-                    <input
-                      required
-                      value={registrationForm.address}
-                      onChange={(event) =>
-                        setRegistrationForm((current) => ({
-                          ...current,
-                          address: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-                <label>
-                  Description
-                  <input
-                    value={registrationForm.description}
-                    onChange={(event) =>
-                      setRegistrationForm((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <section className="form-section">
-                  <div className="form-section-heading">
-                    <span>Endpoint</span>
-                    <strong>Required</strong>
-                  </div>
-                  <p>A service address must have at least one endpoint.</p>
-                  <div className="form-fields-grid">
-                    <label>
-                      Name
-                      <input
-                        required
-                        value={registrationForm.endpoints[0]?.name ?? ""}
-                        onChange={(event) =>
-                          updateRegistrationEndpoint(0, {
-                            name: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Protocol
-                      <select
-                        value={
-                          registrationForm.endpoints[0]?.protocol ??
-                          "PROTOCOL_HTTP"
-                        }
-                        onChange={(event) =>
-                          updateRegistrationEndpoint(0, {
-                            protocol: event.target.value,
-                          })
-                        }
-                      >
-                        <option value="PROTOCOL_HTTP">HTTP</option>
-                        <option value="PROTOCOL_HTTPS">HTTPS</option>
-                        <option value="PROTOCOL_GRPC">gRPC</option>
-                        <option value="PROTOCOL_TCP">TCP</option>
-                        <option value="PROTOCOL_UDP">UDP</option>
-                      </select>
-                    </label>
-                    <label>
-                      Port
-                      <input
-                        max="65535"
-                        min="1"
-                        required
-                        type="number"
-                        value={registrationForm.endpoints[0]?.port ?? 8080}
-                        onChange={(event) =>
-                          updateRegistrationEndpoint(0, {
-                            port: Number(event.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Path
-                      <input
-                        value={registrationForm.endpoints[0]?.path ?? "/"}
-                        onChange={(event) =>
-                          updateRegistrationEndpoint(0, {
-                            path: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                </section>
-                <section className="form-section">
-                  <button
-                    aria-controls="health-monitoring-fields"
-                    aria-expanded={showRuntimeHealth}
-                    className="accordion-button"
-                    type="button"
-                    onClick={() => {
-                      setShowRuntimeHealth((value) => {
-                        const next = !value;
-                        setRegistrationForm((current) => ({
-                          ...current,
-                          configureHealth: next,
-                        }));
-                        return next;
-                      });
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={
-                        showRuntimeHealth
-                          ? "accordion-chevron expanded"
-                          : "accordion-chevron"
-                      }
-                    >
-                      &gt;
-                    </span>
-                    <span>Health monitoring</span>
-                    <strong>Optional</strong>
-                  </button>
-                  {showRuntimeHealth ? (
-                  <div className="form-fields-grid">
-                    <label>
-                      Check name
-                      <input
-                        value={registrationForm.healthName}
-                        onChange={(event) =>
-                          setRegistrationForm((current) => ({
-                            ...current,
-                            healthName: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      Check type
-                      <select
-                        value={registrationForm.healthType}
-                        onChange={(event) =>
-                          setRegistrationForm((current) => ({
-                            ...current,
-                            healthType: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
-                        <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
-                        <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
-                        <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
-                        <option value="HEALTH_CHECK_TYPE_UDP">UDP</option>
-                      </select>
-                    </label>
-                    <label>
-                      Interval
-                      <input
-                        min="1"
-                        type="number"
-                        value={registrationForm.healthIntervalSeconds}
-                        onChange={(event) =>
-                          setRegistrationForm((current) => ({
-                            ...current,
-                            healthIntervalSeconds: Number(event.target.value),
-                          }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      Timeout
-                      <input
-                        min="1"
-                        type="number"
-                        value={registrationForm.healthTimeoutSeconds}
-                        onChange={(event) =>
-                          setRegistrationForm((current) => ({
-                            ...current,
-                            healthTimeoutSeconds: Number(event.target.value),
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  ) : null}
-                </section>
-                <div className="drawer-actions">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddRuntime(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button disabled={savingRegistration} type="submit">
-                    {savingRegistration
-                      ? "Adding"
-                      : selectedEnvironmentDeployment
-                        ? "Register"
-                        : "Register service"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          */}
-        </section>
       ) : activeView === "environments" ? (
         <OperationalWorkspace {...operationalProps} view="environments" />
-      ) : false ? (
-        <section className="content-grid environments-grid">
-          <PageHeader
-            title="Environments"
-            context={`${environments.length} environments`}
-            description="Environment scopes used to filter services, incidents, alerts, and events."
-          />
-          <div className="panel">
-            <div className="panel-heading">
-              <h2>Environments</h2>
-              <span>
-                {loading ? "Loading" : `${environments.length} total`}
-              </span>
-            </div>
-            <div className="table">
-              {environments.map((environment) => (
-                <div className="table-row" key={environment.id}>
-                  <strong>{environment.name}</strong>
-                  <span>{environment.key}</span>
-                  <span>{environment.tier || "untiered"}</span>
-                  <StatusBadge
-                    status={environment.enabled ? "enabled" : "disabled"}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <details className="workflow-disclosure">
-            <summary>Create environment</summary>
-          <form className="panel form-panel" onSubmit={handleCreateEnvironment}>
-            <div className="panel-heading">
-              <h2>Create Environment</h2>
-            </div>
-            <label>
-              Key
-              <input
-                required
-                value={environmentForm.key}
-                onChange={(event) =>
-                  setEnvironmentForm((current) => ({
-                    ...current,
-                    key: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Name
-              <input
-                required
-                value={environmentForm.name}
-                onChange={(event) =>
-                  setEnvironmentForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Tier
-              <input
-                value={environmentForm.tier}
-                onChange={(event) =>
-                  setEnvironmentForm((current) => ({
-                    ...current,
-                    tier: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Description
-              <textarea
-                value={environmentForm.description}
-                onChange={(event) =>
-                  setEnvironmentForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <button disabled={savingEnvironment} type="submit">
-              {savingEnvironment ? "Creating" : "Create environment"}
-            </button>
-          </form>
-          </details>
-        </section>
       ) : activeView === "health" ? (
-        <HealthWorkspace
-          filteredHealthInstances={filteredHealthInstances}
-          healthStateByInstanceId={healthStateByInstanceId}
-          healthStatusFilter={healthStatusFilter}
-          setHealthStatusFilter={setHealthStatusFilter}
-          healthStates={healthStates}
-          instances={instances}
-          incidents={incidents}
-          healthChecks={healthChecks}
-          selectedEnvironmentId={selectedEnvironmentId}
+        healthResultsRoute ? <HealthResultsPage services={services} environments={environments} instances={instances} endpoints={endpoints} checks={healthChecks} deployments={deployments} onBack={()=>{
+          const serviceId=new URLSearchParams(window.location.search).get("serviceId");
+          if(serviceId){setSelectedServiceId(serviceId);setServiceTab("health");setHealthResultsRoute(false);setActiveView("services");window.history.pushState({},"",`/services/${encodeURIComponent(serviceId)}/health`)}
+          else navigateTo("health");
+        }}/> : <HealthWorkspace services={services} environments={environments} deployments={deployments} endpoints={endpoints} error={error}
+          instances={instances} healthChecks={healthChecks} healthStates={healthStates} selectedEnvironmentId={selectedEnvironmentId}
+          healthStatusFilter={healthStatusFilter} setHealthStatusFilter={setHealthStatusFilter}
+          onRun={handleRunHealthCheck} onDelete={handleDeleteHealthCheck} onSaved={()=>loadCatalog(selectedEnvironmentId)}
           loading={loading}
-          selectedHealthCheck={selectedHealthCheck}
-          selectedHealthCheckId={selectedHealthCheckId}
-          onSelectHealthCheck={handleSelectHealthCheck}
-          latestState={latestState}
-          runningHealthCheck={runningHealthCheck}
-          onRunHealthCheck={() => {
-            void handleRunHealthCheck();
-          }}
-          onEditHealthCheck={startEditHealthCheck}
-          healthResults={healthResults}
-          healthSection={healthSection}
-          setHealthSection={setHealthSection}
-          showCreateHealth={showCreateHealth}
-          setShowCreateHealth={setShowCreateHealth}
-          healthForm={healthForm}
-          setHealthForm={setHealthForm}
-          savingHealthCheck={savingHealthCheck}
-          onCreateHealthCheck={handleCreateHealthCheck}
-          formatCheckType={formatCheckType}
-          formatHealthState={formatHealthState}
-        />
-      ) : false ? (
-        <section className="content-grid">
-          <PageHeader
-            title="Health"
-            context={`${filteredHealthInstances.length} instances · ${healthChecks.filter((check) => check.enabled).length} enabled checks`}
-            description="Monitor unhealthy service instances, recent check results, and manual execution from the current environment scope."
-          />
-          <div className="panel service-wide-panel">
-            <div className="panel-heading">
-              <h2>Global Health</h2>
-              <span>{selectedEnvironmentId ? "Filtered" : "Global"}</span>
-            </div>
-            <div className="metrics-grid">
-              <MetricCard
-                label="Healthy"
-                value={
-                  healthStates.filter(
-                    (state) => state.currentState === "HEALTH_STATE_HEALTHY",
-                  ).length
-                }
-                detail={`${healthStates.length} states loaded`}
-              />
-              <MetricCard
-                label="Unhealthy"
-                value={
-                  healthStates.filter(
-                    (state) => state.currentState === "HEALTH_STATE_UNHEALTHY",
-                  ).length
-                }
-                detail={`${incidents.filter((incident) => incident.state === "INCIDENT_STATE_OPEN").length} open incidents`}
-              />
-              <MetricCard
-                label="Unknown"
-                value={Math.max(instances.length - healthStates.length, 0)}
-                detail={`${instances.length} instances`}
-              />
-              <MetricCard
-                label="Checks"
-                value={healthChecks.length}
-                detail={`${healthChecks.filter((check) => check.enabled).length} enabled`}
-              />
-            </div>
-          </div>
+          onServiceHealth={(serviceId,environmentId)=>void navigateServiceHealth(serviceId,environmentId)}
+          onInstanceResults={(instanceId,serviceId,environmentId)=>navigateHealthResults(serviceId,undefined,instanceId,environmentId)}
+          onResults={checkId=>navigateHealthResults(undefined,checkId)}/>
 
-          <div className="panel service-wide-panel">
-            <div className="panel-heading">
-              <h2>Instance health</h2>
-              <span>{filteredHealthInstances.length} shown</span>
-            </div>
-            <div className="filter-bar">
-              <label>
-                Status
-                <select
-                  value={healthStatusFilter}
-                  onChange={(event) =>
-                    setHealthStatusFilter(event.target.value)
-                  }
-                >
-                  <option value="all">All statuses</option>
-                  <option value="healthy">Healthy</option>
-                  <option value="unhealthy">Unhealthy</option>
-                  <option value="unknown">Unknown</option>
-                </select>
-              </label>
-            </div>
-            <div className="table">
-              {filteredHealthInstances.length === 0 ? (
-                <EmptyState
-                  title="No health targets"
-                      description="No instances match the selected health filter."
-                />
-              ) : (
-                filteredHealthInstances.map((instance) => {
-                  const state = healthStateByInstanceId.get(instance.id);
-                  return (
-                    <div className="instance-row" key={instance.id}>
-                      <div>
-                        <strong>{instance.name}</strong>
-                        <span>{instance.address}</span>
-                      </div>
-                      <span>
-                        {state?.currentState ? (
-                          <StatusBadge
-                            status={formatHealthState(state.currentState)}
-                          />
-                        ) : (
-                          "unknown"
-                        )}
-                      </span>
-                      <span>
-                        {state
-                          ? `${state.consecutiveSuccesses} ok / ${state.consecutiveFailures} fail`
-                          : "No checks"}
-                      </span>
-                      <span>{formatTimestamp(state?.lastCheckTime)}</span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel-heading">
-              <h2>Health Checks</h2>
-              <span>
-                {loading ? "Loading" : `${healthChecks.length} total`}
-              </span>
-            </div>
-            {healthChecks.length === 0 && !loading ? (
-              <EmptyState
-                title="No health checks"
-                description="Create a health check or register a service with monitoring enabled to start tracking state."
-              />
-            ) : (
-              <div className="service-list">
-                {healthChecks.map((check) => (
-                  <button
-                    className={
-                      check.id === selectedHealthCheckId
-                        ? "row selected"
-                        : "row"
-                    }
-                    key={check.id}
-                    onClick={() => handleSelectHealthCheck(check.id)}
-                    type="button"
-                  >
-                    <strong>{check.name}</strong>
-                    <span>
-                      {formatCheckType(check.type)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="panel detail-panel">
-            <div className="panel-heading">
-              <h2>Health Status</h2>
-              <button
-                disabled={!selectedHealthCheck || runningHealthCheck}
-                onClick={() => handleRunHealthCheck()}
-                type="button"
-              >
-                {runningHealthCheck ? "Running" : "Run check"}
-              </button>
-            </div>
-            {selectedHealthCheck ? (
-              <dl className="detail-list">
-                <dt>ID</dt>
-                <dd>{selectedHealthCheck!.id}</dd>
-                <dt>Type</dt>
-                <dd>{formatCheckType(selectedHealthCheck!.type)}</dd>
-                <dt>Interval</dt>
-                <dd>{selectedHealthCheck!.intervalSeconds}s</dd>
-                <dt>Timeout</dt>
-                <dd>{selectedHealthCheck!.timeoutSeconds}s</dd>
-                <dt>State</dt>
-                <dd>{latestState?.currentState ?? "Not loaded"}</dd>
-                <dt>Counters</dt>
-                <dd>
-                  {latestState
-                    ? `${latestState!.consecutiveSuccesses} success / ${latestState!.consecutiveFailures} failure`
-                    : "Not loaded"}
-                </dd>
-              </dl>
-            ) : (
-              <EmptyState
-                title="Select a health check"
-                description="Pick a check to inspect its configuration, counters, and recent execution results."
-              />
-            )}
-          </div>
-
-          <div className="panel">
-            <div className="panel-heading">
-              <h2>Recent Results</h2>
-              <span>{healthResults.length} shown</span>
-            </div>
-            <div className="table">
-              {healthResults.length === 0 ? (
-                <EmptyState
-                  title="No health results"
-                  description="Run this check manually or wait for scheduled execution to record a result."
-                />
-              ) : (
-                healthResults.map((result) => (
-                  <div className="health-result-row" key={result.id}>
-                    <strong>
-                      <StatusBadge
-                        status={result.success ? "healthy" : "failed"}
-                      />
-                    </strong>
-                    <span>
-                      {result.statusCode || result.errorType || "n/a"}
-                    </span>
-                    <span>{result.latencyMs ?? 0}ms</span>
-                    <span>{formatTimestamp(result.timestamp)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <form className="panel form-panel" onSubmit={handleCreateHealthCheck}>
-            <div className="panel-heading">
-              <h2>Create Health Check</h2>
-            </div>
-            <label>
-              Instance reference
-              <input
-                required
-                value={healthForm.instanceId}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    instanceId: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Endpoint reference
-              <input
-                value={healthForm.endpointId}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    endpointId: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Name
-              <input
-                required
-                value={healthForm.name}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Type
-              <select
-                value={healthForm.type}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    type: event.target.value,
-                  }))
-                }
-              >
-                <option value="HEALTH_CHECK_TYPE_HTTP">HTTP</option>
-                <option value="HEALTH_CHECK_TYPE_HTTPS">HTTPS</option>
-                <option value="HEALTH_CHECK_TYPE_TCP">TCP</option>
-                <option value="HEALTH_CHECK_TYPE_GRPC">gRPC</option>
-              </select>
-            </label>
-            <label>
-              Path
-              <input
-                value={healthForm.path}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    path: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Expected status
-              <input
-                value={healthForm.expectedStatus}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    expectedStatus: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Interval seconds
-              <input
-                min="1"
-                type="number"
-                value={healthForm.intervalSeconds}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    intervalSeconds: Number(event.target.value),
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Timeout seconds
-              <input
-                min="1"
-                type="number"
-                value={healthForm.timeoutSeconds}
-                onChange={(event) =>
-                  setHealthForm((current) => ({
-                    ...current,
-                    timeoutSeconds: Number(event.target.value),
-                  }))
-                }
-              />
-            </label>
-            <button disabled={savingHealthCheck} type="submit">
-              {savingHealthCheck ? "Creating" : "Create health check"}
-            </button>
-          </form>
-        </section>
       ) : activeView === "incidents" ? (
         <OperationalWorkspace {...operationalProps} view="incidents" />
       ) : false ? (
@@ -5527,39 +2560,13 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   );
 }
 
-function formatCheckType(value: string) {
-  return value.replace("HEALTH_CHECK_TYPE_", "").toLowerCase();
-}
 
-function formatHealthState(value: string) {
-  return value.replace("HEALTH_STATE_", "").toLowerCase();
-}
 
 function formatProtocol(value: string) {
   return value.replace("PROTOCOL_", "").toLowerCase();
 }
 
-function healthTypeForEndpoint(protocol: string) {
-  switch (protocol) {
-    case "PROTOCOL_HTTPS":
-      return "HEALTH_CHECK_TYPE_HTTPS";
-    case "PROTOCOL_GRPC":
-      return "HEALTH_CHECK_TYPE_GRPC";
-    case "PROTOCOL_TCP":
-      return "HEALTH_CHECK_TYPE_TCP";
-    case "PROTOCOL_UDP":
-      return "HEALTH_CHECK_TYPE_UDP";
-    default:
-      return "HEALTH_CHECK_TYPE_HTTP";
-  }
-}
 
-function environmentName(environments: Environment[], id: string) {
-  return (
-    environments.find((environment) => environment.id === id)?.name ??
-    `Environment ${id}`
-  );
-}
 
 function primaryEndpointForInstance(endpoints: Endpoint[], instanceId: string) {
   const instanceEndpoints = endpoints.filter(

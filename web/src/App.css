@@ -966,11 +966,6 @@ textarea::placeholder {
   grid-column: 1 / -1;
 }
 
-.health-config {
-  display: grid;
-  gap: 14px;
-}
-
 .field-needs-value select,
 .field-needs-value input {
   border-color: rgb(245 158 11 / 75%);
@@ -1090,20 +1085,6 @@ textarea::placeholder {
   gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
-}
-
-.health-result-row {
-  display: grid;
-  grid-template-columns:
-    minmax(100px, 0.8fr) minmax(80px, 0.6fr) minmax(70px, 0.5fr)
-    minmax(160px, 1fr);
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.health-result-row span {
-  color: var(--text-muted);
 }
 
 .availability-grid {
@@ -1230,24 +1211,7 @@ textarea::placeholder {
   @apply mt-4 max-w-2xl text-base leading-7 text-slate-300;
 }
 
-.hero-health-card {
-  @apply grid gap-2 rounded-md border border-cyan-300/20 bg-white/[0.06] p-5;
-}
-
-.hero-health-card span {
-  @apply text-sm font-normal text-slate-300;
-}
-
-.hero-health-card strong {
-  @apply text-5xl font-semibold text-cyan-300;
-}
-
-.hero-health-card small {
-  @apply text-sm leading-5 text-slate-300;
-}
-
 .compact-row,
-.environment-overview-row,
 .policy-row,
 .channel-row,
 .instance-row,
@@ -1261,7 +1225,6 @@ textarea::placeholder {
 }
 
 .compact-row strong,
-.environment-overview-row strong,
 .policy-row strong,
 .channel-row strong,
 .endpoint-row strong {
@@ -1280,11 +1243,6 @@ textarea::placeholder {
     );
 }
 
-.environment-overview-row {
-  grid-template-columns:
-    minmax(160px, 1fr) minmax(120px, 0.6fr) minmax(100px, 0.5fr)
-    minmax(100px, 0.5fr);
-}
 
 .policy-row {
   grid-template-columns:
@@ -1309,7 +1267,6 @@ textarea::placeholder {
 }
 
 .compact-row span,
-.environment-overview-row span,
 .policy-row span,
 .channel-row span,
 .instance-row span,
@@ -2494,54 +2451,6 @@ textarea::placeholder {
   flex-basis: 100%;
 }
 
-.runtime-health-form {
-  flex-basis: 100%;
-  display: grid;
-  gap: 16px;
-  width: 100%;
-  margin-top: 2px;
-  border-left: 2px solid color-mix(in srgb, var(--brand) 34%, var(--border));
-  border-top: 1px solid var(--border);
-  border-radius: 0 6px 6px 0;
-  padding: 14px 14px 14px 16px;
-  background: color-mix(in srgb, var(--surface-muted) 82%, transparent);
-}
-
-.runtime-health-form h5 {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.runtime-health-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  gap: 16px;
-}
-
-.runtime-health-form label {
-  display: grid;
-  gap: 7px;
-  color: var(--text);
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
-.runtime-health-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-}
-
-.runtime-health-actions button {
-  min-height: 38px;
-  padding: 8px 15px;
-}
-
 .scoped-list {
   display: grid;
   gap: 8px;
@@ -2705,20 +2614,17 @@ textarea::placeholder {
     grid-template-columns: 1fr;
   }
 
-  .health-result-row,
-  .incident-row,
-  .event-row,
-  .compact-row,
-  .environment-overview-row,
-  .policy-row,
-  .channel-row,
-  .instance-row,
-  .endpoint-row,
-  .endpoint-editor-row,
-  .inline-edit-form,
-  .runtime-health-fields,
-  .row,
-  .form-fields-grid {
+.incident-row,
+.event-row,
+.compact-row,
+.policy-row,
+.channel-row,
+.instance-row,
+.endpoint-row,
+.endpoint-editor-row,
+.inline-edit-form,
+.row,
+.form-fields-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2882,7 +2788,6 @@ button.button-sm,
 }
 
 .form-fields-grid,
-.runtime-health-fields,
 .endpoint-editor-row,
 .inline-edit-form,
 .wizard-step-content .form-fields-grid {
@@ -2906,8 +2811,7 @@ button.button-sm,
 }
 
 .form-panel label,
-.form-section label,
-.runtime-health-form label {
+.form-section label {
   min-width: 0;
 }
 
@@ -2929,8 +2833,7 @@ button.button-sm,
 .policy-row,
 .channel-row,
 .incident-row,
-.event-row,
-.health-result-row {
+.event-row {
   min-width: 0;
 }
 
@@ -2941,8 +2844,7 @@ button.button-sm,
 .policy-row > *,
 .channel-row > *,
 .incident-row > *,
-.event-row > *,
-.health-result-row > * {
+.event-row > * {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -3080,12 +2982,11 @@ button.button-sm,
     flex: 1 1 auto;
   }
 
-  .form-fields-grid,
-  .runtime-health-fields,
-  .endpoint-editor-row,
-  .inline-edit-form,
-  .modal-body .endpoint-editor-row,
-  .wizard-step-content .form-fields-grid {
+.form-fields-grid,
+.endpoint-editor-row,
+.inline-edit-form,
+.modal-body .endpoint-editor-row,
+.wizard-step-content .form-fields-grid {
     grid-template-columns: 1fr;
   }
 
@@ -3138,9 +3039,7 @@ button.button-sm,
 .service-summary-grid-new { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; }
 .compact-list-new { display: grid; gap: 8px; }
 .compact-list-new > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-.endpoint-draft-new { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-muted); }
 .endpoint-editor-section-new { display: grid; gap: 10px; }
-.endpoint-draft-new { grid-template-columns: 1.1fr .7fr 1.2fr auto auto; align-items: end; }
 .dialog-context-new { display: grid; gap: 3px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--surface-muted); }
 .form-success-new { color: var(--success); font-size: 13px; }
 .tab-trigger { min-height: 36px; flex-shrink: 0; border: 0; border-radius: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); padding: 6px 8px; cursor: pointer; }
@@ -3152,7 +3051,6 @@ button.button-sm,
 }
 @media (max-width: 700px) {
   .service-filter-pair, .form-grid-new, .service-summary-grid-new { grid-template-columns: 1fr; }
-  .endpoint-draft-new { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .service-detail-header-new { align-items: flex-start; flex-wrap: wrap; }
 }
 
@@ -3339,9 +3237,7 @@ button.button-sm,
 }
 
 .table-row,
-.health-result-row,
 .compact-row,
-.environment-overview-row,
 .policy-row,
 .channel-row,
 .instance-row,
@@ -3353,7 +3249,6 @@ button.button-sm,
 }
 
 .table-row,
-.health-result-row,
 .policy-row,
 .channel-row,
 .instance-row,
@@ -3376,8 +3271,7 @@ button.button-sm,
 
 .filter-bar label,
 .service-filter-bar label,
-.form-panel label,
-.runtime-health-form label {
+.form-panel label {
   gap: 4px;
 }
 
@@ -3498,17 +3392,15 @@ button.button-sm,
 }
 
 @media (max-width: 640px) {
-  .service-row,
-  .table-row,
-  .health-result-row,
-  .compact-row,
-  .environment-overview-row,
-  .policy-row,
-  .channel-row,
-  .instance-row,
-  .endpoint-row,
-  .incident-row,
-  .event-row {
+.service-row,
+.table-row,
+.compact-row,
+.policy-row,
+.channel-row,
+.instance-row,
+.endpoint-row,
+.incident-row,
+.event-row {
     padding-block: 9px;
   }
 
