@@ -12,6 +12,47 @@ Alauda is a self-hosted service registry and operational control plane for regis
 - PostgreSQL and SQLite-backed persistence
 - Runtime registration and service discovery workflows
 
+## Choose a Storage Provider
+
+Alauda supports SQLite for a simple single-node installation and PostgreSQL for shared or production deployments. Set both `ALAUDA_STORAGE_PROVIDER` and `ALAUDA_DATABASE_URL` explicitly in production.
+
+### SQLite
+
+SQLite is convenient for local development, evaluation, and a single Alauda instance:
+
+```sh
+docker volume create alauda-data
+docker run --name alauda \
+  -p 9700:9700 \
+  -v alauda-data:/data \
+  -e ALAUDA_STORAGE_PROVIDER=sqlite \
+  -e ALAUDA_DATABASE_URL=/data/alauda.db \
+  oamm/alauda:latest
+```
+
+The database is stored in the `alauda-data` volume. Back up that volume or the database file before upgrading or moving the installation.
+
+### PostgreSQL
+
+PostgreSQL is recommended when multiple users, replicas, or shared operational data are expected. The following example starts PostgreSQL and Alauda on the same Docker network:
+
+```sh
+docker network create alauda
+
+docker run --name alauda-postgres --network alauda -d \
+  -e POSTGRES_DB=alauda \
+  -e POSTGRES_USER=alauda \
+  -e POSTGRES_PASSWORD=change-me \
+  postgres:16-alpine
+
+docker run --name alauda --network alauda -p 9700:9700 -d \
+  -e ALAUDA_STORAGE_PROVIDER=postgres \
+  -e ALAUDA_DATABASE_URL='postgres://alauda:change-me@alauda-postgres:5432/alauda?sslmode=disable' \
+  oamm/alauda:latest
+```
+
+Use a managed PostgreSQL service or a secret manager for real deployments. Do not keep the example password in production configuration.
+
 ## Build From Source
 
 Requirements:
@@ -40,7 +81,10 @@ Build and run a local image:
 
 ```sh
 make docker-build IMAGE=alauda:local
-docker run --rm -p 9700:9700 -v "$(pwd)/data:/data" alauda:local
+docker run --rm -p 9700:9700 -v "$(pwd)/data:/data" \
+  -e ALAUDA_STORAGE_PROVIDER=sqlite \
+  -e ALAUDA_DATABASE_URL=/data/alauda.db \
+  alauda:local
 ```
 
 Start the recommended PostgreSQL development workflow with `./scripts/dev.sh` or `make dev`. To use a local SQLite file instead, run `./scripts/dev.sh --db sqlite`. Run the frontend separately with `make dev-ui` when you need the Vite development server.
@@ -92,6 +136,30 @@ On Windows PowerShell:
 ```
 
 The reset keeps the existing development database and records, revokes existing sessions, writes a new temporary password to the bootstrap credential file, and prints it in the terminal. After signing in, change the password again.
+
+## Development With Docker Compose
+
+The repository Compose file starts a PostgreSQL-backed development environment:
+
+```sh
+docker compose up --build
+```
+
+The web console is available at `http://127.0.0.1:9700`. Stop the stack with:
+
+```sh
+docker compose down
+```
+
+Add `-v` to `docker compose down` only when you intend to remove the local PostgreSQL and registry volumes.
+
+## Operational Endpoints
+
+- Web console and API: `http://127.0.0.1:9700`
+- Liveness check: `http://127.0.0.1:9700/healthz`
+- OpenAPI and API details: see [API overview](docs/API.md) and [Public API](docs/PUBLIC_API.md)
+
+The `alauda` CLI talks to the server API and does not access the database directly. Set `ALAUDA_URL` and `ALAUDA_TOKEN` when using it in automation. See the [CLI guide](docs/CLI.md).
 
 ## API and Documentation
 
