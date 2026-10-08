@@ -85,6 +85,26 @@ export type HealthCheck = {
   metadata?: Record<string, string>;
 };
 
+export type HealthCheckRecord = HealthCheck & {
+  type: string;
+  serviceId: string;
+  service: string;
+  environmentId: string;
+  environment: string;
+  instance: string;
+  address: string;
+  endpoint: string;
+  protocol: string;
+  port: number;
+  latestStatus: "healthy" | "unhealthy" | "unknown";
+  latestResultAt?: string;
+  latestDurationMs?: number | null;
+  latestStatusCode?: number | null;
+  latestError?: string;
+  path: string;
+  expectedStatus: string;
+};
+
 export type HealthResult = {
   id: string;
   healthCheckId: string;
@@ -413,7 +433,10 @@ async function connectRequest<TResponse>(
   return response.json() as Promise<TResponse>;
 }
 
-async function authenticatedFetch(input: RequestInfo | URL, init?: RequestInit) {
+async function authenticatedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) {
   const response = await fetch(input, { ...init, credentials: "include" });
   if (response.status === 401) {
     authenticationFailureHandler?.();
@@ -423,7 +446,9 @@ async function authenticatedFetch(input: RequestInfo | URL, init?: RequestInit) 
 
 export async function listEnvironments(): Promise<Environment[]> {
   return listTopologyPages<Environment>(
-    "/registry.v1.EnvironmentService/ListEnvironments", "environments", { includeDisabled: true },
+    "/registry.v1.EnvironmentService/ListEnvironments",
+    "environments",
+    { includeDisabled: true },
   );
 }
 
@@ -444,38 +469,60 @@ export async function createEnvironment(input: {
 }
 
 export async function updateEnvironment(input: {
-  id: string; name: string; tier: string; description: string;
-  enabled: boolean; tags: Record<string, string>;
+  id: string;
+  name: string;
+  tier: string;
+  description: string;
+  enabled: boolean;
+  tags: Record<string, string>;
 }): Promise<Environment> {
   const response = await connectRequest<CreateEnvironmentResponse>(
-    "/registry.v1.EnvironmentService/UpdateEnvironment", input,
+    "/registry.v1.EnvironmentService/UpdateEnvironment",
+    input,
   );
-  if (!response.environment) throw new Error("UpdateEnvironment returned no environment");
+  if (!response.environment)
+    throw new Error("UpdateEnvironment returned no environment");
   return response.environment;
 }
 
 async function listTopologyPages<T>(
-  path: string, field: string, input: Record<string, unknown> = {},
+  path: string,
+  field: string,
+  input: Record<string, unknown> = {},
 ): Promise<T[]> {
   const items: T[] = [];
   const seen = new Set<string>();
   let pageToken = "";
   do {
-    if (seen.has(pageToken)) throw new Error("The resource list could not finish loading. Try refreshing.");
+    if (seen.has(pageToken))
+      throw new Error(
+        "The resource list could not finish loading. Try refreshing.",
+      );
     seen.add(pageToken);
-    const response = await connectRequest<Record<string, unknown> & {
-      pagination?: { nextPageToken?: string };
-    }>(path, { ...input, pagination: { pageSize: 100, pageToken: pageToken || undefined } });
+    const response = await connectRequest<
+      Record<string, unknown> & {
+        pagination?: { nextPageToken?: string };
+      }
+    >(path, {
+      ...input,
+      pagination: { pageSize: 100, pageToken: pageToken || undefined },
+    });
     items.push(...((response[field] as T[] | undefined) || []));
     pageToken = response.pagination?.nextPageToken || "";
-  } while(pageToken);
+  } while (pageToken);
   return items;
 }
 
 export async function listEnvironmentTopology() {
   const [deployments, instances] = await Promise.all([
-    listTopologyPages<ServiceDeployment>("/registry.v1.DeploymentService/ListDeployments", "deployments"),
-    listTopologyPages<ServiceInstance>("/registry.v1.InstanceService/ListInstances", "instances"),
+    listTopologyPages<ServiceDeployment>(
+      "/registry.v1.DeploymentService/ListDeployments",
+      "deployments",
+    ),
+    listTopologyPages<ServiceInstance>(
+      "/registry.v1.InstanceService/ListInstances",
+      "instances",
+    ),
   ]);
   return { deployments, instances };
 }
@@ -730,6 +777,24 @@ export async function listHealthChecks(
   return response.healthChecks ?? [];
 }
 
+export async function queryHealthChecks(
+  params: URLSearchParams,
+  signal?: AbortSignal,
+): Promise<{
+  items: HealthCheckRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/health/checks?${params}`,
+    { headers: authHeaders(), signal },
+  );
+  if (!response.ok)
+    throw new Error((await response.text()) || "Unable to load health checks");
+  return response.json();
+}
+
 export async function createHealthCheck(input: {
   instanceId: string;
   endpointId: string;
@@ -815,16 +880,52 @@ export async function listHealthResults(
 }
 
 export type HealthResultRecord = {
-  id:string;timestamp:string;serviceId:string;service:string;environmentId:string;environment:string;instanceId:string;instance:string;
-  endpointId:string;endpoint:string;protocol:number;port:number;address:string;checkId:string;check:string;type:string;path:string;expectedStatus:string;
-  success:boolean;latencyMs:number|null;statusCode:number|null;errorType:string;errorMessage:string;
+  id: string;
+  timestamp: string;
+  serviceId: string;
+  service: string;
+  environmentId: string;
+  environment: string;
+  instanceId: string;
+  instance: string;
+  endpointId: string;
+  endpoint: string;
+  protocol: number;
+  port: number;
+  address: string;
+  checkId: string;
+  check: string;
+  type: string;
+  path: string;
+  expectedStatus: string;
+  success: boolean;
+  latencyMs: number | null;
+  statusCode: number | null;
+  errorType: string;
+  errorMessage: string;
 };
-export async function queryHealthResults(params:URLSearchParams, signal?:AbortSignal):Promise<{results:HealthResultRecord[];nextPageToken:string}>{
-  const response=await authenticatedFetch(`${apiBaseUrl}/api/v1/health/results?${params}`,{headers:authHeaders(),signal});
-  if(!response.ok)throw new Error((await response.text())||"Unable to query health results");
+export async function queryHealthResults(
+  params: URLSearchParams,
+  signal?: AbortSignal,
+): Promise<{ results: HealthResultRecord[]; nextPageToken: string }> {
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/health/results?${params}`,
+    { headers: authHeaders(), signal },
+  );
+  if (!response.ok)
+    throw new Error(
+      (await response.text()) || "Unable to query health results",
+    );
   const payload = await response.json();
-  if (!payload || !Array.isArray(payload.results)) throw new Error("Invalid health results response. Refresh or try again later.");
-  return { results: payload.results, nextPageToken: typeof payload.nextPageToken === "string" ? payload.nextPageToken : "" };
+  if (!payload || !Array.isArray(payload.results))
+    throw new Error(
+      "Invalid health results response. Refresh or try again later.",
+    );
+  return {
+    results: payload.results,
+    nextPageToken:
+      typeof payload.nextPageToken === "string" ? payload.nextPageToken : "",
+  };
 }
 
 export async function listIncidents(input: {
@@ -1048,9 +1149,12 @@ export async function getCurrentSession(): Promise<CurrentSessionResponse> {
 }
 
 export async function logout(): Promise<void> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/logout`, {
-    method: "POST",
-  });
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/logout`,
+    {
+      method: "POST",
+    },
+  );
   if (!response.ok && response.status !== 401) {
     throw new Error((await response.text()) || "Logout failed");
   }
@@ -1060,11 +1164,14 @@ export async function changePassword(input: {
   newPassword: string;
   confirmPassword: string;
 }): Promise<void> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(input),
-  });
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/password`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(input),
+    },
+  );
   if (!response.ok) {
     throw new Error((await response.text()) || "Password update failed");
   }
@@ -1105,9 +1212,12 @@ export async function createUser(input: {
 
 export async function listApiTokens(userId: string): Promise<ApiToken[]> {
   const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/tokens${query}`, {
-    headers: authHeaders(),
-  });
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/tokens${query}`,
+    {
+      headers: authHeaders(),
+    },
+  );
   if (!response.ok) {
     throw new Error((await response.text()) || "List tokens failed");
   }
@@ -1121,11 +1231,14 @@ export async function createApiToken(input: {
   scopes: string[];
   expiresAt?: string;
 }): Promise<CreateApiTokenResponse> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/tokens`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(input),
-  });
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/tokens`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(input),
+    },
+  );
   if (!response.ok) {
     throw new Error((await response.text()) || "Create token failed");
   }
@@ -1133,18 +1246,25 @@ export async function createApiToken(input: {
 }
 
 export async function revokeApiToken(id: string): Promise<void> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/tokens/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/tokens/${id}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    },
+  );
   if (!response.ok) {
     throw new Error((await response.text()) || "Revoke token failed");
   }
 }
 
 export async function listApplicationKeys(): Promise<ApplicationKey[]> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/application-keys`, { headers: authHeaders() });
-  if (!response.ok) throw new Error((await response.text()) || "List application keys failed");
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/application-keys`,
+    { headers: authHeaders() },
+  );
+  if (!response.ok)
+    throw new Error((await response.text()) || "List application keys failed");
   const payload = (await response.json()) as ListApplicationKeysResponse;
   return payload.keys ?? [];
 }
@@ -1155,27 +1275,38 @@ export async function createApplicationKey(input: {
   environmentIds?: string[];
   expiresAt?: string;
 }): Promise<CreateApplicationKeyResponse> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/application-keys`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) throw new Error((await response.text()) || "Create application key failed");
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/application-keys`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok)
+    throw new Error((await response.text()) || "Create application key failed");
   return response.json() as Promise<CreateApplicationKeyResponse>;
 }
 
 export async function revokeApplicationKey(id: string): Promise<void> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/application-keys/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  if (!response.ok) throw new Error((await response.text()) || "Revoke application key failed");
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/application-keys/${id}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    },
+  );
+  if (!response.ok)
+    throw new Error((await response.text()) || "Revoke application key failed");
 }
 
 export async function listSessions(): Promise<Session[]> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/sessions`, {
-    headers: authHeaders(),
-  });
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/sessions`,
+    {
+      headers: authHeaders(),
+    },
+  );
   if (!response.ok) {
     throw new Error((await response.text()) || "List sessions failed");
   }
@@ -1184,10 +1315,13 @@ export async function listSessions(): Promise<Session[]> {
 }
 
 export async function revokeSession(id: string): Promise<void> {
-  const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/sessions/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
+  const response = await authenticatedFetch(
+    `${apiBaseUrl}/api/v1/auth/sessions/${id}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(),
+    },
+  );
   if (!response.ok) {
     throw new Error((await response.text()) || "Revoke session failed");
   }

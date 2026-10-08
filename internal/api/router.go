@@ -42,6 +42,7 @@ func RegisterRoutesWithConfig(mux *http.ServeMux, db *storage.Database, cfg *con
 	RegisterConnectHandlersWithMiddleware(mux, db, secure)
 	registerEventSSE(apiMux, storage.NewEventRepository(db))
 	registerHealthResultsREST(apiMux, storage.NewHealthRepository(db))
+	registerHealthChecksREST(apiMux, storage.NewHealthRepository(db))
 	registerAlertREST(apiMux, storage.NewAlertRepository(db), alerts.NewEngine(storage.NewAlertRepository(db), nil))
 	registerAuthREST(apiMux, authHandler{service: authService, repo: authRepo, cookieName: cookieName, audit: auditRepo})
 	registerAuditREST(apiMux, auditRepo)

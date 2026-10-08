@@ -90,6 +90,7 @@ type EndpointEditForm = EndpointFormValue;
 type ServicesWorkspaceProps = {
   onHealthSaved: () => Promise<void>;
   onHealthResults: (serviceId?: string, checkId?: string) => void;
+  onHealthChecks?: (serviceId: string) => void;
   onConfigureInstance?: (instance: ServiceInstance) => void;
   loading: boolean;
   error: string;
@@ -448,6 +449,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                     onResults={(checkId) =>
                       props.onHealthResults(selectedService.id, checkId)
                     }
+                    onChecks={() => props.onHealthChecks?.(selectedService.id)}
                     checks={selectedHealthChecks}
                     states={props.healthStates}
                     instances={selectedInstances}

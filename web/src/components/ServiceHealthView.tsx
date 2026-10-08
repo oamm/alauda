@@ -49,6 +49,7 @@ type Props = {
   onDelete: (check: HealthCheck) => void;
   onInstances: () => void;
   onResults: (checkId?: string) => void;
+  onChecks?: () => void;
   showAvailability?: boolean;
 };
 
@@ -249,19 +250,26 @@ export function ServiceHealthView(props: Props) {
       <Section
         title="Health checks"
         action={
-          props.checks.length && props.instances[0] ? (
-            <Button
-              size="sm"
-              onClick={() => props.onConfigure(props.instances[0])}
-            >
-              Create health check
-            </Button>
-          ) : undefined
+          <Inline>
+            {props.checks.length > 5 && props.onChecks ? (
+              <Button size="sm" variant="link" onClick={props.onChecks}>
+                View all {props.checks.length} checks
+              </Button>
+            ) : null}
+            {props.instances[0] ? (
+              <Button
+                size="sm"
+                onClick={() => props.onConfigure(props.instances[0])}
+              >
+                Create health check
+              </Button>
+            ) : undefined}
+          </Inline>
         }
       >
         {props.checks.length ? (
           <ResourceList label="Health checks">
-            {props.checks.map((check) => {
+            {props.checks.slice(0, 5).map((check) => {
               const latest = results.find(
                 (result) => result.healthCheckId === check.id,
               );
@@ -311,6 +319,11 @@ export function ServiceHealthView(props: Props) {
                 />
               );
             })}
+            {props.checks.length > 5 && props.onChecks ? (
+              <div className="px-4 py-2 text-xs text-[var(--text-muted)]">
+                Showing 5 of {props.checks.length} checks.
+              </div>
+            ) : null}
           </ResourceList>
         ) : (
           <EmptyState

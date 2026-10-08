@@ -1550,14 +1550,14 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     >
       {loading ? <div className="status">Loading registry data...</div> : null}
 
-      {error && (
+      {error && !healthResultsRoute && (
         <div className="error" role="alert">
           {error}
         </div>
       )}
 
-      {testResult && <div className="success">{testResult}</div>}
-      {authMessage && <div className="success">{authMessage}</div>}
+      {!healthResultsRoute && testResult && <div className="success">{testResult}</div>}
+      {!healthResultsRoute && authMessage && <div className="success">{authMessage}</div>}
 
       {activeView === "dashboard" ? (
         <OperationalWorkspace {...operationalProps} view="dashboard" />
@@ -1565,6 +1565,11 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
         <ServicesWorkspace
           onHealthSaved={()=>loadCatalog(selectedEnvironmentId)}
           onHealthResults={navigateHealthResults}
+          onHealthChecks={(serviceId) => {
+            setActiveView("health");
+            setHealthResultsRoute(false);
+            window.history.pushState({}, "", `/health/checks?serviceId=${encodeURIComponent(serviceId)}`);
+          }}
           error={error}
           loading={loading}
           environments={environments}
@@ -1656,7 +1661,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       ) : activeView === "environments" ? (
         <OperationalWorkspace {...operationalProps} view="environments" />
       ) : activeView === "health" ? (
-        healthResultsRoute ? <HealthResultsPage services={services} environments={environments} instances={instances} endpoints={endpoints} checks={healthChecks} deployments={deployments} onBack={()=>{
+        healthResultsRoute ? <HealthResultsPage services={services} environments={environments} instances={instances} endpoints={endpoints} checks={healthChecks} deployments={deployments} onService={(serviceId, environmentId)=>void navigateServiceHealth(serviceId, environmentId)} onInstance={(instanceId, serviceId, environmentId)=>navigateHealthResults(serviceId, undefined, instanceId, environmentId)} onBack={()=>{
           const serviceId=new URLSearchParams(window.location.search).get("serviceId");
           if(serviceId){setSelectedServiceId(serviceId);setServiceTab("health");setHealthResultsRoute(false);setActiveView("services");window.history.pushState({},"",`/services/${encodeURIComponent(serviceId)}/health`)}
           else navigateTo("health");
