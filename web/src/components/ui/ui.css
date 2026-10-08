@@ -329,6 +329,9 @@ textarea.alauda-control:read-only {
 .alauda-filter-advanced {
   display: contents;
 }
+.alauda-filter-bar[data-disclosure="persistent"] .alauda-filter-advanced[data-expanded="false"] {
+  display: none;
+}
 .alauda-filter-bar[data-density="compact"] > .alauda-field {
   flex: 0 1 180px;
 }

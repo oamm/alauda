@@ -18,7 +18,7 @@ func registerHealthResultsREST(mux *http.ServeMux, repo *storage.HealthRepositor
 			return
 		}
 		v := r.URL.Query()
-		q := storage.HealthResultsQuery{From: v.Get("from"), To: v.Get("to"), ServiceID: v.Get("serviceId"), EnvironmentID: v.Get("environmentId"), InstanceID: v.Get("instanceId"), EndpointID: v.Get("endpointId"), CheckID: v.Get("checkId"), Type: v.Get("type"), Status: v.Get("status"), PageSize: 25}
+		q := storage.HealthResultsQuery{From: v.Get("from"), To: v.Get("to"), Search: v.Get("search"), ServiceID: v.Get("serviceId"), EnvironmentID: v.Get("environmentId"), InstanceID: v.Get("instanceId"), EndpointID: v.Get("endpointId"), CheckID: v.Get("checkId"), Type: v.Get("type"), Status: v.Get("status"), PageSize: 25}
 		var from, to time.Time
 		for _, bound := range []struct {
 			raw    string

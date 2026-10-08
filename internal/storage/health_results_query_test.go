@@ -56,6 +56,12 @@ func TestQueryHealthResultsFiltersOrderingPaginationAndContext(t *testing.T) {
 			t.Fatalf("filter %+v: %d %v", q, len(found), err)
 		}
 	}
+	for _, q := range []HealthResultsQuery{{Search: "endpoint-ready"}, {Search: "ready"}, {Search: "9090"}} {
+		found, _, err := repo.QueryHealthResults(ctx, q)
+		if err != nil || len(found) != 4 {
+			t.Fatalf("search %+v: %d %v", q, len(found), err)
+		}
+	}
 	for _, state := range []string{"healthy", "unhealthy"} {
 		found, _, err := repo.QueryHealthResults(ctx, HealthResultsQuery{Status: state})
 		if err != nil || len(found) != 2 {

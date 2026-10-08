@@ -197,11 +197,13 @@ export function FilterBar({
   collapseAfter,
   activeAdvanced = 0,
   compact = false,
+  persistentDisclosure = false,
 }: {
   children: React.ReactNode;
   collapseAfter?: number;
   activeAdvanced?: number;
   compact?: boolean;
+  persistentDisclosure?: boolean;
 }) {
   const id = useId();
   const [expanded, setExpanded] = useState(false);
@@ -210,12 +212,13 @@ export function FilterBar({
     <div
       className="alauda-filter-bar"
       data-density={compact ? "compact" : undefined}
+      data-disclosure={persistentDisclosure ? "persistent" : undefined}
     >
       {collapseAfter ? controls.slice(0, collapseAfter) : children}
       {collapseAfter ? (
         <>
           <Button
-            className="md:hidden"
+            className={persistentDisclosure ? undefined : "md:hidden"}
             variant="ghost"
             aria-controls={id}
             aria-expanded={expanded}

@@ -9,7 +9,7 @@ import (
 )
 
 type HealthResultsQuery struct {
-	From, To, ServiceID, EnvironmentID, InstanceID, EndpointID, CheckID, Type, Status string
+	From, To, Search, ServiceID, EnvironmentID, InstanceID, EndpointID, CheckID, Type, Status string
 	Port, PageSize, Offset                                                            int
 	Oldest                                                                            bool
 	AllowedEnvironmentIDs                                                             []string
@@ -51,6 +51,13 @@ func (r *HealthRepository) QueryHealthResults(ctx context.Context, q HealthResul
 		if filter.value != "" {
 			where = append(where, filter.column+" = ?")
 			args = append(args, filter.value)
+		}
+	}
+	if q.Search != "" {
+		term := "%" + strings.ToLower(q.Search) + "%"
+		where = append(where, `(LOWER(s.name) LIKE ? OR LOWER(s.display_name) LIKE ? OR LOWER(env.name) LIKE ? OR LOWER(si.name) LIKE ? OR LOWER(si.address) LIKE ? OR LOWER(e.name) LIKE ? OR LOWER(hc.name) LIKE ? OR LOWER(COALESCE(hr.error_message, '')) LIKE ? OR CAST(COALESCE(e.port, si.port) AS TEXT) LIKE ?)`)
+		for range 9 {
+			args = append(args, term)
 		}
 	}
 	if q.From != "" {
