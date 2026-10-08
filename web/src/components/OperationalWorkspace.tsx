@@ -1,4 +1,4 @@
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import { EnvironmentsWorkspace } from "./EnvironmentsWorkspace";
 import {
   AlertPolicy,
@@ -6,6 +6,7 @@ import {
   Environment,
   EventRecord,
   Incident,
+  HealthCheck,
   NotificationChannel,
   ServiceDeployment,
   ServiceInstance,
@@ -36,6 +37,7 @@ import {
   Dialog,
   DialogBody,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -88,6 +90,7 @@ type OperationalWorkspaceProps = {
     availability30d?: AvailabilitySummary;
   };
   healthChecksCount: number;
+  healthChecks: HealthCheck[];
   alertPolicies: AlertPolicy[];
   notificationChannels: NotificationChannel[];
   selectedEnvironmentId: string;
@@ -108,6 +111,7 @@ type OperationalWorkspaceProps = {
   savingChannel: boolean;
   testingChannelId: string;
   resolvingIncidentId: string;
+  incidentActionMessage?: string;
   onIncidentStateFilter: (value: string) => void;
   onIncidentSearch: (value: string) => void;
   onEventTypeFilter: (value: string) => void;
@@ -128,7 +132,8 @@ type OperationalWorkspaceProps = {
   onEditPolicy: (policy: AlertPolicy) => void;
   onEditChannel: (channel: NotificationChannel) => void;
   onTestChannel: (id: string) => void;
-  onResolveIncident: (id: string) => void;
+  onVerifyIncident: (id: string) => void;
+  onResolveIncidentManually: (id: string, note: string) => void;
   onSelectedIncident: (id: string) => void;
   onViewChange: (
     view: "environments" | "services" | "incidents" | "alerts" | "events",
@@ -349,11 +354,19 @@ function Incidents({
   onIncidentStateFilter,
   onIncidentSearch,
   onSelectedIncident,
-  onResolveIncident,
+  onVerifyIncident,
+  onResolveIncidentManually,
   resolvingIncidentId,
+  incidentActionMessage,
+  services,
+  environments,
+  instances,
+  healthChecks,
   onSelectService,
   onViewChange,
 }: OperationalWorkspaceProps) {
+  const [manualIncident, setManualIncident] = useState<Incident>();
+  const [manualNote, setManualNote] = useState("");
   const open = incidents.filter(
     (incident) => incident.state === "INCIDENT_STATE_OPEN",
   ).length;
@@ -363,6 +376,11 @@ function Incidents({
         title="Incidents"
         description={`${open} open incidents require attention in the current environment scope.`}
       />
+      {incidentActionMessage ? (
+        <div className="text-sm text-[var(--text-muted)]" role="status">
+          {incidentActionMessage}
+        </div>
+      ) : null}
       <Card>
         <FilterBar>
           <label className={fieldClass}>
@@ -407,72 +425,106 @@ function Incidents({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredIncidents.map((incident) => (
-                <TableRow key={incident.id}>
-                  <TableCell>
-                    <StatusBadge
-                      status={incident.state
-                        .replace("INCIDENT_STATE_", "")
-                        .toLowerCase()}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <strong className="font-medium">
-                      {incident.reason || "No reason recorded"}
-                    </strong>
-                    <div className={muted}>
-                      {incident.impactSummary || "Impact not recorded"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => {
-                        onSelectService(incident.serviceId);
-                        onViewChange("services");
-                      }}
-                    >
-                      {incident.serviceId || incident.instanceId}
-                    </Button>
-                  </TableCell>
-                  <TableCell className={muted}>
-                    {incident.environmentId}
-                  </TableCell>
-                  <TableCell className={muted}>
-                    {formatTimestamp(incident.openedAt)}
-                  </TableCell>
-                  <TableCell className={muted}>
-                    {incident.resolvedAt
-                      ? formatDuration(incident.durationSeconds)
-                      : "Open"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
+              {filteredIncidents.map((incident) => {
+                const canVerify = Boolean(
+                  incident.metadata?.health_check_id &&
+                  healthChecks.some(
+                    (check) =>
+                      check.id === incident.metadata?.health_check_id &&
+                      check.enabled,
+                  ),
+                );
+                return (
+                  <TableRow key={incident.id}>
+                    <TableCell>
+                      <StatusBadge
+                        status={incident.state
+                          .replace("INCIDENT_STATE_", "")
+                          .toLowerCase()}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <strong className="font-medium">
+                        {incident.reason || "No reason recorded"}
+                      </strong>
+                      <div className={muted}>
+                        {incident.impactSummary || "Impact not recorded"}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <Button
+                        variant="link"
                         size="sm"
-                        variant="ghost"
-                        onClick={() => onSelectedIncident(incident.id)}
+                        onClick={() => {
+                          onSelectService(incident.serviceId);
+                          onViewChange("services");
+                        }}
                       >
-                        Details
+                        {services.find(
+                          (service) => service.id === incident.serviceId,
+                        )?.displayName ||
+                          services.find(
+                            (service) => service.id === incident.serviceId,
+                          )?.name ||
+                          incident.serviceId ||
+                          incident.instanceId}
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={
-                          incident.state !== "INCIDENT_STATE_OPEN" ||
-                          resolvingIncidentId === incident.id
-                        }
-                        onClick={() => onResolveIncident(incident.id)}
-                      >
-                        {resolvingIncidentId === incident.id
-                          ? "Resolving"
-                          : "Resolve"}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className={muted}>
+                      {environments.find(
+                        (environment) =>
+                          environment.id === incident.environmentId,
+                      )?.name || incident.environmentId}
+                    </TableCell>
+                    <TableCell className={muted}>
+                      {formatTimestamp(incident.openedAt)}
+                    </TableCell>
+                    <TableCell className={muted}>
+                      {incident.resolvedAt
+                        ? formatDuration(incident.durationSeconds)
+                        : "Open"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onSelectedIncident(incident.id)}
+                        >
+                          Details
+                        </Button>
+                        {incident.state === "INCIDENT_STATE_OPEN" ? (
+                          <>
+                            {canVerify ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={resolvingIncidentId === incident.id}
+                                onClick={() => onVerifyIncident(incident.id)}
+                              >
+                                {resolvingIncidentId === incident.id
+                                  ? "Checking..."
+                                  : "Verify recovery"}
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={resolvingIncidentId === incident.id}
+                              onClick={() => {
+                                setManualIncident(incident);
+                                setManualNote("");
+                              }}
+                            >
+                              Resolve manually
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -513,18 +565,141 @@ function Incidents({
                       onViewChange("services");
                     }}
                   >
-                    {selectedIncident.serviceId}
+                    {services.find(
+                      (service) => service.id === selectedIncident.serviceId,
+                    )?.displayName ||
+                      services.find(
+                        (service) => service.id === selectedIncident.serviceId,
+                      )?.name ||
+                      selectedIncident.serviceId}
                   </Button>
                 </dd>
+                <dt className={muted}>Environment</dt>
+                <dd>
+                  {environments.find(
+                    (environment) =>
+                      environment.id === selectedIncident.environmentId,
+                  )?.name || selectedIncident.environmentId}
+                </dd>
                 <dt className={muted}>Instance</dt>
-                <dd>{selectedIncident.instanceId}</dd>
+                <dd>
+                  {instances.find(
+                    (instance) => instance.id === selectedIncident.instanceId,
+                  )?.name || selectedIncident.instanceId}
+                </dd>
+                <dt className={muted}>Health Check</dt>
+                <dd>
+                  {healthChecks.find(
+                    (check) =>
+                      check.id === selectedIncident.metadata?.health_check_id,
+                  )?.name ||
+                    (selectedIncident.metadata?.health_check_id
+                      ? "Health Check"
+                      : "Not verifiable")}
+                </dd>
                 <dt className={muted}>Opened</dt>
                 <dd>{formatTimestamp(selectedIncident.openedAt)}</dd>
                 <dt className={muted}>Resolved</dt>
                 <dd>{formatTimestamp(selectedIncident.resolvedAt)}</dd>
+                {selectedIncident.resolutionMethod ? (
+                  <>
+                    <dt className={muted}>Resolution method</dt>
+                    <dd>{selectedIncident.resolutionMethod}</dd>
+                    <dt className={muted}>Resolution note</dt>
+                    <dd>{selectedIncident.resolutionNote || "None"}</dd>
+                    <dt className={muted}>Resolved by</dt>
+                    <dd>{selectedIncident.resolvedBy || "None"}</dd>
+                    <dt className={muted}>Evidence</dt>
+                    <dd>
+                      {selectedIncident.resolutionEvidenceHealthResultId
+                        ? `${healthChecks.find((check) => check.id === selectedIncident.metadata?.health_check_id)?.name || "Health Check"} succeeded`
+                        : "None"}
+                    </dd>
+                  </>
+                ) : null}
               </dl>
             </DialogBody>
           ) : null}
+          {selectedIncident?.state === "INCIDENT_STATE_OPEN" ? (
+            <DialogFooter>
+              {selectedIncident.metadata?.health_check_id &&
+              healthChecks.some(
+                (check) =>
+                  check.id === selectedIncident.metadata?.health_check_id &&
+                  check.enabled,
+              ) ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={resolvingIncidentId === selectedIncident.id}
+                  onClick={() => onVerifyIncident(selectedIncident.id)}
+                >
+                  {resolvingIncidentId === selectedIncident.id
+                    ? "Checking..."
+                    : "Verify recovery"}
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={resolvingIncidentId === selectedIncident.id}
+                onClick={() => {
+                  setManualIncident(selectedIncident);
+                  setManualNote("");
+                }}
+              >
+                Resolve manually
+              </Button>
+            </DialogFooter>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(manualIncident)}
+        onOpenChange={(open) => {
+          if (!open) setManualIncident(undefined);
+        }}
+      >
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Resolve incident manually</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <p className="m-0 text-sm text-[var(--text-muted)]">
+              The original condition has not been verified as recovered.
+            </p>
+            <FormField label="Reason / note">
+              <Textarea
+                value={manualNote}
+                onChange={(event) => setManualNote(event.target.value)}
+                placeholder="Describe why this incident is being closed manually"
+                rows={4}
+              />
+            </FormField>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setManualIncident(undefined)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={
+                !manualNote.trim() || resolvingIncidentId === manualIncident?.id
+              }
+              onClick={() => {
+                if (!manualIncident) return;
+                onResolveIncidentManually(manualIncident.id, manualNote.trim());
+                setManualIncident(undefined);
+              }}
+            >
+              {manualIncident && resolvingIncidentId === manualIncident.id
+                ? "Resolving..."
+                : "Resolve manually"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

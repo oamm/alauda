@@ -138,6 +138,10 @@ export type Incident = {
   reason: string;
   impactSummary?: string;
   metadata?: Record<string, string>;
+  resolutionMethod?: string;
+  resolutionNote?: string;
+  resolutionEvidenceHealthResultId?: string;
+  resolvedBy?: string;
 };
 
 export type AvailabilitySummary = {
@@ -335,7 +339,15 @@ type ListIncidentsResponse = {
   incidents?: Incident[];
 };
 
-type ResolveIncidentResponse = {
+type VerifyIncidentRecoveryResponse = {
+  incident?: Incident;
+  recovered?: boolean;
+  checkedAt?: string;
+  result?: HealthResult;
+  reason?: string;
+};
+
+type ResolveIncidentManuallyResponse = {
   incident?: Incident;
 };
 
@@ -945,13 +957,35 @@ export async function listIncidents(input: {
   return response.incidents ?? [];
 }
 
-export async function resolveIncident(id: string): Promise<Incident> {
-  const response = await connectRequest<ResolveIncidentResponse>(
-    "/registry.v1.IncidentService/ResolveIncident",
-    { id, reason: "resolved from UI" },
+export async function verifyIncidentRecovery(id: string): Promise<{
+  incident: Incident;
+  recovered: boolean;
+  reason?: string;
+}> {
+  const response = await connectRequest<VerifyIncidentRecoveryResponse>(
+    "/registry.v1.IncidentService/VerifyIncidentRecovery",
+    { id },
   );
   if (!response.incident) {
-    throw new Error("ResolveIncident returned no incident");
+    throw new Error("VerifyIncidentRecovery returned no incident");
+  }
+  return {
+    incident: response.incident,
+    recovered: response.recovered === true,
+    reason: response.reason,
+  };
+}
+
+export async function resolveIncidentManually(
+  id: string,
+  note: string,
+): Promise<Incident> {
+  const response = await connectRequest<ResolveIncidentManuallyResponse>(
+    "/registry.v1.IncidentService/ResolveIncidentManually",
+    { id, note },
+  );
+  if (!response.incident) {
+    throw new Error("ResolveIncidentManually returned no incident");
   }
   return response.incident;
 }

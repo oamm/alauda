@@ -830,3 +830,12 @@ Status: AUDITED -> DESIGNED -> IN PROGRESS -> MIGRATED -> VERIFIED within the re
 - StatusBadge and FilterChip use a compact 28px geometry with shared text, padding, radius and icon spacing. Filter chips truncate long values and expose a 20px close hit area.
 - FilterBar uses shared 12px gaps, shared field-label rhythm and bottom alignment for controls. More filters is a standard compact Button with the sliders icon; Clear all uses the same ghost-button family as its surrounding controls.
 - Health Results keeps the shared PageHeader action treatment, grouped target table alignment and middle-aligned row actions. No page-specific control-sizing CSS is permitted; page-specific CSS may only describe content layout.
+
+## Incident Lifecycle and Resolution Semantics
+
+- Incident resolution is no longer a generic `Resolve` mutation. Open incidents with an originating `metadata.health_check_id` expose `Verify recovery`, which executes that check again, persists the new Health Result and resolves the incident only when the result is healthy.
+- A failed verification is an operational outcome: the incident remains Open and the UI reports `Condition still present` with the latest failure reason. Incidents without a verifiable originating Health Check do not expose Verify recovery.
+- `Resolve manually` is a separate confirmed administrative action requiring a note. It records `ManualOverride`, the note and the operator event; it does not reuse the verification handler.
+- Scheduled recovery continues to resolve active incidents after the health state recovers, recording `AutoRecovered` and the successful Health Result as evidence. Conditional incident updates and one resolution event per open-to-resolved transition provide idempotency across scheduled and user-triggered work.
+- Incident records now persist `resolution_method`, `resolution_note`, `resolved_by` and `resolution_evidence_health_result_id`. The explicit API operations are `VerifyIncidentRecovery` and `ResolveIncidentManually`; the legacy ambiguous Resolve RPC was removed.
+- Incident list default state is Open. Open rows offer Verify recovery when supported, Resolve manually and Details. Resolved rows offer Details only and show resolution method, note and evidence in the detail dialog. Service, environment and instance names are preferred over internal IDs in the list/detail presentation.

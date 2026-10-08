@@ -1,5 +1,6 @@
 export function mockResponse(path: string, init?: RequestInit) {
-  if (path.includes("/api/v1/health/results")) return { results: [], nextPageToken: "" };
+  if (path.includes("/api/v1/health/results"))
+    return { results: [], nextPageToken: "" };
   if (
     path.includes("CreateHealthCheck") ||
     path.includes("UpdateHealthCheck")
@@ -164,6 +165,40 @@ export function mockResponse(path: string, init?: RequestInit) {
       ],
     };
   }
+  if (path.includes("VerifyIncidentRecovery")) {
+    return {
+      recovered: true,
+      checkedAt: "2026-08-12T12:05:00Z",
+      result: {
+        id: "result-recovery",
+        healthCheckId: "hc-1",
+        instanceId: "inst-1",
+        success: true,
+      },
+      incident: {
+        id: "inc-1",
+        instanceId: "inst-1",
+        deploymentId: "dep-1",
+        environmentId: "env-1",
+        serviceId: "svc-1",
+        state: "INCIDENT_STATE_RESOLVED",
+        openedAt: "2026-08-12T12:00:00Z",
+        resolvedAt: "2026-08-12T12:05:00Z",
+        resolutionMethod: "VerifiedRecovery",
+        resolutionEvidenceHealthResultId: "result-recovery",
+        reason: "health check failed",
+      },
+    };
+  }
+  if (path.includes("ResolveIncidentManually")) {
+    return {
+      incident: {
+        id: "inc-1",
+        state: "INCIDENT_STATE_RESOLVED",
+        resolutionMethod: "ManualOverride",
+      },
+    };
+  }
   if (path.includes("ListIncidents")) {
     return {
       incidents: [
@@ -176,6 +211,7 @@ export function mockResponse(path: string, init?: RequestInit) {
           state: "INCIDENT_STATE_OPEN",
           openedAt: "2026-08-12T12:00:00Z",
           reason: "health check failed",
+          metadata: { health_check_id: "hc-1" },
         },
       ],
     };

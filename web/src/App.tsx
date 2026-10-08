@@ -1,10 +1,21 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import "./App.css";
-import { newEndpoint, validateEndpoint, validateEndpointCollection, type EndpointFormValue } from "./lib/endpoint-form";
+import {
+  newEndpoint,
+  validateEndpoint,
+  validateEndpointCollection,
+  type EndpointFormValue,
+} from "./lib/endpoint-form";
 import "./components/ui/ui.css";
 import { AppShell } from "./components/AppShell";
-import { FormField, Input, PasswordInput, Alert, Button as FormButton } from "./components/ui";
+import {
+  FormField,
+  Input,
+  PasswordInput,
+  Alert,
+  Button as FormButton,
+} from "./components/ui";
 import { AvailabilityCard, MetricCard } from "./components/Cards";
 import {
   EmptyState,
@@ -73,11 +84,12 @@ import {
   login,
   logout,
   registerRuntime,
-  resolveIncident,
+  resolveIncidentManually,
   revokeApiToken,
   revokeApplicationKey,
   revokeSession,
   runHealthCheck,
+  verifyIncidentRecovery,
   Service,
   setBearerToken,
   setAuthenticationFailureHandler,
@@ -91,7 +103,8 @@ import {
 } from "./api";
 
 function endpointMutationError(error: unknown, name: string): string {
-  const message = error instanceof Error ? error.message : "Failed to update endpoint";
+  const message =
+    error instanceof Error ? error.message : "Failed to update endpoint";
   try {
     const response = JSON.parse(message);
     if (response?.code === "already_exists") {
@@ -111,7 +124,9 @@ function newRegistrationEndpoint(overrides: Partial<EndpointFormValue> = {}) {
 function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const initialPath = parseApplicationPath(window.location.pathname);
   const [activeView, setActiveView] = useState<ActiveView>(initialPath.view);
-  const [healthResultsRoute,setHealthResultsRoute] = useState(window.location.pathname === "/health/results");
+  const [healthResultsRoute, setHealthResultsRoute] = useState(
+    window.location.pathname === "/health/results",
+  );
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [deployments, setDeployments] = useState<ServiceDeployment[]>([]);
@@ -140,13 +155,20 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     availability30d?: AvailabilitySummary;
   }>({});
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState("");
-  const [selectedServiceId, setSelectedServiceId] = useState(initialPath.serviceId);
+  const [selectedServiceId, setSelectedServiceId] = useState(
+    initialPath.serviceId,
+  );
   const [serviceSearch, setServiceSearch] = useState("");
   const [serviceHealthFilter, setServiceHealthFilter] = useState("all");
   const [serviceTagFilter, setServiceTagFilter] = useState("");
   const [servicePage, setServicePage] = useState(1);
   const [serviceTab, setServiceTab] = useState<
-    "overview" | "instances" | "availability" | "health" | "incidents" | "events"
+    | "overview"
+    | "instances"
+    | "availability"
+    | "health"
+    | "incidents"
+    | "events"
   >(initialPath.serviceTab);
   const [showCreateService, setShowCreateService] = useState(false);
   const [showAddRuntime, setShowAddRuntime] = useState(false);
@@ -154,7 +176,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [selectedBulkServiceIds, setSelectedBulkServiceIds] = useState<
     string[]
   >([]);
-  const [incidentStateFilter, setIncidentStateFilter] = useState("all");
+  const [incidentStateFilter, setIncidentStateFilter] = useState("open");
   const [incidentSearch, setIncidentSearch] = useState("");
   const [selectedIncidentId, setSelectedIncidentId] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
@@ -170,7 +192,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [securitySection, setSecuritySection] = useState<
     "users" | "tokens" | "applicationKeys" | "sessions"
   >("users");
-  const [showCreateApplicationKey, setShowCreateApplicationKey] = useState(false);
+  const [showCreateApplicationKey, setShowCreateApplicationKey] =
+    useState(false);
   const [applicationKeySecret, setApplicationKeySecret] = useState("");
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showCreateApiToken, setShowCreateApiToken] = useState(false);
@@ -187,6 +210,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [bulkActionRunning, setBulkActionRunning] = useState(false);
   const [resolvingIncidentId, setResolvingIncidentId] = useState("");
+  const [incidentActionMessage, setIncidentActionMessage] = useState("");
   const [testingChannelId, setTestingChannelId] = useState("");
   const [testResult, setTestResult] = useState("");
   const [authToken] = useState("");
@@ -274,7 +298,8 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }, [authToken]);
 
   useEffect(() => {
-    if (!showCreateApplicationKey && !showCreateUser && !showCreateApiToken) return;
+    if (!showCreateApplicationKey && !showCreateUser && !showCreateApiToken)
+      return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         closeApplicationKeyFlow();
@@ -586,29 +611,62 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }, []);
 
   useEffect(() => {
-    const nextPath = activeView === "health" && healthResultsRoute ? "/health/results" : applicationPath(activeView, selectedServiceId, serviceTab);
+    const nextPath =
+      activeView === "health" && healthResultsRoute
+        ? "/health/results"
+        : applicationPath(activeView, selectedServiceId, serviceTab);
     if (window.location.pathname !== nextPath) {
       window.history.replaceState({}, "", nextPath);
     }
   }, [activeView, selectedServiceId, serviceTab, healthResultsRoute]);
 
-  function navigateHealthResults(serviceId?:string,checkId?:string,instanceId?:string,environmentId=selectedEnvironmentId) {
-    const params=new URLSearchParams();if(serviceId)params.set("serviceId",serviceId);if(checkId)params.set("checkId",checkId);if(instanceId)params.set("instanceId",instanceId);if(environmentId)params.set("environmentId",environmentId);
-    setActiveView("health");setHealthResultsRoute(true);window.history.pushState({},"",`/health/results${params.size?`?${params}`:""}`);
+  function navigateHealthResults(
+    serviceId?: string,
+    checkId?: string,
+    instanceId?: string,
+    environmentId = selectedEnvironmentId,
+  ) {
+    const params = new URLSearchParams();
+    if (serviceId) params.set("serviceId", serviceId);
+    if (checkId) params.set("checkId", checkId);
+    if (instanceId) params.set("instanceId", instanceId);
+    if (environmentId) params.set("environmentId", environmentId);
+    setActiveView("health");
+    setHealthResultsRoute(true);
+    window.history.pushState(
+      {},
+      "",
+      `/health/results${params.size ? `?${params}` : ""}`,
+    );
   }
   function navigateTo(view: ActiveView) {
     setHealthResultsRoute(false);
     setActiveView(view);
-    const nextPath = applicationPath(view, view === "services" ? selectedServiceId : "", serviceTab);
+    const nextPath = applicationPath(
+      view,
+      view === "services" ? selectedServiceId : "",
+      serviceTab,
+    );
     if (window.location.pathname !== nextPath) {
       window.history.pushState({}, "", nextPath);
     }
   }
 
-  async function navigateServiceHealth(serviceId:string,environmentId:string) {
-    if(environmentId!==selectedEnvironmentId)await handleEnvironmentChange(environmentId);
-    setSelectedServiceId(serviceId);setServiceTab("health");setHealthResultsRoute(false);setActiveView("services");
-    window.history.pushState({},"",`/services/${encodeURIComponent(serviceId)}/health`);
+  async function navigateServiceHealth(
+    serviceId: string,
+    environmentId: string,
+  ) {
+    if (environmentId !== selectedEnvironmentId)
+      await handleEnvironmentChange(environmentId);
+    setSelectedServiceId(serviceId);
+    setServiceTab("health");
+    setHealthResultsRoute(false);
+    setActiveView("services");
+    window.history.pushState(
+      {},
+      "",
+      `/services/${encodeURIComponent(serviceId)}/health`,
+    );
   }
 
   useEffect(() => {
@@ -722,13 +780,20 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     setAuthMessage("");
     try {
       const expiresIn = Number(applicationKeyForm.expiresInHours);
-      const expiresAt = Number.isFinite(expiresIn) && expiresIn > 0
-        ? new Date(Date.now() + expiresIn * 60 * 60 * 1000).toISOString()
-        : undefined;
+      const expiresAt =
+        Number.isFinite(expiresIn) && expiresIn > 0
+          ? new Date(Date.now() + expiresIn * 60 * 60 * 1000).toISOString()
+          : undefined;
       const response = await createApplicationKey({
         name: applicationKeyForm.name,
-        scopes: applicationKeyForm.scopes.split(",").map((scope) => scope.trim()).filter(Boolean),
-        environmentIds: applicationKeyForm.environmentIds.split(",").map((id) => id.trim()).filter(Boolean),
+        scopes: applicationKeyForm.scopes
+          .split(",")
+          .map((scope) => scope.trim())
+          .filter(Boolean),
+        environmentIds: applicationKeyForm.environmentIds
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean),
         expiresAt,
       });
       setApplicationKeyForm((current) => ({ ...current, name: "" }));
@@ -736,14 +801,21 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       setAuthMessage("Application key created.");
       setApplicationKeys(await listApplicationKeys());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create application key");
+      setError(
+        err instanceof Error ? err.message : "Failed to create application key",
+      );
     }
   }
 
   function closeApplicationKeyFlow() {
     setShowCreateApplicationKey(false);
     setApplicationKeySecret("");
-    setApplicationKeyForm({ name: "", scopes: "read", environmentIds: "", expiresInHours: "720" });
+    setApplicationKeyForm({
+      name: "",
+      scopes: "read",
+      environmentIds: "",
+      expiresInHours: "720",
+    });
   }
 
   async function copyApplicationKey() {
@@ -760,7 +832,9 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       setAuthMessage("Application key revoked.");
       setApplicationKeys(await listApplicationKeys());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke application key");
+      setError(
+        err instanceof Error ? err.message : "Failed to revoke application key",
+      );
     }
   }
 
@@ -781,7 +855,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       setSavingService(false);
     }
   }
-
 
   async function handleUpdateService(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -836,8 +909,11 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     setRegistrationForm((current) => ({
       ...current,
       endpoints: current.endpoints.map((endpoint, endpointIndex) =>
-        endpointIndex === index ? { ...endpoint, ...updates } :
-          updates.primary ? { ...endpoint, primary: false } : endpoint,
+        endpointIndex === index
+          ? { ...endpoint, ...updates }
+          : updates.primary
+            ? { ...endpoint, primary: false }
+            : endpoint,
       ),
     }));
   }
@@ -847,7 +923,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       ...current,
       endpoints: [
         ...current.endpoints,
-        newEndpoint(current.endpoints.map(endpoint => endpoint.name.trim())),
+        newEndpoint(current.endpoints.map((endpoint) => endpoint.name.trim())),
       ],
     }));
   }
@@ -905,12 +981,16 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   }
 
   function startAddEndpoint(instance: ServiceInstance) {
-    const names = endpoints.filter(endpoint => endpoint.instanceId === instance.id).map(endpoint => endpoint.name);
+    const names = endpoints
+      .filter((endpoint) => endpoint.instanceId === instance.id)
+      .map((endpoint) => endpoint.name);
     setEditingEndpointId("");
     setAddingEndpointInstanceId(instance.id);
-    setEndpointEditForm(newEndpoint(names, {
-      port: primaryEndpointForInstance(endpoints, instance.id)?.port || 8080,
-    }));
+    setEndpointEditForm(
+      newEndpoint(names, {
+        port: primaryEndpointForInstance(endpoints, instance.id)?.port || 8080,
+      }),
+    );
   }
 
   async function handleUpdateInstance(event: FormEvent<HTMLFormElement>) {
@@ -987,7 +1067,16 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     );
     const name = endpointEditForm.name.trim();
     const instanceId = addingEndpointInstanceId || current?.instanceId;
-    const validation = validateEndpoint(endpointEditForm, endpoints.filter(endpoint => endpoint.instanceId === instanceId && endpoint.id !== editingEndpointId).map(endpoint => endpoint.name));
+    const validation = validateEndpoint(
+      endpointEditForm,
+      endpoints
+        .filter(
+          (endpoint) =>
+            endpoint.instanceId === instanceId &&
+            endpoint.id !== editingEndpointId,
+        )
+        .map((endpoint) => endpoint.name),
+    );
     if (Object.keys(validation).length) {
       setError(Object.values(validation)[0] || "Check endpoint details.");
       return;
@@ -1022,9 +1111,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       setAddingEndpointInstanceId("");
       await loadCatalog(selectedEnvironmentId);
     } catch (err) {
-      setError(
-        endpointMutationError(err, name),
-      );
+      setError(endpointMutationError(err, name));
     } finally {
       setSavingRuntimeEdit(false);
     }
@@ -1033,8 +1120,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   function startEditHealthCheck(check: HealthCheck) {
     setEditingHealthCheckId(check.id);
   }
-
-
 
   async function handleDeleteHealthCheck(check: HealthCheck) {
     const confirmed = window.confirm(`Delete health check ${check.name}?`);
@@ -1088,12 +1173,18 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     if (!serviceId) {
       return;
     }
-    const endpointErrors = validateEndpointCollection(registrationForm.endpoints);
-    if (!registrationForm.environmentId || !registrationForm.instanceName.trim() || !registrationForm.address.trim()) {
+    const endpointErrors = validateEndpointCollection(
+      registrationForm.endpoints,
+    );
+    if (
+      !registrationForm.environmentId ||
+      !registrationForm.instanceName.trim() ||
+      !registrationForm.address.trim()
+    ) {
       setError("Choose an environment and enter instance details.");
       return;
     }
-    if (endpointErrors.some(errors => Object.keys(errors).length)) {
+    if (endpointErrors.some((errors) => Object.keys(errors).length)) {
       setError("Check the endpoint fields before adding this instance.");
       return;
     }
@@ -1152,7 +1243,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       setSavingRegistration(false);
     }
   }
-
 
   function closeRuntimeDialog() {
     setShowAddRuntime(false);
@@ -1216,8 +1306,6 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     );
   }
 
-
-
   async function handleRunHealthCheck(id: string) {
     if (!id) {
       return;
@@ -1227,7 +1315,10 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       const response = await runHealthCheck(id);
       if (response.state) {
         const state = response.state;
-        setHealthStates(current => [...current.filter(item => item.instanceId !== state.instanceId), state]);
+        setHealthStates((current) => [
+          ...current.filter((item) => item.instanceId !== state.instanceId),
+          state,
+        ]);
       }
     } catch (err) {
       setError(
@@ -1236,16 +1327,40 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     }
   }
 
-
-  async function handleResolveIncident(id: string) {
+  async function handleVerifyIncident(id: string) {
     setResolvingIncidentId(id);
     setError("");
+    setIncidentActionMessage("");
     try {
-      await resolveIncident(id);
+      const response = await verifyIncidentRecovery(id);
       await loadOperationalData(selectedEnvironmentId);
+      setIncidentActionMessage(
+        response.recovered
+          ? "Recovery verified. The Incident has been resolved."
+          : `Condition still present. ${response.reason || "The latest verification failed."}`,
+      );
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to resolve incident",
+        err instanceof Error ? err.message : "Failed to verify recovery",
+      );
+    } finally {
+      setResolvingIncidentId("");
+    }
+  }
+
+  async function handleResolveIncidentManually(id: string, note: string) {
+    setResolvingIncidentId(id);
+    setError("");
+    setIncidentActionMessage("");
+    try {
+      await resolveIncidentManually(id, note);
+      await loadOperationalData(selectedEnvironmentId);
+      setIncidentActionMessage("Incident resolved manually.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to resolve incident manually",
       );
     } finally {
       setResolvingIncidentId("");
@@ -1473,6 +1588,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     filteredEvents,
     availability,
     healthChecksCount: healthChecks.length,
+    healthChecks,
     alertPolicies,
     notificationChannels,
     selectedEnvironmentId,
@@ -1493,18 +1609,19 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     savingChannel,
     testingChannelId,
     resolvingIncidentId,
+    incidentActionMessage,
     onIncidentStateFilter: setIncidentStateFilter,
     onIncidentSearch: setIncidentSearch,
     onEventTypeFilter: setEventTypeFilter,
     onEventResourceFilter: setEventResourceFilter,
     onEventSearch: setEventSearch,
     onAlertsSection: setAlertsSection,
-    onEnvironmentSaved: async (environment:Environment,created:boolean) => {
-      const scope=created?environment.id:selectedEnvironmentId;
-      if(created)setSelectedEnvironmentId(scope);
+    onEnvironmentSaved: async (environment: Environment, created: boolean) => {
+      const scope = created ? environment.id : selectedEnvironmentId;
+      if (created) setSelectedEnvironmentId(scope);
       await loadCatalog(scope);
     },
-    onViewEnvironmentServices: async (environmentId:string) => {
+    onViewEnvironmentServices: async (environmentId: string) => {
       await handleEnvironmentChange(environmentId);
       navigateTo("services");
     },
@@ -1516,10 +1633,19 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     onCancelChannel: cancelChannelEdit,
     onEditPolicy: editPolicy,
     onEditChannel: editChannel,
-    onTestChannel: (id: string) => { void handleTestChannel(id); },
-    onResolveIncident: (id: string) => { void handleResolveIncident(id); },
+    onTestChannel: (id: string) => {
+      void handleTestChannel(id);
+    },
+    onVerifyIncident: (id: string) => {
+      void handleVerifyIncident(id);
+    },
+    onResolveIncidentManually: (id: string, note: string) => {
+      void handleResolveIncidentManually(id, note);
+    },
     onSelectedIncident: setSelectedIncidentId,
-    onViewChange: (view: "environments" | "services" | "incidents" | "alerts" | "events") => navigateTo(view),
+    onViewChange: (
+      view: "environments" | "services" | "incidents" | "alerts" | "events",
+    ) => navigateTo(view),
     onSelectService: setSelectedServiceId,
   };
 
@@ -1534,14 +1660,14 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       selectedEnvironmentId={selectedEnvironmentId}
       onEnvironmentChange={handleEnvironmentChange}
       onRefresh={() => loadCatalog()}
-      onLogout={() => { void handleLogout(); }}
+      onLogout={() => {
+        void handleLogout();
+      }}
       onSecurityOpen={() => {
         navigateTo("security");
         loadSecurityData().catch((err: unknown) =>
           setError(
-            err instanceof Error
-              ? err.message
-              : "Failed to load security data",
+            err instanceof Error ? err.message : "Failed to load security data",
           ),
         );
       }}
@@ -1556,19 +1682,27 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
         </div>
       )}
 
-      {!healthResultsRoute && testResult && <div className="success">{testResult}</div>}
-      {!healthResultsRoute && authMessage && <div className="success">{authMessage}</div>}
+      {!healthResultsRoute && testResult && (
+        <div className="success">{testResult}</div>
+      )}
+      {!healthResultsRoute && authMessage && (
+        <div className="success">{authMessage}</div>
+      )}
 
       {activeView === "dashboard" ? (
         <OperationalWorkspace {...operationalProps} view="dashboard" />
       ) : activeView === "services" ? (
         <ServicesWorkspace
-          onHealthSaved={()=>loadCatalog(selectedEnvironmentId)}
+          onHealthSaved={() => loadCatalog(selectedEnvironmentId)}
           onHealthResults={navigateHealthResults}
           onHealthChecks={(serviceId) => {
             setActiveView("health");
             setHealthResultsRoute(false);
-            window.history.pushState({}, "", `/health/checks?serviceId=${encodeURIComponent(serviceId)}`);
+            window.history.pushState(
+              {},
+              "",
+              `/health/checks?serviceId=${encodeURIComponent(serviceId)}`,
+            );
           }}
           error={error}
           loading={loading}
@@ -1661,19 +1795,73 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       ) : activeView === "environments" ? (
         <OperationalWorkspace {...operationalProps} view="environments" />
       ) : activeView === "health" ? (
-        healthResultsRoute ? <HealthResultsPage services={services} environments={environments} instances={instances} endpoints={endpoints} checks={healthChecks} deployments={deployments} onService={(serviceId, environmentId)=>void navigateServiceHealth(serviceId, environmentId)} onInstance={(instanceId, serviceId, environmentId)=>navigateHealthResults(serviceId, undefined, instanceId, environmentId)} onBack={()=>{
-          const serviceId=new URLSearchParams(window.location.search).get("serviceId");
-          if(serviceId){setSelectedServiceId(serviceId);setServiceTab("health");setHealthResultsRoute(false);setActiveView("services");window.history.pushState({},"",`/services/${encodeURIComponent(serviceId)}/health`)}
-          else navigateTo("health");
-        }}/> : <HealthWorkspace services={services} environments={environments} deployments={deployments} endpoints={endpoints} error={error}
-          instances={instances} healthChecks={healthChecks} healthStates={healthStates} selectedEnvironmentId={selectedEnvironmentId}
-          healthStatusFilter={healthStatusFilter} setHealthStatusFilter={setHealthStatusFilter}
-          onRun={handleRunHealthCheck} onDelete={handleDeleteHealthCheck} onSaved={()=>loadCatalog(selectedEnvironmentId)}
-          loading={loading}
-          onServiceHealth={(serviceId,environmentId)=>void navigateServiceHealth(serviceId,environmentId)}
-          onInstanceResults={(instanceId,serviceId,environmentId)=>navigateHealthResults(serviceId,undefined,instanceId,environmentId)}
-          onResults={checkId=>navigateHealthResults(undefined,checkId)}/>
-
+        healthResultsRoute ? (
+          <HealthResultsPage
+            services={services}
+            environments={environments}
+            instances={instances}
+            endpoints={endpoints}
+            checks={healthChecks}
+            deployments={deployments}
+            onService={(serviceId, environmentId) =>
+              void navigateServiceHealth(serviceId, environmentId)
+            }
+            onInstance={(instanceId, serviceId, environmentId) =>
+              navigateHealthResults(
+                serviceId,
+                undefined,
+                instanceId,
+                environmentId,
+              )
+            }
+            onBack={() => {
+              const serviceId = new URLSearchParams(window.location.search).get(
+                "serviceId",
+              );
+              if (serviceId) {
+                setSelectedServiceId(serviceId);
+                setServiceTab("health");
+                setHealthResultsRoute(false);
+                setActiveView("services");
+                window.history.pushState(
+                  {},
+                  "",
+                  `/services/${encodeURIComponent(serviceId)}/health`,
+                );
+              } else navigateTo("health");
+            }}
+          />
+        ) : (
+          <HealthWorkspace
+            services={services}
+            environments={environments}
+            deployments={deployments}
+            endpoints={endpoints}
+            error={error}
+            instances={instances}
+            healthChecks={healthChecks}
+            healthStates={healthStates}
+            selectedEnvironmentId={selectedEnvironmentId}
+            healthStatusFilter={healthStatusFilter}
+            setHealthStatusFilter={setHealthStatusFilter}
+            onRun={handleRunHealthCheck}
+            onDelete={handleDeleteHealthCheck}
+            onSaved={() => loadCatalog(selectedEnvironmentId)}
+            loading={loading}
+            onServiceHealth={(serviceId, environmentId) =>
+              void navigateServiceHealth(serviceId, environmentId)
+            }
+            onInstanceResults={(instanceId, serviceId, environmentId) =>
+              navigateHealthResults(
+                serviceId,
+                undefined,
+                instanceId,
+                environmentId,
+              )
+            }
+            onResults={(checkId) => navigateHealthResults(undefined, checkId)}
+          />
+        )
       ) : activeView === "incidents" ? (
         <OperationalWorkspace {...operationalProps} view="incidents" />
       ) : false ? (
@@ -1785,12 +1973,12 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
                         incident.state !== "INCIDENT_STATE_OPEN" ||
                         resolvingIncidentId === incident.id
                       }
-                      onClick={() => handleResolveIncident(incident.id)}
+                      onClick={() => handleVerifyIncident(incident.id)}
                       type="button"
                     >
                       {resolvingIncidentId === incident.id
-                        ? "Resolving"
-                        : "Resolve"}
+                        ? "Checking..."
+                        : "Verify recovery"}
                     </button>
                     <button
                       onClick={() => setSelectedIncidentId(incident.id)}
@@ -1866,326 +2054,350 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
             description="Keep notification channels separate from policies so routing and triggers stay clear."
           />
           <nav className="subnav" aria-label="Alert views">
-            <button className={alertsSection === "policies" ? "active" : ""} type="button" onClick={() => setAlertsSection("policies")}>Alert policies</button>
-            <button className={alertsSection === "channels" ? "active" : ""} type="button" onClick={() => setAlertsSection("channels")}>Notification channels</button>
+            <button
+              className={alertsSection === "policies" ? "active" : ""}
+              type="button"
+              onClick={() => setAlertsSection("policies")}
+            >
+              Alert policies
+            </button>
+            <button
+              className={alertsSection === "channels" ? "active" : ""}
+              type="button"
+              onClick={() => setAlertsSection("channels")}
+            >
+              Notification channels
+            </button>
           </nav>
           {alertsSection === "policies" ? (
-          <div className="panel">
-            <div className="panel-heading">
-              <h2>Alert Policies</h2>
-              <span>{alertPolicies.length} total</span>
-            </div>
-            <div className="table">
-              {alertPolicies.length === 0 ? (
-                <EmptyState
-                  title="No alert policies"
-                  description="Create a policy to route health transitions or incident changes to a notification channel."
-                />
-              ) : (
-                alertPolicies.map((policy) => (
-                  <div className="policy-row" key={policy.id}>
-                    <div>
-                      <StatusBadge
-                        status={policy.enabled ? "enabled" : "disabled"}
-                      />
-                      <span>{formatPolicyScope(policy)}</span>
+            <div className="panel">
+              <div className="panel-heading">
+                <h2>Alert Policies</h2>
+                <span>{alertPolicies.length} total</span>
+              </div>
+              <div className="table">
+                {alertPolicies.length === 0 ? (
+                  <EmptyState
+                    title="No alert policies"
+                    description="Create a policy to route health transitions or incident changes to a notification channel."
+                  />
+                ) : (
+                  alertPolicies.map((policy) => (
+                    <div className="policy-row" key={policy.id}>
+                      <div>
+                        <StatusBadge
+                          status={policy.enabled ? "enabled" : "disabled"}
+                        />
+                        <span>{formatPolicyScope(policy)}</span>
+                      </div>
+                      <span>
+                        {policy.notifyOn?.join(", ") || "No triggers"}
+                      </span>
+                      <span>{policy.cooldownMinutes}m cooldown</span>
+                      <span>{policy.channelIds?.length ?? 0} channels</span>
+                      <button onClick={() => editPolicy(policy)} type="button">
+                        Edit
+                      </button>
                     </div>
-                    <span>{policy.notifyOn?.join(", ") || "No triggers"}</span>
-                    <span>{policy.cooldownMinutes}m cooldown</span>
-                    <span>{policy.channelIds?.length ?? 0} channels</span>
-                    <button onClick={() => editPolicy(policy)} type="button">
-                      Edit
-                    </button>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-
           ) : (
-          <div className="panel">
-            <div className="panel-heading">
-              <h2>Notification Channels</h2>
-              <span>{notificationChannels.length} total</span>
-            </div>
-            <div className="table">
-              {notificationChannels.length === 0 ? (
-                <EmptyState
-                  title="No notification channels"
-                  description="Add a webhook or email destination before assigning policies."
-                />
-              ) : (
-                notificationChannels.map((channel) => (
-                  <div className="channel-row" key={channel.id}>
-                    <div>
-                      <strong>{channel.name}</strong>
-                      <span>{channel.type}</span>
+            <div className="panel">
+              <div className="panel-heading">
+                <h2>Notification Channels</h2>
+                <span>{notificationChannels.length} total</span>
+              </div>
+              <div className="table">
+                {notificationChannels.length === 0 ? (
+                  <EmptyState
+                    title="No notification channels"
+                    description="Add a webhook or email destination before assigning policies."
+                  />
+                ) : (
+                  notificationChannels.map((channel) => (
+                    <div className="channel-row" key={channel.id}>
+                      <div>
+                        <strong>{channel.name}</strong>
+                        <span>{channel.type}</span>
+                      </div>
+                      <span>
+                        {channel.description || "Description unavailable"}
+                      </span>
+                      <StatusBadge
+                        status={channel.enabled ? "enabled" : "disabled"}
+                      />
+                      <button
+                        disabled={
+                          !channel.enabled || testingChannelId === channel.id
+                        }
+                        onClick={() => handleTestChannel(channel.id)}
+                        type="button"
+                      >
+                        {testingChannelId === channel.id ? "Testing" : "Test"}
+                      </button>
+                      <button
+                        onClick={() => editChannel(channel)}
+                        type="button"
+                      >
+                        Edit
+                      </button>
                     </div>
-                    <span>
-                      {channel.description || "Description unavailable"}
-                    </span>
-                    <StatusBadge
-                      status={channel.enabled ? "enabled" : "disabled"}
-                    />
-                    <button
-                      disabled={
-                        !channel.enabled || testingChannelId === channel.id
-                      }
-                      onClick={() => handleTestChannel(channel.id)}
-                      type="button"
-                    >
-                      {testingChannelId === channel.id ? "Testing" : "Test"}
-                    </button>
-                    <button onClick={() => editChannel(channel)} type="button">
-                      Edit
-                    </button>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
           )}
 
           <details className="workflow-disclosure">
-            <summary>{editingPolicyId ? "Edit alert policy" : "Create alert policy"}</summary>
-          <form className="panel form-panel" onSubmit={handleCreatePolicy}>
-            <div className="panel-heading">
-              <h2>
-                {editingPolicyId ? "Edit Alert Policy" : "Create Alert Policy"}
-              </h2>
-              {editingPolicyId ? (
-                <button onClick={cancelPolicyEdit} type="button">
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-            <label>
-              Environment
-              <select
-                value={policyForm.environmentId || selectedEnvironmentId}
-                onChange={(event) =>
-                  setPolicyForm((current) => ({
-                    ...current,
-                    environmentId: event.target.value,
-                  }))
-                }
-              >
-                <option value="">Select environment</option>
-                {environments.map((environment) => (
-                  <option key={environment.id} value={environment.id}>
-                    {environment.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Environment scope reference
-              <input
-                value={policyForm.deploymentId}
-                onChange={(event) =>
-                  setPolicyForm((current) => ({
-                    ...current,
-                    deploymentId: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Notify on
-              <input
-                required
-                value={policyForm.notifyOn}
-                onChange={(event) =>
-                  setPolicyForm((current) => ({
-                    ...current,
-                    notifyOn: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Channel IDs
-              <input
-                required
-                value={policyForm.channelIds}
-                onChange={(event) =>
-                  setPolicyForm((current) => ({
-                    ...current,
-                    channelIds: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Cooldown minutes
-              <input
-                min="0"
-                type="number"
-                value={policyForm.cooldownMinutes}
-                onChange={(event) =>
-                  setPolicyForm((current) => ({
-                    ...current,
-                    cooldownMinutes: Number(event.target.value),
-                  }))
-                }
-              />
-            </label>
-            <label className="checkbox-label">
-              <input
-                checked={policyForm.sendRecoveryNotification}
-                type="checkbox"
-                onChange={(event) =>
-                  setPolicyForm((current) => ({
-                    ...current,
-                    sendRecoveryNotification: event.target.checked,
-                  }))
-                }
-              />
-              Send recovery notification
-            </label>
-            <button disabled={savingPolicy} type="submit">
-              {savingPolicy
-                ? "Saving"
-                : editingPolicyId
-                  ? "Save policy"
-                  : "Create policy"}
-            </button>
-          </form>
-          </details>
-
-          <details className="workflow-disclosure">
-            <summary>{editingChannelId ? "Edit notification channel" : "Create notification channel"}</summary>
-          <form className="panel form-panel" onSubmit={handleCreateChannel}>
-            <div className="panel-heading">
-              <h2>
-                {editingChannelId
-                  ? "Edit Notification Channel"
-                  : "Create Notification Channel"}
-              </h2>
-              {editingChannelId ? (
-                <button onClick={cancelChannelEdit} type="button">
-                  Cancel
-                </button>
-              ) : null}
-            </div>
-            <label>
-              Type
-              <select
-                value={channelForm.type}
-                onChange={(event) =>
-                  setChannelForm((current) => ({
-                    ...current,
-                    type: event.target.value,
-                  }))
-                }
-              >
-                <option value="webhook">Webhook</option>
-                <option value="email">Email</option>
-              </select>
-            </label>
-            <label>
-              Name
-              <input
-                required
-                value={channelForm.name}
-                onChange={(event) =>
-                  setChannelForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Description
-              <textarea
-                value={channelForm.description}
-                onChange={(event) =>
-                  setChannelForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            {channelForm.type === "webhook" ? (
+            <summary>
+              {editingPolicyId ? "Edit alert policy" : "Create alert policy"}
+            </summary>
+            <form className="panel form-panel" onSubmit={handleCreatePolicy}>
+              <div className="panel-heading">
+                <h2>
+                  {editingPolicyId
+                    ? "Edit Alert Policy"
+                    : "Create Alert Policy"}
+                </h2>
+                {editingPolicyId ? (
+                  <button onClick={cancelPolicyEdit} type="button">
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
               <label>
-                Webhook URL
-                <input
-                  required
-                  value={channelForm.url}
+                Environment
+                <select
+                  value={policyForm.environmentId || selectedEnvironmentId}
                   onChange={(event) =>
-                    setChannelForm((current) => ({
+                    setPolicyForm((current) => ({
                       ...current,
-                      url: event.target.value,
+                      environmentId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Select environment</option>
+                  {environments.map((environment) => (
+                    <option key={environment.id} value={environment.id}>
+                      {environment.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Environment scope reference
+                <input
+                  value={policyForm.deploymentId}
+                  onChange={(event) =>
+                    setPolicyForm((current) => ({
+                      ...current,
+                      deploymentId: event.target.value,
                     }))
                   }
                 />
               </label>
-            ) : (
-              <div className="form-fields-grid">
-                <label>
-                  SMTP host
-                  <input
-                    required
-                    value={channelForm.smtpHost}
-                    onChange={(event) =>
-                      setChannelForm((current) => ({
-                        ...current,
-                        smtpHost: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  SMTP port
-                  <input
-                    required
-                    value={channelForm.smtpPort}
-                    onChange={(event) =>
-                      setChannelForm((current) => ({
-                        ...current,
-                        smtpPort: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  From
-                  <input
-                    required
-                    value={channelForm.from}
-                    onChange={(event) =>
-                      setChannelForm((current) => ({
-                        ...current,
-                        from: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  To
-                  <input
-                    required
-                    value={channelForm.to}
-                    onChange={(event) =>
-                      setChannelForm((current) => ({
-                        ...current,
-                        to: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
+              <label>
+                Notify on
+                <input
+                  required
+                  value={policyForm.notifyOn}
+                  onChange={(event) =>
+                    setPolicyForm((current) => ({
+                      ...current,
+                      notifyOn: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Channel IDs
+                <input
+                  required
+                  value={policyForm.channelIds}
+                  onChange={(event) =>
+                    setPolicyForm((current) => ({
+                      ...current,
+                      channelIds: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Cooldown minutes
+                <input
+                  min="0"
+                  type="number"
+                  value={policyForm.cooldownMinutes}
+                  onChange={(event) =>
+                    setPolicyForm((current) => ({
+                      ...current,
+                      cooldownMinutes: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <label className="checkbox-label">
+                <input
+                  checked={policyForm.sendRecoveryNotification}
+                  type="checkbox"
+                  onChange={(event) =>
+                    setPolicyForm((current) => ({
+                      ...current,
+                      sendRecoveryNotification: event.target.checked,
+                    }))
+                  }
+                />
+                Send recovery notification
+              </label>
+              <button disabled={savingPolicy} type="submit">
+                {savingPolicy
+                  ? "Saving"
+                  : editingPolicyId
+                    ? "Save policy"
+                    : "Create policy"}
+              </button>
+            </form>
+          </details>
+
+          <details className="workflow-disclosure">
+            <summary>
+              {editingChannelId
+                ? "Edit notification channel"
+                : "Create notification channel"}
+            </summary>
+            <form className="panel form-panel" onSubmit={handleCreateChannel}>
+              <div className="panel-heading">
+                <h2>
+                  {editingChannelId
+                    ? "Edit Notification Channel"
+                    : "Create Notification Channel"}
+                </h2>
+                {editingChannelId ? (
+                  <button onClick={cancelChannelEdit} type="button">
+                    Cancel
+                  </button>
+                ) : null}
               </div>
-            )}
-            <button disabled={savingChannel} type="submit">
-              {savingChannel
-                ? "Saving"
-                : editingChannelId
-                  ? "Save channel"
-                  : "Create channel"}
-            </button>
-          </form>
+              <label>
+                Type
+                <select
+                  value={channelForm.type}
+                  onChange={(event) =>
+                    setChannelForm((current) => ({
+                      ...current,
+                      type: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="webhook">Webhook</option>
+                  <option value="email">Email</option>
+                </select>
+              </label>
+              <label>
+                Name
+                <input
+                  required
+                  value={channelForm.name}
+                  onChange={(event) =>
+                    setChannelForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Description
+                <textarea
+                  value={channelForm.description}
+                  onChange={(event) =>
+                    setChannelForm((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              {channelForm.type === "webhook" ? (
+                <label>
+                  Webhook URL
+                  <input
+                    required
+                    value={channelForm.url}
+                    onChange={(event) =>
+                      setChannelForm((current) => ({
+                        ...current,
+                        url: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              ) : (
+                <div className="form-fields-grid">
+                  <label>
+                    SMTP host
+                    <input
+                      required
+                      value={channelForm.smtpHost}
+                      onChange={(event) =>
+                        setChannelForm((current) => ({
+                          ...current,
+                          smtpHost: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    SMTP port
+                    <input
+                      required
+                      value={channelForm.smtpPort}
+                      onChange={(event) =>
+                        setChannelForm((current) => ({
+                          ...current,
+                          smtpPort: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    From
+                    <input
+                      required
+                      value={channelForm.from}
+                      onChange={(event) =>
+                        setChannelForm((current) => ({
+                          ...current,
+                          from: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    To
+                    <input
+                      required
+                      value={channelForm.to}
+                      onChange={(event) =>
+                        setChannelForm((current) => ({
+                          ...current,
+                          to: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              )}
+              <button disabled={savingChannel} type="submit">
+                {savingChannel
+                  ? "Saving"
+                  : editingChannelId
+                    ? "Save channel"
+                    : "Create channel"}
+              </button>
+            </form>
           </details>
         </section>
       ) : activeView === "security" ? (
@@ -2196,223 +2408,521 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
             description="Manage users, application credentials, API tokens, and session access without exposing secrets in normal lists."
           />
           <nav className="subnav" aria-label="Security views">
-            <button className={securitySection === "users" ? "active" : ""} type="button" onClick={() => setSecuritySection("users")}>Users</button>
-            <button className={securitySection === "tokens" ? "active" : ""} type="button" onClick={() => setSecuritySection("tokens")}>API tokens</button>
-            <button className={securitySection === "applicationKeys" ? "active" : ""} type="button" onClick={() => { setSecuritySection("applicationKeys"); listApplicationKeys().then(setApplicationKeys).catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load application keys")); }}>Application keys</button>
-            <button className={securitySection === "sessions" ? "active" : ""} type="button" onClick={() => { setSecuritySection("sessions"); loadSessionData().catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load sessions")); }}>Sessions</button>
-          </nav>
-          <section className="settings-page" hidden={securitySection !== "sessions"}>
-            <div className="settings-page-header"><div><h2>Sessions</h2><p>Review active browser sessions and revoke access you no longer recognize.</p></div><button type="button" onClick={() => loadSessionData().catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load sessions"))}>Refresh sessions</button></div>
-            <div className="application-key-table session-table" role="table" aria-label="Sessions">
-              <div className="application-key-table-header" role="row"><span>User</span><span>Client</span><span>Last active</span><span>Created</span><span>Expires</span><span>Status</span><span>Actions</span></div>
-              {sessions.length === 0 ? <EmptyState title="No active sessions" description="Authenticated browser sessions will appear here when they are available." /> : sessions.map((session) => <div className="application-key-table-row" key={session.id} role="row"><strong>{session.userId}</strong><span>{session.userAgent || "Unknown client"}</span><span>{formatTimestamp(session.lastActivityAt)}</span><span>{formatTimestamp(session.createdAt)}</span><span>{formatTimestamp(session.expiresAt)}</span><StatusBadge status={session.revokedAt ? "revoked" : "active"} label={session.revokedAt ? "Revoked" : "Active"} />{!session.revokedAt ? <button className="text-action danger-action" type="button" onClick={() => revokeSession(session.id).then(loadSessionData).catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to revoke session"))}>Revoke</button> : <span>—</span>}</div>)}
-            </div>
-          </section>
-          <section className="settings-page" hidden={securitySection !== "users"}>
-            <div className="settings-page-header"><div><h2>Users</h2><p>Manage the people and roles that can access this Alauda instance.</p></div><button type="button" onClick={() => setShowCreateUser(true)}>Create user</button></div>
-            <div className="application-key-table" role="table" aria-label="Users"><div className="application-key-table-header" role="row"><span>Username</span><span>Display name</span><span>Email</span><span>Role</span><span>Created</span><span>Status</span><span>Actions</span></div>{users.length === 0 ? <EmptyState title="No users yet" description="Create an account to grant access to the Alauda administration interface." action={<button type="button" onClick={() => setShowCreateUser(true)}>Create user</button>} /> : users.map((user) => <div className="application-key-table-row" key={user.id} role="row"><strong>{user.username}</strong><span>{user.displayName || "—"}</span><span>{user.email}</span><span>{user.role}</span><span>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Not available"}</span><StatusBadge status={user.enabled ? "enabled" : "disabled"} label={user.enabled ? "Active" : "Disabled"} /><span>—</span></div>)}</div>
-          </section>
-          {false && <form className="panel form-panel" onSubmit={handleCreateUser}>
-            <div className="panel-heading">
-              <h2>Users</h2>
-              <button
-                type="button"
-                onClick={() =>
-                  loadSecurityData().catch((err: unknown) =>
+            <button
+              className={securitySection === "users" ? "active" : ""}
+              type="button"
+              onClick={() => setSecuritySection("users")}
+            >
+              Users
+            </button>
+            <button
+              className={securitySection === "tokens" ? "active" : ""}
+              type="button"
+              onClick={() => setSecuritySection("tokens")}
+            >
+              API tokens
+            </button>
+            <button
+              className={securitySection === "applicationKeys" ? "active" : ""}
+              type="button"
+              onClick={() => {
+                setSecuritySection("applicationKeys");
+                listApplicationKeys()
+                  .then(setApplicationKeys)
+                  .catch((err: unknown) =>
                     setError(
                       err instanceof Error
                         ? err.message
-                        : "Failed to load users",
+                        : "Failed to load application keys",
+                    ),
+                  );
+              }}
+            >
+              Application keys
+            </button>
+            <button
+              className={securitySection === "sessions" ? "active" : ""}
+              type="button"
+              onClick={() => {
+                setSecuritySection("sessions");
+                loadSessionData().catch((err: unknown) =>
+                  setError(
+                    err instanceof Error
+                      ? err.message
+                      : "Failed to load sessions",
+                  ),
+                );
+              }}
+            >
+              Sessions
+            </button>
+          </nav>
+          <section
+            className="settings-page"
+            hidden={securitySection !== "sessions"}
+          >
+            <div className="settings-page-header">
+              <div>
+                <h2>Sessions</h2>
+                <p>
+                  Review active browser sessions and revoke access you no longer
+                  recognize.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  loadSessionData().catch((err: unknown) =>
+                    setError(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to load sessions",
                     ),
                   )
                 }
               >
-                Refresh
+                Refresh sessions
               </button>
             </div>
-            <div className="table compact-table">
-              {users.length === 0 ? (
+            <div
+              className="application-key-table session-table"
+              role="table"
+              aria-label="Sessions"
+            >
+              <div className="application-key-table-header" role="row">
+                <span>User</span>
+                <span>Client</span>
+                <span>Last active</span>
+                <span>Created</span>
+                <span>Expires</span>
+                <span>Status</span>
+                <span>Actions</span>
+              </div>
+              {sessions.length === 0 ? (
                 <EmptyState
-                  title="No users loaded"
-                  description="Refresh security data or sign in with an account that can list users."
+                  title="No active sessions"
+                  description="Authenticated browser sessions will appear here when they are available."
                 />
               ) : (
-                users.map((user) => (
-                  <div className="table-row" key={user.id}>
-                    <strong>{user.username}</strong>
-                    <span>{user.role}</span>
-                    <span>{user.email}</span>
+                sessions.map((session) => (
+                  <div
+                    className="application-key-table-row"
+                    key={session.id}
+                    role="row"
+                  >
+                    <strong>{session.userId}</strong>
+                    <span>{session.userAgent || "Unknown client"}</span>
+                    <span>{formatTimestamp(session.lastActivityAt)}</span>
+                    <span>{formatTimestamp(session.createdAt)}</span>
+                    <span>{formatTimestamp(session.expiresAt)}</span>
                     <StatusBadge
-                      status={user.enabled ? "enabled" : "disabled"}
+                      status={session.revokedAt ? "revoked" : "active"}
+                      label={session.revokedAt ? "Revoked" : "Active"}
                     />
+                    {!session.revokedAt ? (
+                      <button
+                        className="text-action danger-action"
+                        type="button"
+                        onClick={() =>
+                          revokeSession(session.id)
+                            .then(loadSessionData)
+                            .catch((err: unknown) =>
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Failed to revoke session",
+                              ),
+                            )
+                        }
+                      >
+                        Revoke
+                      </button>
+                    ) : (
+                      <span>—</span>
+                    )}
                   </div>
                 ))
               )}
             </div>
-            <label>
-              Username
-              <input
-                required
-                value={userForm.username}
-                onChange={(event) =>
-                  setUserForm((current) => ({
-                    ...current,
-                    username: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Email
-              <input
-                required
-                type="email"
-                value={userForm.email}
-                onChange={(event) =>
-                  setUserForm((current) => ({
-                    ...current,
-                    email: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Display name
-              <input
-                required
-                value={userForm.displayName}
-                onChange={(event) =>
-                  setUserForm((current) => ({
-                    ...current,
-                    displayName: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Password
-              <input
-                required
-                type="password"
-                value={userForm.password}
-                onChange={(event) =>
-                  setUserForm((current) => ({
-                    ...current,
-                    password: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Role
-              <select
-                value={userForm.role}
-                onChange={(event) =>
-                  setUserForm((current) => ({
-                    ...current,
-                    role: event.target.value,
-                  }))
-                }
-              >
-                <option value="Administrator">Administrator</option>
-                <option value="Operator">Operator</option>
-                <option value="Viewer">Viewer</option>
-                <option value="Automation">Automation</option>
-              </select>
-            </label>
-            <button type="submit">Create user</button>
-          </form>}
-          {showCreateUser ? <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreateUser(false); }}><div className="modal form-panel application-key-modal" role="dialog" aria-modal="true" aria-labelledby="create-user-title"><form onSubmit={async (event) => { await handleCreateUser(event); setShowCreateUser(false); }}><div className="modal-header"><div><h2 id="create-user-title">Create user</h2><span>Give a person access to the Alauda administration interface.</span></div><button className="text-action" type="button" onClick={() => setShowCreateUser(false)}>Close</button></div><div className="modal-body application-key-form-body"><label>Username<input required autoFocus value={userForm.username} onChange={(event) => setUserForm((current) => ({ ...current, username: event.target.value }))} /></label><label>Email<input required type="email" value={userForm.email} onChange={(event) => setUserForm((current) => ({ ...current, email: event.target.value }))} /></label><label>Display name<input required value={userForm.displayName} onChange={(event) => setUserForm((current) => ({ ...current, displayName: event.target.value }))} /></label><label>Password<input required type="password" value={userForm.password} onChange={(event) => setUserForm((current) => ({ ...current, password: event.target.value }))} /></label><label>Role<select value={userForm.role} onChange={(event) => setUserForm((current) => ({ ...current, role: event.target.value }))}><option value="Administrator">Administrator</option><option value="Operator">Operator</option><option value="Viewer">Viewer</option><option value="Automation">Automation</option></select></label></div><div className="dialog-actions"><button className="text-action" type="button" onClick={() => setShowCreateUser(false)}>Cancel</button><button type="submit">Create user</button></div></form></div></div> : null}
-          <section className="settings-page" hidden={securitySection !== "tokens"}>
-            <div className="settings-page-header"><div><h2>API tokens</h2><p>Manage user-scoped credentials for scripts and automation without exposing secrets in the list.</p></div><button type="button" onClick={() => setShowCreateApiToken(true)}>Create API token</button></div>
-            <div className="application-key-table" role="table" aria-label="API tokens"><div className="application-key-table-header" role="row"><span>Name</span><span>User</span><span>Scopes</span><span>Created</span><span>Expires</span><span>Status</span><span>Actions</span></div>{apiTokens.length === 0 ? <EmptyState title="No API tokens yet" description="Create a scoped token for a user or automation workflow." action={<button type="button" onClick={() => setShowCreateApiToken(true)}>Create API token</button>} /> : apiTokens.map((token) => <div className="application-key-table-row" key={token.id} role="row"><strong>{token.name}</strong><span>{users.find((user) => user.id === token.userId)?.username ?? token.userId}</span><span>{token.scopes.join(", ")}</span><span>{token.createdAt ? new Date(token.createdAt).toLocaleDateString() : "Not available"}</span><span>{token.expiresAt ? new Date(token.expiresAt).toLocaleDateString() : "Never"}</span><StatusBadge status={token.enabled ? "enabled" : "disabled"} label={token.enabled ? "Active" : "Revoked"} /><button className="text-action danger-action" type="button" onClick={() => handleRevokeApiToken(token.id)}>Revoke</button></div>)}</div>
           </section>
-          {false && <form className="panel form-panel" onSubmit={handleCreateApiToken}>
-            <div className="panel-heading">
-              <h2>API Tokens</h2>
-              <span>{apiTokens.length} loaded</span>
+          <section
+            className="settings-page"
+            hidden={securitySection !== "users"}
+          >
+            <div className="settings-page-header">
+              <div>
+                <h2>Users</h2>
+                <p>
+                  Manage the people and roles that can access this Alauda
+                  instance.
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowCreateUser(true)}>
+                Create user
+              </button>
             </div>
-            <label>
-              User
-              <select
-                required
-                value={tokenForm.userId}
-                onChange={(event) => {
-                  const userId = event.target.value;
-                  setTokenForm((current) => ({ ...current, userId }));
-                  loadSecurityData(userId).catch((err: unknown) =>
-                    setError(
-                      err instanceof Error
-                        ? err.message
-                        : "Failed to load tokens",
-                    ),
-                  );
-                }}
+            <div
+              className="application-key-table"
+              role="table"
+              aria-label="Users"
+            >
+              <div className="application-key-table-header" role="row">
+                <span>Username</span>
+                <span>Display name</span>
+                <span>Email</span>
+                <span>Role</span>
+                <span>Created</span>
+                <span>Status</span>
+                <span>Actions</span>
+              </div>
+              {users.length === 0 ? (
+                <EmptyState
+                  title="No users yet"
+                  description="Create an account to grant access to the Alauda administration interface."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateUser(true)}
+                    >
+                      Create user
+                    </button>
+                  }
+                />
+              ) : (
+                users.map((user) => (
+                  <div
+                    className="application-key-table-row"
+                    key={user.id}
+                    role="row"
+                  >
+                    <strong>{user.username}</strong>
+                    <span>{user.displayName || "—"}</span>
+                    <span>{user.email}</span>
+                    <span>{user.role}</span>
+                    <span>
+                      {user.createdAt
+                        ? new Date(user.createdAt).toLocaleDateString()
+                        : "Not available"}
+                    </span>
+                    <StatusBadge
+                      status={user.enabled ? "enabled" : "disabled"}
+                      label={user.enabled ? "Active" : "Disabled"}
+                    />
+                    <span>—</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+          {false && (
+            <form className="panel form-panel" onSubmit={handleCreateUser}>
+              <div className="panel-heading">
+                <h2>Users</h2>
+                <button
+                  type="button"
+                  onClick={() =>
+                    loadSecurityData().catch((err: unknown) =>
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : "Failed to load users",
+                      ),
+                    )
+                  }
+                >
+                  Refresh
+                </button>
+              </div>
+              <div className="table compact-table">
+                {users.length === 0 ? (
+                  <EmptyState
+                    title="No users loaded"
+                    description="Refresh security data or sign in with an account that can list users."
+                  />
+                ) : (
+                  users.map((user) => (
+                    <div className="table-row" key={user.id}>
+                      <strong>{user.username}</strong>
+                      <span>{user.role}</span>
+                      <span>{user.email}</span>
+                      <StatusBadge
+                        status={user.enabled ? "enabled" : "disabled"}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+              <label>
+                Username
+                <input
+                  required
+                  value={userForm.username}
+                  onChange={(event) =>
+                    setUserForm((current) => ({
+                      ...current,
+                      username: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  required
+                  type="email"
+                  value={userForm.email}
+                  onChange={(event) =>
+                    setUserForm((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Display name
+                <input
+                  required
+                  value={userForm.displayName}
+                  onChange={(event) =>
+                    setUserForm((current) => ({
+                      ...current,
+                      displayName: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  required
+                  type="password"
+                  value={userForm.password}
+                  onChange={(event) =>
+                    setUserForm((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Role
+                <select
+                  value={userForm.role}
+                  onChange={(event) =>
+                    setUserForm((current) => ({
+                      ...current,
+                      role: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="Administrator">Administrator</option>
+                  <option value="Operator">Operator</option>
+                  <option value="Viewer">Viewer</option>
+                  <option value="Automation">Automation</option>
+                </select>
+              </label>
+              <button type="submit">Create user</button>
+            </form>
+          )}
+          {showCreateUser ? (
+            <div
+              className="modal-backdrop"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget)
+                  setShowCreateUser(false);
+              }}
+            >
+              <div
+                className="modal form-panel application-key-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-user-title"
               >
-                <option value="">Select user</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.username}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Token name
-              <input
-                required
-                value={tokenForm.name}
-                onChange={(event) =>
-                  setTokenForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Scopes
-              <input
-                value={tokenForm.scopes}
-                onChange={(event) =>
-                  setTokenForm((current) => ({
-                    ...current,
-                    scopes: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label>
-              Expires in hours
-              <input
-                type="number"
-                min="1"
-                value={tokenForm.expiresInHours}
-                onChange={(event) =>
-                  setTokenForm((current) => ({
-                    ...current,
-                    expiresInHours: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <button type="submit">Create token</button>
-            <div className="table compact-table">
+                <form
+                  onSubmit={async (event) => {
+                    await handleCreateUser(event);
+                    setShowCreateUser(false);
+                  }}
+                >
+                  <div className="modal-header">
+                    <div>
+                      <h2 id="create-user-title">Create user</h2>
+                      <span>
+                        Give a person access to the Alauda administration
+                        interface.
+                      </span>
+                    </div>
+                    <button
+                      className="text-action"
+                      type="button"
+                      onClick={() => setShowCreateUser(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="modal-body application-key-form-body">
+                    <label>
+                      Username
+                      <input
+                        required
+                        autoFocus
+                        value={userForm.username}
+                        onChange={(event) =>
+                          setUserForm((current) => ({
+                            ...current,
+                            username: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Email
+                      <input
+                        required
+                        type="email"
+                        value={userForm.email}
+                        onChange={(event) =>
+                          setUserForm((current) => ({
+                            ...current,
+                            email: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Display name
+                      <input
+                        required
+                        value={userForm.displayName}
+                        onChange={(event) =>
+                          setUserForm((current) => ({
+                            ...current,
+                            displayName: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Password
+                      <input
+                        required
+                        type="password"
+                        value={userForm.password}
+                        onChange={(event) =>
+                          setUserForm((current) => ({
+                            ...current,
+                            password: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Role
+                      <select
+                        value={userForm.role}
+                        onChange={(event) =>
+                          setUserForm((current) => ({
+                            ...current,
+                            role: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="Administrator">Administrator</option>
+                        <option value="Operator">Operator</option>
+                        <option value="Viewer">Viewer</option>
+                        <option value="Automation">Automation</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="dialog-actions">
+                    <button
+                      className="text-action"
+                      type="button"
+                      onClick={() => setShowCreateUser(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit">Create user</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
+          <section
+            className="settings-page"
+            hidden={securitySection !== "tokens"}
+          >
+            <div className="settings-page-header">
+              <div>
+                <h2>API tokens</h2>
+                <p>
+                  Manage user-scoped credentials for scripts and automation
+                  without exposing secrets in the list.
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowCreateApiToken(true)}>
+                Create API token
+              </button>
+            </div>
+            <div
+              className="application-key-table"
+              role="table"
+              aria-label="API tokens"
+            >
+              <div className="application-key-table-header" role="row">
+                <span>Name</span>
+                <span>User</span>
+                <span>Scopes</span>
+                <span>Created</span>
+                <span>Expires</span>
+                <span>Status</span>
+                <span>Actions</span>
+              </div>
               {apiTokens.length === 0 ? (
                 <EmptyState
-                  title="No API tokens loaded"
-                  description="Select a user to inspect existing tokens or create a new scoped token."
+                  title="No API tokens yet"
+                  description="Create a scoped token for a user or automation workflow."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateApiToken(true)}
+                    >
+                      Create API token
+                    </button>
+                  }
                 />
               ) : (
                 apiTokens.map((token) => (
-                  <div className="table-row" key={token.id}>
+                  <div
+                    className="application-key-table-row"
+                    key={token.id}
+                    role="row"
+                  >
                     <strong>{token.name}</strong>
+                    <span>
+                      {users.find((user) => user.id === token.userId)
+                        ?.username ?? token.userId}
+                    </span>
                     <span>{token.scopes.join(", ")}</span>
+                    <span>
+                      {token.createdAt
+                        ? new Date(token.createdAt).toLocaleDateString()
+                        : "Not available"}
+                    </span>
+                    <span>
+                      {token.expiresAt
+                        ? new Date(token.expiresAt).toLocaleDateString()
+                        : "Never"}
+                    </span>
                     <StatusBadge
                       status={token.enabled ? "enabled" : "disabled"}
-                      label={token.enabled ? "Enabled" : "Revoked"}
+                      label={token.enabled ? "Active" : "Revoked"}
                     />
                     <button
+                      className="text-action danger-action"
                       type="button"
                       onClick={() => handleRevokeApiToken(token.id)}
                     >
@@ -2422,57 +2932,594 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
                 ))
               )}
             </div>
-          </form>}
-          {showCreateApiToken ? <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreateApiToken(false); }}><div className="modal form-panel application-key-modal" role="dialog" aria-modal="true" aria-labelledby="create-api-token-title"><form onSubmit={async (event) => { await handleCreateApiToken(event); setShowCreateApiToken(false); }}><div className="modal-header"><div><h2 id="create-api-token-title">Create API token</h2><span>Create a scoped credential for a user or automation workflow.</span></div><button className="text-action" type="button" onClick={() => setShowCreateApiToken(false)}>Close</button></div><div className="modal-body application-key-form-body"><label>User<select required autoFocus value={tokenForm.userId} onChange={(event) => setTokenForm((current) => ({ ...current, userId: event.target.value }))}><option value="">Select user</option>{users.map((user) => <option key={user.id} value={user.id}>{user.username}</option>)}</select></label><label>Token name<input required value={tokenForm.name} onChange={(event) => setTokenForm((current) => ({ ...current, name: event.target.value }))} /></label><fieldset><legend>Scopes</legend><span className="field-help">Use the minimum permissions required by the workflow.</span><div className="choice-grid">{["read", "write", "admin"].map((scope) => { const selected = tokenForm.scopes.split(",").includes(scope); return <label className="choice-row" key={scope}><input type="checkbox" checked={selected} onChange={() => setTokenForm((current) => { const scopes = current.scopes.split(",").filter(Boolean); return { ...current, scopes: selected ? scopes.filter((value) => value !== scope).join(",") : [...scopes, scope].join(",") }; })} /><span><strong>{scope}</strong></span></label>; })}</div></fieldset><label>Expiration<select value={tokenForm.expiresInHours} onChange={(event) => setTokenForm((current) => ({ ...current, expiresInHours: event.target.value }))}><option value="168">7 days</option><option value="720">30 days</option><option value="2160">90 days</option><option value="">Never</option></select></label></div><div className="dialog-actions"><button className="text-action" type="button" onClick={() => setShowCreateApiToken(false)}>Cancel</button><button type="submit">Create API token</button></div></form></div></div> : null}
-          <section className="settings-page" hidden={securitySection !== "applicationKeys"}>
+          </section>
+          {false && (
+            <form className="panel form-panel" onSubmit={handleCreateApiToken}>
+              <div className="panel-heading">
+                <h2>API Tokens</h2>
+                <span>{apiTokens.length} loaded</span>
+              </div>
+              <label>
+                User
+                <select
+                  required
+                  value={tokenForm.userId}
+                  onChange={(event) => {
+                    const userId = event.target.value;
+                    setTokenForm((current) => ({ ...current, userId }));
+                    loadSecurityData(userId).catch((err: unknown) =>
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : "Failed to load tokens",
+                      ),
+                    );
+                  }}
+                >
+                  <option value="">Select user</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.username}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Token name
+                <input
+                  required
+                  value={tokenForm.name}
+                  onChange={(event) =>
+                    setTokenForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Scopes
+                <input
+                  value={tokenForm.scopes}
+                  onChange={(event) =>
+                    setTokenForm((current) => ({
+                      ...current,
+                      scopes: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                Expires in hours
+                <input
+                  type="number"
+                  min="1"
+                  value={tokenForm.expiresInHours}
+                  onChange={(event) =>
+                    setTokenForm((current) => ({
+                      ...current,
+                      expiresInHours: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <button type="submit">Create token</button>
+              <div className="table compact-table">
+                {apiTokens.length === 0 ? (
+                  <EmptyState
+                    title="No API tokens loaded"
+                    description="Select a user to inspect existing tokens or create a new scoped token."
+                  />
+                ) : (
+                  apiTokens.map((token) => (
+                    <div className="table-row" key={token.id}>
+                      <strong>{token.name}</strong>
+                      <span>{token.scopes.join(", ")}</span>
+                      <StatusBadge
+                        status={token.enabled ? "enabled" : "disabled"}
+                        label={token.enabled ? "Enabled" : "Revoked"}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeApiToken(token.id)}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </form>
+          )}
+          {showCreateApiToken ? (
+            <div
+              className="modal-backdrop"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget)
+                  setShowCreateApiToken(false);
+              }}
+            >
+              <div
+                className="modal form-panel application-key-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-api-token-title"
+              >
+                <form
+                  onSubmit={async (event) => {
+                    await handleCreateApiToken(event);
+                    setShowCreateApiToken(false);
+                  }}
+                >
+                  <div className="modal-header">
+                    <div>
+                      <h2 id="create-api-token-title">Create API token</h2>
+                      <span>
+                        Create a scoped credential for a user or automation
+                        workflow.
+                      </span>
+                    </div>
+                    <button
+                      className="text-action"
+                      type="button"
+                      onClick={() => setShowCreateApiToken(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="modal-body application-key-form-body">
+                    <label>
+                      User
+                      <select
+                        required
+                        autoFocus
+                        value={tokenForm.userId}
+                        onChange={(event) =>
+                          setTokenForm((current) => ({
+                            ...current,
+                            userId: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">Select user</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.username}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Token name
+                      <input
+                        required
+                        value={tokenForm.name}
+                        onChange={(event) =>
+                          setTokenForm((current) => ({
+                            ...current,
+                            name: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <fieldset>
+                      <legend>Scopes</legend>
+                      <span className="field-help">
+                        Use the minimum permissions required by the workflow.
+                      </span>
+                      <div className="choice-grid">
+                        {["read", "write", "admin"].map((scope) => {
+                          const selected = tokenForm.scopes
+                            .split(",")
+                            .includes(scope);
+                          return (
+                            <label className="choice-row" key={scope}>
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() =>
+                                  setTokenForm((current) => {
+                                    const scopes = current.scopes
+                                      .split(",")
+                                      .filter(Boolean);
+                                    return {
+                                      ...current,
+                                      scopes: selected
+                                        ? scopes
+                                            .filter((value) => value !== scope)
+                                            .join(",")
+                                        : [...scopes, scope].join(","),
+                                    };
+                                  })
+                                }
+                              />
+                              <span>
+                                <strong>{scope}</strong>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+                    <label>
+                      Expiration
+                      <select
+                        value={tokenForm.expiresInHours}
+                        onChange={(event) =>
+                          setTokenForm((current) => ({
+                            ...current,
+                            expiresInHours: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="168">7 days</option>
+                        <option value="720">30 days</option>
+                        <option value="2160">90 days</option>
+                        <option value="">Never</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="dialog-actions">
+                    <button
+                      className="text-action"
+                      type="button"
+                      onClick={() => setShowCreateApiToken(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit">Create API token</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
+          <section
+            className="settings-page"
+            hidden={securitySection !== "applicationKeys"}
+          >
             <div className="settings-page-header">
               <div>
                 <h2>Application keys</h2>
-                <p>Manage credentials used by external services and automation to access Alauda.</p>
+                <p>
+                  Manage credentials used by external services and automation to
+                  access Alauda.
+                </p>
               </div>
-              <button type="button" onClick={() => { setApplicationKeySecret(""); setShowCreateApplicationKey(true); }}>Create application key</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setApplicationKeySecret("");
+                  setShowCreateApplicationKey(true);
+                }}
+              >
+                Create application key
+              </button>
             </div>
-            <div className="application-key-table" role="table" aria-label="Application keys">
+            <div
+              className="application-key-table"
+              role="table"
+              aria-label="Application keys"
+            >
               <div className="application-key-table-header" role="row">
-                <span>Name</span><span>Scopes</span><span>Environments</span><span>Created</span><span>Expires</span><span>Status</span><span>Actions</span>
+                <span>Name</span>
+                <span>Scopes</span>
+                <span>Environments</span>
+                <span>Created</span>
+                <span>Expires</span>
+                <span>Status</span>
+                <span>Actions</span>
               </div>
               {applicationKeys.length === 0 ? (
-                <EmptyState title="No application keys yet" description="Application keys are intended for machine-to-machine authentication, automation, and external service clients." action={<button type="button" onClick={() => setShowCreateApplicationKey(true)}>Create application key</button>} />
-              ) : applicationKeys.map((key) => {
-                const keyEnvironments = key.environmentIds?.length
-                  ? key.environmentIds.map((id) => environments.find((environment) => environment.id === id)?.name ?? id).join(", ")
-                  : "All environments";
-                const expired = Boolean(key.expiresAt && new Date(key.expiresAt).getTime() < Date.now());
-                return <div className="application-key-table-row" key={key.id} role="row">
-                  <strong>{key.name}</strong>
-                  <span>{key.scopes.join(", ")}</span>
-                  <span>{keyEnvironments}</span>
-                  <span>{key.createdAt ? new Date(key.createdAt).toLocaleDateString() : "Not available"}</span>
-                  <span>{key.expiresAt ? new Date(key.expiresAt).toLocaleDateString() : "Never"}</span>
-                  <StatusBadge status={expired ? "warning" : key.enabled ? "enabled" : "disabled"} label={expired ? "Expired" : key.enabled ? "Active" : "Revoked"} />
-                  {key.enabled ? <button className="text-action danger-action" type="button" onClick={() => handleRevokeApplicationKey(key.id)}>Revoke</button> : <span>—</span>}
-                </div>;
-              })}
+                <EmptyState
+                  title="No application keys yet"
+                  description="Application keys are intended for machine-to-machine authentication, automation, and external service clients."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateApplicationKey(true)}
+                    >
+                      Create application key
+                    </button>
+                  }
+                />
+              ) : (
+                applicationKeys.map((key) => {
+                  const keyEnvironments = key.environmentIds?.length
+                    ? key.environmentIds
+                        .map(
+                          (id) =>
+                            environments.find(
+                              (environment) => environment.id === id,
+                            )?.name ?? id,
+                        )
+                        .join(", ")
+                    : "All environments";
+                  const expired = Boolean(
+                    key.expiresAt &&
+                    new Date(key.expiresAt).getTime() < Date.now(),
+                  );
+                  return (
+                    <div
+                      className="application-key-table-row"
+                      key={key.id}
+                      role="row"
+                    >
+                      <strong>{key.name}</strong>
+                      <span>{key.scopes.join(", ")}</span>
+                      <span>{keyEnvironments}</span>
+                      <span>
+                        {key.createdAt
+                          ? new Date(key.createdAt).toLocaleDateString()
+                          : "Not available"}
+                      </span>
+                      <span>
+                        {key.expiresAt
+                          ? new Date(key.expiresAt).toLocaleDateString()
+                          : "Never"}
+                      </span>
+                      <StatusBadge
+                        status={
+                          expired
+                            ? "warning"
+                            : key.enabled
+                              ? "enabled"
+                              : "disabled"
+                        }
+                        label={
+                          expired
+                            ? "Expired"
+                            : key.enabled
+                              ? "Active"
+                              : "Revoked"
+                        }
+                      />
+                      {key.enabled ? (
+                        <button
+                          className="text-action danger-action"
+                          type="button"
+                          onClick={() => handleRevokeApplicationKey(key.id)}
+                        >
+                          Revoke
+                        </button>
+                      ) : (
+                        <span>—</span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </section>
-          {showCreateApplicationKey ? <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeApplicationKeyFlow(); }}>
-            <div className="modal form-panel application-key-modal" role="dialog" aria-modal="true" aria-labelledby="create-application-key-title">
-              {applicationKeySecret ? <div className="application-key-secret-step">
-                <div className="modal-header"><div><h2 id="create-application-key-title">Application key created</h2><span>Copy this key now. It will not be shown again.</span></div></div>
-                <div className="secret-callout"><code>{applicationKeySecret}</code><button type="button" onClick={() => void copyApplicationKey()}>Copy</button></div>
-                <div className="dialog-actions"><button type="button" onClick={closeApplicationKeyFlow}>Done</button></div>
-              </div> : <form onSubmit={handleCreateApplicationKey}>
-                <div className="modal-header"><div><h2 id="create-application-key-title">Create application key</h2><span>Create a machine credential for external services and automation.</span></div><IconButton label="Close dialog" type="button" onClick={closeApplicationKeyFlow}>x</IconButton></div>
-                <div className="modal-body application-key-form-body">
-                  <label>Name<input required autoFocus value={applicationKeyForm.name} onChange={(event) => setApplicationKeyForm((current) => ({ ...current, name: event.target.value }))} placeholder="payments-production" /><span className="field-help">Choose a name that identifies the consuming service.</span></label>
-                  <fieldset><legend>Scopes</legend><span className="field-help">Select the permissions this credential needs.</span><div className="choice-grid">{["read", "write", "admin"].map((scope) => { const selected = applicationKeyForm.scopes.split(",").includes(scope); return <label className="choice-row" key={scope}><input type="checkbox" checked={selected} onChange={() => setApplicationKeyForm((current) => { const scopes = current.scopes.split(",").filter(Boolean); return { ...current, scopes: selected ? scopes.filter((value) => value !== scope).join(",") : [...scopes, scope].join(",") }; })} /><span><strong>{scope}</strong><small>{scope === "read" ? "View registry resources" : scope === "write" ? "Change registry resources" : "Administrative access"}</small></span></label>; })}</div></fieldset>
-                  <fieldset><legend>Environments</legend><span className="field-help">Limit this key to selected environments, or allow all environments.</span><label className="choice-row environment-all-choice"><input type="checkbox" checked={!applicationKeyForm.environmentIds} onChange={(event) => setApplicationKeyForm((current) => ({ ...current, environmentIds: event.target.checked ? "" : environments[0]?.id ?? "" }))} /><span><strong>All environments</strong><small>Allow access across the registry</small></span></label><div className="choice-grid environment-choices">{environments.map((environment) => { const selected = applicationKeyForm.environmentIds.split(",").filter(Boolean).includes(environment.id); return <label className="choice-row" key={environment.id}><input type="checkbox" disabled={!applicationKeyForm.environmentIds} checked={selected} onChange={() => setApplicationKeyForm((current) => { const ids = current.environmentIds.split(",").filter(Boolean); const next = selected ? ids.filter((id) => id !== environment.id) : [...ids, environment.id]; return { ...current, environmentIds: next.join(",") }; })} /><span><strong>{environment.name}</strong><small>{environment.key}</small></span></label>; })}</div></fieldset>
-                  <label>Expiration<select value={applicationKeyForm.expiresInHours} onChange={(event) => setApplicationKeyForm((current) => ({ ...current, expiresInHours: event.target.value }))}><option value="168">7 days</option><option value="720">30 days</option><option value="2160">90 days</option><option value="">Never</option></select></label>
-                </div>
-                <div className="dialog-actions"><Button variant="ghost" type="button" onClick={closeApplicationKeyFlow}>Cancel</Button><Button variant="primary" type="submit">Create application key</Button></div>
-              </form>}
+          {showCreateApplicationKey ? (
+            <div
+              className="modal-backdrop"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget)
+                  closeApplicationKeyFlow();
+              }}
+            >
+              <div
+                className="modal form-panel application-key-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-application-key-title"
+              >
+                {applicationKeySecret ? (
+                  <div className="application-key-secret-step">
+                    <div className="modal-header">
+                      <div>
+                        <h2 id="create-application-key-title">
+                          Application key created
+                        </h2>
+                        <span>
+                          Copy this key now. It will not be shown again.
+                        </span>
+                      </div>
+                    </div>
+                    <div className="secret-callout">
+                      <code>{applicationKeySecret}</code>
+                      <button
+                        type="button"
+                        onClick={() => void copyApplicationKey()}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <div className="dialog-actions">
+                      <button type="button" onClick={closeApplicationKeyFlow}>
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleCreateApplicationKey}>
+                    <div className="modal-header">
+                      <div>
+                        <h2 id="create-application-key-title">
+                          Create application key
+                        </h2>
+                        <span>
+                          Create a machine credential for external services and
+                          automation.
+                        </span>
+                      </div>
+                      <IconButton
+                        label="Close dialog"
+                        type="button"
+                        onClick={closeApplicationKeyFlow}
+                      >
+                        x
+                      </IconButton>
+                    </div>
+                    <div className="modal-body application-key-form-body">
+                      <label>
+                        Name
+                        <input
+                          required
+                          autoFocus
+                          value={applicationKeyForm.name}
+                          onChange={(event) =>
+                            setApplicationKeyForm((current) => ({
+                              ...current,
+                              name: event.target.value,
+                            }))
+                          }
+                          placeholder="payments-production"
+                        />
+                        <span className="field-help">
+                          Choose a name that identifies the consuming service.
+                        </span>
+                      </label>
+                      <fieldset>
+                        <legend>Scopes</legend>
+                        <span className="field-help">
+                          Select the permissions this credential needs.
+                        </span>
+                        <div className="choice-grid">
+                          {["read", "write", "admin"].map((scope) => {
+                            const selected = applicationKeyForm.scopes
+                              .split(",")
+                              .includes(scope);
+                            return (
+                              <label className="choice-row" key={scope}>
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={() =>
+                                    setApplicationKeyForm((current) => {
+                                      const scopes = current.scopes
+                                        .split(",")
+                                        .filter(Boolean);
+                                      return {
+                                        ...current,
+                                        scopes: selected
+                                          ? scopes
+                                              .filter(
+                                                (value) => value !== scope,
+                                              )
+                                              .join(",")
+                                          : [...scopes, scope].join(","),
+                                      };
+                                    })
+                                  }
+                                />
+                                <span>
+                                  <strong>{scope}</strong>
+                                  <small>
+                                    {scope === "read"
+                                      ? "View registry resources"
+                                      : scope === "write"
+                                        ? "Change registry resources"
+                                        : "Administrative access"}
+                                  </small>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                      <fieldset>
+                        <legend>Environments</legend>
+                        <span className="field-help">
+                          Limit this key to selected environments, or allow all
+                          environments.
+                        </span>
+                        <label className="choice-row environment-all-choice">
+                          <input
+                            type="checkbox"
+                            checked={!applicationKeyForm.environmentIds}
+                            onChange={(event) =>
+                              setApplicationKeyForm((current) => ({
+                                ...current,
+                                environmentIds: event.target.checked
+                                  ? ""
+                                  : (environments[0]?.id ?? ""),
+                              }))
+                            }
+                          />
+                          <span>
+                            <strong>All environments</strong>
+                            <small>Allow access across the registry</small>
+                          </span>
+                        </label>
+                        <div className="choice-grid environment-choices">
+                          {environments.map((environment) => {
+                            const selected = applicationKeyForm.environmentIds
+                              .split(",")
+                              .filter(Boolean)
+                              .includes(environment.id);
+                            return (
+                              <label
+                                className="choice-row"
+                                key={environment.id}
+                              >
+                                <input
+                                  type="checkbox"
+                                  disabled={!applicationKeyForm.environmentIds}
+                                  checked={selected}
+                                  onChange={() =>
+                                    setApplicationKeyForm((current) => {
+                                      const ids = current.environmentIds
+                                        .split(",")
+                                        .filter(Boolean);
+                                      const next = selected
+                                        ? ids.filter(
+                                            (id) => id !== environment.id,
+                                          )
+                                        : [...ids, environment.id];
+                                      return {
+                                        ...current,
+                                        environmentIds: next.join(","),
+                                      };
+                                    })
+                                  }
+                                />
+                                <span>
+                                  <strong>{environment.name}</strong>
+                                  <small>{environment.key}</small>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                      <label>
+                        Expiration
+                        <select
+                          value={applicationKeyForm.expiresInHours}
+                          onChange={(event) =>
+                            setApplicationKeyForm((current) => ({
+                              ...current,
+                              expiresInHours: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="168">7 days</option>
+                          <option value="720">30 days</option>
+                          <option value="2160">90 days</option>
+                          <option value="">Never</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="dialog-actions">
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={closeApplicationKeyFlow}
+                      >
+                        Cancel
+                      </Button>
+                      <Button variant="primary" type="submit">
+                        Create application key
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
-          </div> : null}
+          ) : null}
         </section>
       ) : activeView === "events" ? (
         <OperationalWorkspace {...operationalProps} view="events" />
@@ -2565,13 +3612,9 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   );
 }
 
-
-
 function formatProtocol(value: string) {
   return value.replace("PROTOCOL_", "").toLowerCase();
 }
-
-
 
 function primaryEndpointForInstance(endpoints: Endpoint[], instanceId: string) {
   const instanceEndpoints = endpoints.filter(
@@ -2653,26 +3696,62 @@ function formatPolicyScope(policy: AlertPolicy) {
   return "No scope";
 }
 
-const serviceTabs = ["overview", "instances", "health", "incidents", "events"] as const;
+const serviceTabs = [
+  "overview",
+  "instances",
+  "health",
+  "incidents",
+  "events",
+] as const;
 type ServiceTabPath = (typeof serviceTabs)[number];
 
-function parseApplicationPath(pathname: string): { view: ActiveView; serviceId: string; serviceTab: ServiceTabPath } {
-  const parts = pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
+function parseApplicationPath(pathname: string): {
+  view: ActiveView;
+  serviceId: string;
+  serviceTab: ServiceTabPath;
+} {
+  const parts = pathname
+    .split("/")
+    .filter(Boolean)
+    .map((part) => decodeURIComponent(part));
   const view = parts[0] as ActiveView | undefined;
   if (view === "services") {
-    const serviceTab = parts[2] === "availability" ? "health" : serviceTabs.includes(parts[2] as ServiceTabPath) ? parts[2] as ServiceTabPath : "overview";
+    const serviceTab =
+      parts[2] === "availability"
+        ? "health"
+        : serviceTabs.includes(parts[2] as ServiceTabPath)
+          ? (parts[2] as ServiceTabPath)
+          : "overview";
     return { view, serviceId: parts[1] ?? "", serviceTab };
   }
   return {
-    view: view && ["dashboard", "environments", "health", "incidents", "alerts", "security", "events"].includes(view) ? view : "dashboard",
+    view:
+      view &&
+      [
+        "dashboard",
+        "environments",
+        "health",
+        "incidents",
+        "alerts",
+        "security",
+        "events",
+      ].includes(view)
+        ? view
+        : "dashboard",
     serviceId: "",
     serviceTab: "overview",
   };
 }
 
-function applicationPath(view: ActiveView, serviceId: string, serviceTab: ServiceTabPath | "availability") {
+function applicationPath(
+  view: ActiveView,
+  serviceId: string,
+  serviceTab: ServiceTabPath | "availability",
+) {
   if (view === "services") {
-    return serviceId ? `/services/${encodeURIComponent(serviceId)}/${serviceTab === "availability" ? "health" : serviceTab}` : "/services";
+    return serviceId
+      ? `/services/${encodeURIComponent(serviceId)}/${serviceTab === "availability" ? "health" : serviceTab}`
+      : "/services";
   }
   return `/${view}`;
 }
@@ -2686,7 +3765,11 @@ function serviceOperationalStatus(service: Service, incidents: Incident[]) {
   return hasOpenIncident ? "degraded" : "healthy";
 }
 
-function LoginPage({ onAuthenticated }: { onAuthenticated: (user: UserAccount, mustChangePassword: boolean) => void }) {
+function LoginPage({
+  onAuthenticated,
+}: {
+  onAuthenticated: (user: UserAccount, mustChangePassword: boolean) => void;
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -2699,7 +3782,12 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: UserAccount, m
     try {
       const response = await login({ username, password });
       if (!response.user) throw new Error("Login returned no user");
-      onAuthenticated(response.user, Boolean(response.mustChangePassword ?? response.user.mustChangePassword));
+      onAuthenticated(
+        response.user,
+        Boolean(
+          response.mustChangePassword ?? response.user.mustChangePassword,
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
     } finally {
@@ -2710,13 +3798,42 @@ function LoginPage({ onAuthenticated }: { onAuthenticated: (user: UserAccount, m
   return (
     <main className="auth-boundary">
       <section className="auth-card" aria-labelledby="login-title">
-        <div className="brand-lockup auth-brand"><div className="brand-mark" aria-hidden="true">A</div><div><h1>Alauda</h1><p>Service Registry</p></div></div>
+        <div className="brand-lockup auth-brand">
+          <div className="brand-mark" aria-hidden="true">
+            A
+          </div>
+          <div>
+            <h1>Alauda</h1>
+            <p>Service Registry</p>
+          </div>
+        </div>
         <h2 id="login-title">Sign in to Alauda</h2>
         <form className="alauda-auth-form" onSubmit={submit}>
-          <FormField label="Username"><Input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></FormField>
-          <FormField label="Password"><PasswordInput autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></FormField>
+          <FormField label="Username">
+            <Input
+              autoComplete="username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              required
+            />
+          </FormField>
+          <FormField label="Password">
+            <PasswordInput
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </FormField>
           {error ? <Alert tone="danger" title={error} /> : null}
-          <FormButton variant="primary" disabled={saving} aria-busy={saving} type="submit">{saving ? "Signing in" : "Sign in"}</FormButton>
+          <FormButton
+            variant="primary"
+            disabled={saving}
+            aria-busy={saving}
+            type="submit"
+          >
+            {saving ? "Signing in" : "Sign in"}
+          </FormButton>
         </form>
       </section>
     </main>
@@ -2746,14 +3863,48 @@ function PasswordChangePage({ onComplete }: { onComplete: () => void }) {
   return (
     <main className="auth-boundary">
       <section className="auth-card" aria-labelledby="password-title">
-        <div className="brand-lockup auth-brand"><div className="brand-mark" aria-hidden="true">A</div><div><h1>Alauda</h1><p>Service Registry</p></div></div>
+        <div className="brand-lockup auth-brand">
+          <div className="brand-mark" aria-hidden="true">
+            A
+          </div>
+          <div>
+            <h1>Alauda</h1>
+            <p>Service Registry</p>
+          </div>
+        </div>
         <h2 id="password-title">Set a new password</h2>
-        <p>For security, replace the temporary administrator password before continuing.</p>
+        <p>
+          For security, replace the temporary administrator password before
+          continuing.
+        </p>
         <form className="alauda-auth-form" onSubmit={submit}>
-          <FormField label="New password" hint="At least 12 characters"><PasswordInput autoComplete="new-password" minLength={12} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></FormField>
-          <FormField label="Confirm password"><PasswordInput autoComplete="new-password" minLength={12} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required /></FormField>
+          <FormField label="New password" hint="At least 12 characters">
+            <PasswordInput
+              autoComplete="new-password"
+              minLength={12}
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              required
+            />
+          </FormField>
+          <FormField label="Confirm password">
+            <PasswordInput
+              autoComplete="new-password"
+              minLength={12}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+            />
+          </FormField>
           {error ? <Alert tone="danger" title={error} /> : null}
-          <FormButton variant="primary" disabled={saving} aria-busy={saving} type="submit">{saving ? "Updating" : "Update password"}</FormButton>
+          <FormButton
+            variant="primary"
+            disabled={saving}
+            aria-busy={saving}
+            type="submit"
+          >
+            {saving ? "Updating" : "Update password"}
+          </FormButton>
         </form>
       </section>
     </main>
@@ -2761,7 +3912,9 @@ function PasswordChangePage({ onComplete }: { onComplete: () => void }) {
 }
 
 function App() {
-  const [authState, setAuthState] = useState<"loading" | "anonymous" | "authenticated" | "must-change">("loading");
+  const [authState, setAuthState] = useState<
+    "loading" | "anonymous" | "authenticated" | "must-change"
+  >("loading");
 
   useEffect(() => {
     setAuthenticationFailureHandler(() => {
@@ -2770,19 +3923,44 @@ function App() {
     getCurrentSession()
       .then((response) => {
         if (!response.user) throw new Error("Session returned no user");
-        setAuthState(response.mustChangePassword ? "must-change" : "authenticated");
+        setAuthState(
+          response.mustChangePassword ? "must-change" : "authenticated",
+        );
       })
       .catch(() => setAuthState("anonymous"));
     return () => setAuthenticationFailureHandler(undefined);
   }, []);
 
   async function handleLogout() {
-    try { await logout(); } finally { setAuthState("anonymous"); }
+    try {
+      await logout();
+    } finally {
+      setAuthState("anonymous");
+    }
   }
 
-  if (authState === "loading") return <main className="auth-boundary"><div className="status">Loading authentication...</div></main>;
-  if (authState === "anonymous") return <LoginPage onAuthenticated={(_nextUser, mustChange) => { setAuthState(mustChange ? "must-change" : "authenticated"); }} />;
-  if (authState === "must-change") return <PasswordChangePage onComplete={() => { setAuthState("anonymous"); }} />;
+  if (authState === "loading")
+    return (
+      <main className="auth-boundary">
+        <div className="status">Loading authentication...</div>
+      </main>
+    );
+  if (authState === "anonymous")
+    return (
+      <LoginPage
+        onAuthenticated={(_nextUser, mustChange) => {
+          setAuthState(mustChange ? "must-change" : "authenticated");
+        }}
+      />
+    );
+  if (authState === "must-change")
+    return (
+      <PasswordChangePage
+        onComplete={() => {
+          setAuthState("anonymous");
+        }}
+      />
+    );
   return <AuthenticatedApp onLogout={handleLogout} />;
 }
 
