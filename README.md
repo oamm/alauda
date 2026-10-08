@@ -1,6 +1,12 @@
 # Alauda Service Registry
 
-Alauda is a self-hosted service registry and operational control plane for registering services, environments, instances, endpoints, health checks, incidents, and execution results.
+Alauda is a self-hosted service registry and service discovery platform for registering services, environments, instances, endpoints, health checks, incidents, and execution results. It gives teams a clear operational view of distributed services without depending on a hosted control plane.
+
+Run Alauda with the public container image:
+
+```sh
+docker pull oamm/alauda:latest
+```
 
 ## Features
 
@@ -174,16 +180,6 @@ The `alauda` CLI talks to the server API and does not access the database direct
 - [Health model](docs/HEALTH.md)
 
 The web console is served by the registry binary. The default server port is `9700`; use `registry server --help` or the configuration documentation for available options.
-
-## Container Image
-
-The latest Alauda image is available on [Docker Hub](https://hub.docker.com/r/oamm/alauda):
-
-```sh
-docker pull oamm/alauda:latest
-```
-
-See [Docker usage](docs/DOCKER.md) for deployment and configuration options.
 
 ## Contributing
 
