@@ -175,22 +175,15 @@ The `alauda` CLI talks to the server API and does not access the database direct
 
 The web console is served by the registry binary. The default server port is `9700`; use `registry server --help` or the configuration documentation for available options.
 
-## Docker Hub Publishing
+## Container Image
 
-The workflow in `.github/workflows/docker-publish.yml` publishes the production image to Docker Hub:
+The latest Alauda image is available on [Docker Hub](https://hub.docker.com/r/oamm/alauda):
 
-- pushes to `main` publish the `latest` tag
-- version tags such as `v1.2.3` publish semver tags and the corresponding version tag
-- manual runs publish the branch-derived tag
+```sh
+docker pull oamm/alauda:latest
+```
 
-Configure these GitHub repository secrets before enabling publication:
-
-- `DOCKERHUB_USERNAME`: Docker Hub account name
-- `DOCKERHUB_TOKEN`: Docker Hub access token with permission to push to the repository
-
-The workflow publishes the `alauda` Docker Hub repository.
-
-Published images are available at [hub.docker.com/r/oamm/alauda](https://hub.docker.com/r/oamm/alauda).
+See [Docker usage](docs/DOCKER.md) for deployment and configuration options.
 
 ## Contributing
 
