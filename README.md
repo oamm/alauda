@@ -122,6 +122,8 @@ Configure these GitHub repository secrets before enabling publication:
 
 The workflow publishes the `alauda` Docker Hub repository.
 
+Published images are available at [hub.docker.com/r/oamm/alauda](https://hub.docker.com/r/oamm/alauda).
+
 ## Contributing
 
 Read the project documentation and run the Go and frontend test suites before opening a pull request. Keep API contracts and migration behavior documented when changing server or UI workflows.
