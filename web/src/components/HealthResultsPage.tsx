@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   queryHealthResults,
   type HealthResultRecord,
@@ -38,6 +38,7 @@ import {
   DialogFooter,
   DefinitionList,
   StatusBadge,
+  FilterChip,
   ResourceList,
   ResourceRow,
   Inline,
@@ -267,6 +268,7 @@ export function HealthResultsPage(props: Props) {
         description="Search and inspect health-check executions across services."
         action={
           <Button variant="ghost" onClick={props.onBack}>
+            <ArrowLeft size={14} aria-hidden="true" />
             Back to Health
           </Button>
         }
@@ -350,32 +352,30 @@ export function HealthResultsPage(props: Props) {
             <option value="100">100</option>
           </Select>
         </FormField>
-        <Button variant="ghost" aria-label="Reset filters" onClick={clearAll}>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label="Reset filters"
+          onClick={clearAll}
+        >
           Clear all
         </Button>
       </FilterBar>
       {chips.length ? (
         <div
-          className="flex flex-wrap items-center gap-1.5 text-xs"
+          className="flex flex-wrap items-center gap-2 text-xs"
           aria-label="Active filters"
         >
           <span className="mr-1 text-[var(--text-muted)]">Filtered by</span>
           {chips.map(([key, label, value]) => (
-            <span
-              className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-1"
+            <FilterChip
               key={key}
-            >
-              {label}: {value}
-              <button
-                type="button"
-                aria-label={`Remove ${label} filter`}
-                onClick={() => update(key, "")}
-              >
-                <X size={12} />
-              </button>
-            </span>
+              label={label}
+              value={value}
+              onRemove={() => update(key, "")}
+            />
           ))}
-          <Button size="sm" variant="link" onClick={clearAll}>
+          <Button size="sm" variant="ghost" onClick={clearAll}>
             Clear all
           </Button>
         </div>
@@ -461,7 +461,11 @@ export function HealthResultsPage(props: Props) {
                             ? "text-[var(--text-muted)]"
                             : undefined
                         }
-                        title={result.latencyMs == null ? "Duration not recorded" : undefined}
+                        title={
+                          result.latencyMs == null
+                            ? "Duration not recorded"
+                            : undefined
+                        }
                       >
                         {duration(result.latencyMs)}
                         {result.latencyMs == null ? (
@@ -470,8 +474,8 @@ export function HealthResultsPage(props: Props) {
                       </span>
                     </TableCell>
                     <TableCell>
-                  <IconButton
-                      label={`Details for ${result.check}`}
+                      <IconButton
+                        label="View result details"
                         variant="ghost"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -507,17 +511,23 @@ export function HealthResultsPage(props: Props) {
                         {result.endpoint || "Instance address"} ·{" "}
                         {protocolName(result.protocol)} :{result.port}
                       </span>
-                        <span
-                          className={
-                            result.latencyMs == null
-                              ? "text-[var(--text-muted)]"
-                              : undefined
-                          }
-                          title={result.latencyMs == null ? "Duration not recorded" : undefined}
-                        >
-                          {duration(result.latencyMs)}
-                          {result.latencyMs == null ? <span className="sr-only">Not recorded</span> : null}
-                        </span>
+                      <span
+                        className={
+                          result.latencyMs == null
+                            ? "text-[var(--text-muted)]"
+                            : undefined
+                        }
+                        title={
+                          result.latencyMs == null
+                            ? "Duration not recorded"
+                            : undefined
+                        }
+                      >
+                        {duration(result.latencyMs)}
+                        {result.latencyMs == null ? (
+                          <span className="sr-only">Not recorded</span>
+                        ) : null}
+                      </span>
                     </>
                   }
                   status={
@@ -527,7 +537,7 @@ export function HealthResultsPage(props: Props) {
                   }
                   action={
                     <IconButton
-                    label={`Details for ${result.check}`}
+                      label="View result details"
                       variant="ghost"
                       onClick={() => setSelection(result)}
                     >
@@ -540,12 +550,14 @@ export function HealthResultsPage(props: Props) {
           </div>
         </>
       )}
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-2 text-xs text-[var(--text-muted)]">
-      <span>
-        {first}–{last}
-        {hasNext ? "+" : ""}
-        {token ? <span className="sr-only">Page {Math.floor(token / size) + 1}</span> : null}
-      </span>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-2 text-xs text-[var(--text-muted)]">
+        <span>
+          {first}–{last}
+          {hasNext ? "+" : ""}
+          {token ? (
+            <span className="sr-only">Page {Math.floor(token / size) + 1}</span>
+          ) : null}
+        </span>
         <div className="flex gap-2">
           <Button
             size="sm"

@@ -214,7 +214,9 @@ describe("Health result history", () => {
     });
     expect(table).toHaveTextContent("Production");
     expect(table).toHaveTextContent("Not recorded");
-    fireEvent.click(within(table).getByRole("button", { name: /Details for/ }));
+    fireEvent.click(
+      within(table).getByRole("button", { name: "View result details" }),
+    );
     const drawer = screen.getByRole("dialog", { name: "readiness" });
     expect(drawer).toHaveTextContent("Reason");
     expect(drawer).toHaveTextContent("Port must be greater than 0");
