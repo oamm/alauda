@@ -12,29 +12,6 @@ Alauda is a self-hosted service registry and operational control plane for regis
 - PostgreSQL and SQLite-backed persistence
 - Runtime registration and service discovery workflows
 
-## Quick Start With Docker
-
-Pull the latest public image:
-
-```sh
-docker pull YOUR_DOCKERHUB_USERNAME/service-registry:latest
-```
-
-Run the registry with a persistent data directory:
-
-```sh
-docker run --name alauda-registry \
-  -p 9700:9700 \
-  -v "$(pwd)/data:/data" \
-  -e ALAUDA_STORAGE_PROVIDER=sqlite \
-  -e ALAUDA_DATABASE_URL=/data/alauda.db \
-  YOUR_DOCKERHUB_USERNAME/service-registry:latest
-```
-
-Open `http://localhost:9700` after the container starts. Replace `YOUR_DOCKERHUB_USERNAME` with the Docker Hub account that publishes your image.
-
-The default configuration uses PostgreSQL. For a single-node SQLite deployment, mount `/data` and set `ALAUDA_STORAGE_PROVIDER=sqlite` and `ALAUDA_DATABASE_URL=/data/alauda.db`. See [Storage Providers](docs/STORAGE.md), [Configuration](docs/CONFIGURATION.md), and [Docker](docs/DOCKER.md).
-
 ## Build From Source
 
 Requirements:
@@ -62,8 +39,8 @@ make build-alauda
 Build and run a local image:
 
 ```sh
-make docker-build IMAGE=alauda/service-registry:local
-docker run --rm -p 9700:9700 -v "$(pwd)/data:/data" -e ALAUDA_STORAGE_PROVIDER=sqlite -e ALAUDA_DATABASE_URL=/data/alauda.db alauda/service-registry:local
+make docker-build IMAGE=alauda:local
+docker run --rm -p 9700:9700 -v "$(pwd)/data:/data" alauda:local
 ```
 
 Start the recommended PostgreSQL development workflow with `./scripts/dev.sh` or `make dev`. To use a local SQLite file instead, run `./scripts/dev.sh --db sqlite`. Run the frontend separately with `make dev-ui` when you need the Vite development server.
@@ -143,7 +120,7 @@ Configure these GitHub repository secrets before enabling publication:
 - `DOCKERHUB_USERNAME`: Docker Hub account name
 - `DOCKERHUB_TOKEN`: Docker Hub access token with permission to push to the repository
 
-The workflow assumes the Docker Hub repository is named `service-registry`. Change `IMAGE_REPOSITORY` in the workflow if the public repository uses another name.
+The workflow publishes the `alauda` Docker Hub repository.
 
 ## Contributing
 
