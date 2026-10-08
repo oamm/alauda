@@ -51,6 +51,7 @@ type Props = {
   onResults: (checkId?: string) => void;
   onChecks?: () => void;
   showAvailability?: boolean;
+  status: string;
 };
 
 function checkType(check: HealthCheck) {
@@ -125,19 +126,17 @@ export function ServiceHealthView(props: Props) {
   const unhealthy = props.instances.filter(
     (instance) => stateFor(instance) === "HEALTH_STATE_UNHEALTHY",
   ).length;
-  const unknown = props.instances.length - healthy - unhealthy;
-  const overall = unhealthy
-    ? healthy
-      ? "degraded"
-      : "unhealthy"
-    : unknown || !props.instances.length
-      ? "unknown"
-      : "healthy";
-  const monitored = new Set(
-    props.checks
-      .filter((check) => check.enabled)
-      .map((check) => check.instanceId),
-  ).size;
+  const degraded = props.instances.filter(
+    (instance) => stateFor(instance) === "HEALTH_STATE_DEGRADED",
+  ).length;
+  const disabled = props.instances.filter(
+    (instance) => stateFor(instance) === "HEALTH_STATE_DISABLED",
+  ).length;
+  const unknown = props.instances.length - healthy - unhealthy - degraded - disabled;
+  const overall = props.status;
+  const monitored = props.instances.filter((instance) =>
+    props.states.some((state) => state.instanceId === instance.id && state.monitored),
+  ).length;
   const windows: Array<[string, AvailabilitySummary | undefined]> = [
     ["24 hours", props.availability.availability24h],
     ["7 days", props.availability.availability7d],
@@ -208,13 +207,10 @@ export function ServiceHealthView(props: Props) {
           <Stat label="Monitored" value={monitored} />
           <Stat label="Healthy" value={healthy} />
           <Stat label="Unhealthy" value={unhealthy} />
+          <Stat label="Unknown" value={unknown} />
+          {degraded > 0 ? <Stat label="Degraded" value={degraded} /> : null}
+          {disabled > 0 ? <Stat label="Disabled" value={disabled} /> : null}
         </StatGroup>
-        {unknown > 0 ? (
-          <p className="mt-2 text-xs text-[var(--text-muted)]">
-            {pluralize(unknown, "instance")} without a known current health
-            state.
-          </p>
-        ) : null}
       </Section>
       {props.showAvailability !== false ? (
         <Section title="Availability">

@@ -111,7 +111,14 @@ func TestAuthenticatedPublicCLIWorkflow(t *testing.T) {
 			}
 		}
 	}
-	require("services", "list", "--environment", "stg", "--output", "json")
+	serviceList := require("services", "list", "--environment", "stg", "--output", "json")
+	if !strings.Contains(serviceList, `"healthStatus":"Unknown"`) {
+		t.Fatalf("unmonitored Service must report canonical Unknown health: %s", serviceList)
+	}
+	serviceTable := require("services", "list", "--environment", "stg", "--output", "table")
+	if !strings.Contains(serviceTable, "HEALTHSTATUS") || !strings.Contains(serviceTable, "Unknown") {
+		t.Fatalf("table omitted canonical health status: %s", serviceTable)
+	}
 	require("services", "instances", "Authentication.Grpc", "--output", "table", "--page-size", "1")
 	if _, err = run("services", "endpoints", "Authentication.Grpc", "--instance", "missing"); exitCode(err) != 5 {
 		t.Fatalf("not found=%v", err)

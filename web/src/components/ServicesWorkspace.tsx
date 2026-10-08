@@ -222,7 +222,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
     (event) => event.serviceId === props.selectedServiceId,
   );
   const status = selectedService
-    ? serviceStatus(selectedService, props.incidents)
+    ? serviceStatus(selectedService)
     : "unknown";
 
   return (
@@ -263,6 +263,8 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                   <option value="all">All health</option>
                   <option value="healthy">Healthy</option>
                   <option value="degraded">Degraded</option>
+                  <option value="unhealthy">Unhealthy</option>
+                  <option value="unknown">Unknown</option>
                 </Select>
               </FormField>
               <FormField label="Tag">
@@ -364,7 +366,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                       ).has(instance.deploymentId),
                     ).length
                   }
-                  status={serviceStatus(service, props.incidents)}
+                  status={serviceStatus(service)}
                   onSelect={() => props.onSelectService(service.id)}
                   onToggle={() => props.toggleBulkService(service.id)}
                 />
@@ -445,6 +447,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                 </TabsContent>
                 <TabsContent value="health">
                   <ServiceHealthView
+                    status={status}
                     key={selectedService.id}
                     onResults={(checkId) =>
                       props.onHealthResults(selectedService.id, checkId)
@@ -662,7 +665,7 @@ function ServiceOverview({
         <Stat label="Endpoints" value={endpoints.length} />
         <Stat
           label="Status"
-          value={status === "healthy" ? "Healthy" : "Degraded"}
+          value={status.charAt(0).toUpperCase() + status.slice(1)}
         />
       </StatGroup>
       <div className="service-summary-grid-new">
@@ -1669,14 +1672,8 @@ function HealthDialog(
     </Dialog>
   );
 }
-function serviceStatus(service: Service, incidents: Incident[]) {
-  return incidents.some(
-    (incident) =>
-      incident.serviceId === service.id &&
-      incident.state === "INCIDENT_STATE_OPEN",
-  )
-    ? "degraded"
-    : "healthy";
+function serviceStatus(service: Service) {
+  return (service.healthStatus || "Unknown").toLowerCase();
 }
 function environmentName(environments: Environment[], id: string) {
   return (

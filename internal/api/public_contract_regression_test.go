@@ -184,22 +184,37 @@ func TestPublicDiscoveryHealthPoliciesAndOrdering(t *testing.T) {
 		if out.Instance.Healthy || out.Instance.HealthState != "Unknown" {
 			t.Fatal("registration invented healthy state")
 		}
+		if item.state == "Disabled" {
+			if _, err := f.db.Exec(context.Background(), "UPDATE service_instances SET enabled=0 WHERE id=?", out.Instance.ID); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
 		if item.state != "Unknown" {
-			_, err := storage.NewHealthRepository(f.db).CreateHealthCheck(context.Background(), &v1.CreateHealthCheckRequest{InstanceId: out.Instance.ID, EndpointId: out.Endpoints[0].ID, Name: "check", Type: v1.HealthCheckType_HEALTH_CHECK_TYPE_HTTP, Enabled: true, IntervalSeconds: 10, TimeoutSeconds: 3, FailuresBeforeUnhealthy: 3, SuccessesBeforeHealthy: 2})
+			check, err := storage.NewHealthRepository(f.db).CreateHealthCheck(context.Background(), &v1.CreateHealthCheckRequest{InstanceId: out.Instance.ID, EndpointId: out.Endpoints[0].ID, Name: "check", Type: v1.HealthCheckType_HEALTH_CHECK_TYPE_HTTP, Enabled: true, IntervalSeconds: 10, TimeoutSeconds: 3, FailuresBeforeUnhealthy: 3, SuccessesBeforeHealthy: 2})
 			if err != nil {
 				t.Fatal(err)
 			}
 			now := time.Now().UTC().Format(time.RFC3339Nano)
-			_, err = f.db.Exec(context.Background(), `INSERT INTO health_states(id,instance_id,current_state,last_transition_time,last_check_time,updated_at) VALUES(?,?,?,?,?,?)`, item.name, out.Instance.ID, "HEALTH_STATE_"+strings.ToUpper(item.state), now, now, now)
+			_, err = f.db.Exec(context.Background(), `INSERT INTO health_results(id,health_check_id,instance_id,timestamp,success) VALUES(?,?,?,?,?)`, item.name, check.Id, out.Instance.ID, now, item.state == "Healthy" || item.state == "Degraded")
 			if err != nil {
 				t.Fatal(err)
+			}
+			if item.state == "Degraded" {
+				second, err := storage.NewHealthRepository(f.db).CreateHealthCheck(context.Background(), &v1.CreateHealthCheckRequest{InstanceId: out.Instance.ID, EndpointId: out.Endpoints[0].ID, Name: "second", Type: v1.HealthCheckType_HEALTH_CHECK_TYPE_HTTP, Enabled: true, IntervalSeconds: 10, TimeoutSeconds: 3})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := f.db.Exec(context.Background(), `INSERT INTO health_results(id,health_check_id,instance_id,timestamp,success) VALUES(?,?,?,?,0)`, "second-"+item.name, second.Id, out.Instance.ID, now); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 	}
 	for _, policy := range []struct {
 		value string
 		count int
-	}{{"usable", 3}, {"healthy", 1}, {"all", 5}} {
+	}{{"usable", 3}, {"healthy", 1}, {"all", 4}} {
 		w := f.request("GET", "/api/v1/discovery/Authentication.Grpc?environment=stg&health="+policy.value, "")
 		if w.Code != 200 {
 			t.Fatal(w.Body.String())
@@ -222,7 +237,7 @@ func TestPublicDiscoveryHealthPoliciesAndOrdering(t *testing.T) {
 	if f.request("GET", "/api/v1/discovery/Authentication.Grpc?environment=stg&health=invalid", "").Code != 400 {
 		t.Fatal("invalid policy accepted")
 	}
-	_, err := f.db.Exec(context.Background(), `UPDATE health_states SET last_check_time='2000-01-01T00:00:00Z'`)
+	_, err := f.db.Exec(context.Background(), `UPDATE health_results SET timestamp='2000-01-01T00:00:00Z'`)
 	if err != nil {
 		t.Fatal(err)
 	}

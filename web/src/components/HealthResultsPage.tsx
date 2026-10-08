@@ -42,6 +42,7 @@ import {
   ResourceList,
   ResourceRow,
   Inline,
+  Pagination,
 } from "./ui";
 
 function localDateTime(value: string) {
@@ -197,7 +198,6 @@ export function HealthResultsPage(props: Props) {
     "type",
     "checkId",
     "sort",
-    "pageSize",
   ].filter((key) => get(key));
   const token = Number(get("pageToken") || 0);
   const size = Number(get("pageSize") || 25);
@@ -231,25 +231,25 @@ export function HealthResultsPage(props: Props) {
     "Service",
     props.services.find((item) => item.id === get("serviceId"))?.displayName ||
       props.services.find((item) => item.id === get("serviceId"))?.name ||
-      "Service",
+      get("serviceId"),
   );
   chip(
     "environmentId",
     "Environment",
     props.environments.find((item) => item.id === get("environmentId"))?.name ||
-      "Environment",
+      get("environmentId"),
   );
   chip(
     "instanceId",
     "Instance",
     props.instances.find((item) => item.id === get("instanceId"))?.name ||
-      "Instance",
+      get("instanceId"),
   );
   chip(
     "endpointId",
     "Endpoint",
     props.endpoints.find((item) => item.id === get("endpointId"))?.name ||
-      "Endpoint",
+      get("endpointId"),
   );
   chip("port", "Port", get("port"));
   chip("type", "Type", typeName(get("type")));
@@ -257,10 +257,25 @@ export function HealthResultsPage(props: Props) {
     "checkId",
     "Health check",
     props.checks.find((item) => item.id === get("checkId"))?.name ||
-      "Health check",
+      get("checkId"),
   );
   chip("status", "Result", get("status"));
   chip("search", "Search", get("search"));
+  for (const [key, label] of [
+    ["from", "From"],
+    ["to", "To"],
+  ]) {
+    const value = get(key);
+    if (!value) continue;
+    const date = new Date(value);
+    chip(
+      key,
+      label,
+      Number.isNaN(date.getTime())
+        ? value
+        : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" }),
+    );
+  }
   return (
     <div className="grid min-w-0 gap-3">
       <PageHeader
@@ -273,317 +288,312 @@ export function HealthResultsPage(props: Props) {
           </Button>
         }
       />
-      <FilterBar
-        collapseAfter={5}
-        persistentDisclosure
-        compact
-        activeAdvanced={advancedKeys.length}
-      >
-        <FormField label="From">
-          <Input
-            type="datetime-local"
-            value={localDateTime(get("from"))}
-            onChange={(e) => update("from", e.target.value)}
-          />
-        </FormField>
-        <FormField label="To">
-          <Input
-            type="datetime-local"
-            value={localDateTime(get("to"))}
-            onChange={(e) => update("to", e.target.value)}
-          />
-        </FormField>
-        {select(
-          "serviceId",
-          "Service",
-          props.services.map((s) => ({
-            id: s.id,
-            name: s.displayName || s.name,
-          })),
-        )}
-        {select("status", "Result", [
-          { id: "healthy", name: "Healthy" },
-          { id: "unhealthy", name: "Unhealthy" },
-        ])}
-        <FormField label="Search">
-          <SearchInput
-            value={get("search")}
-            placeholder="Search targets, checks, failures"
-            onChange={(e) => update("search", e.target.value)}
-          />
-        </FormField>
-        {select("environmentId", "Environment", props.environments)}
-        {select("instanceId", "Instance", scopedInstances)}
-        {select("endpointId", "Endpoint", scopedEndpoints)}
-        <FormField label="Port">
-          <Input
-            type="number"
-            min={1}
-            max={65535}
-            value={get("port")}
-            onChange={(e) => update("port", e.target.value)}
-          />
-        </FormField>
-        {select(
-          "type",
-          "Check type",
-          allHealthTypes.map((type) => ({
-            id: `HEALTH_CHECK_TYPE_${type}`,
-            name: type,
-          })),
-        )}
-        {select("checkId", "Health check", scopedChecks)}
-        <FormField label="Order">
-          <Select
-            value={get("sort") || "newest"}
-            onChange={(e) => update("sort", e.target.value)}
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </Select>
-        </FormField>
-        <FormField label="Page size">
-          <Select
-            value={String(size)}
-            onChange={(e) => update("pageSize", e.target.value)}
-          >
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </Select>
-        </FormField>
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label="Reset filters"
-          onClick={clearAll}
+      <div className="health-results-surface">
+        <FilterBar
+          collapseAfter={5}
+          persistentDisclosure
+          compact
+          activeAdvanced={advancedKeys.length}
         >
-          Clear all
-        </Button>
-      </FilterBar>
-      {chips.length ? (
-        <div
-          className="flex flex-wrap items-center gap-2 text-xs"
-          aria-label="Active filters"
-        >
-          <span className="mr-1 text-[var(--text-muted)]">Filtered by</span>
-          {chips.map(([key, label, value]) => (
-            <FilterChip
-              key={key}
-              label={label}
-              value={value}
-              onRemove={() => update(key, "")}
+          <FormField label="From">
+            <Input
+              type="datetime-local"
+              value={localDateTime(get("from"))}
+              onChange={(e) => update("from", e.target.value)}
             />
-          ))}
-          <Button size="sm" variant="ghost" onClick={clearAll}>
-            Clear all
-          </Button>
-        </div>
-      ) : null}
-      {loading ? (
-        <>
-          <TableSkeleton />
-          <div className="sr-only" role="status">
-            Loading health results
+          </FormField>
+          <FormField label="To">
+            <Input
+              type="datetime-local"
+              value={localDateTime(get("to"))}
+              onChange={(e) => update("to", e.target.value)}
+            />
+          </FormField>
+          {select(
+            "serviceId",
+            "Service",
+            props.services.map((s) => ({
+              id: s.id,
+              name: s.displayName || s.name,
+            })),
+          )}
+          {select("status", "Result", [
+            { id: "healthy", name: "Healthy" },
+            { id: "unhealthy", name: "Unhealthy" },
+          ])}
+          <FormField label="Search">
+            <SearchInput
+              value={get("search")}
+              placeholder="Search targets, checks, failures"
+              onChange={(e) => update("search", e.target.value)}
+            />
+          </FormField>
+          {select("environmentId", "Environment", props.environments)}
+          {select("instanceId", "Instance", scopedInstances)}
+          {select("endpointId", "Endpoint", scopedEndpoints)}
+          <FormField label="Port">
+            <Input
+              type="number"
+              min={1}
+              max={65535}
+              value={get("port")}
+              onChange={(e) => update("port", e.target.value)}
+            />
+          </FormField>
+          {select(
+            "type",
+            "Check type",
+            allHealthTypes.map((type) => ({
+              id: `HEALTH_CHECK_TYPE_${type}`,
+              name: type,
+            })),
+          )}
+          {select("checkId", "Health check", scopedChecks)}
+          <FormField label="Order">
+            <Select
+              value={get("sort") || "newest"}
+              onChange={(e) => update("sort", e.target.value)}
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </Select>
+          </FormField>
+        </FilterBar>
+        {chips.length ? (
+          <div
+            className="flex flex-wrap items-center gap-2 text-xs"
+            aria-label="Active filters"
+          >
+            {chips.map(([key, label, value]) => (
+              <FilterChip
+                key={key}
+                label={label}
+                value={value}
+                onRemove={() => update(key, "")}
+              />
+            ))}
+            <Button size="sm" variant="ghost" onClick={clearAll}>
+              Clear all
+            </Button>
           </div>
-        </>
-      ) : error ? (
-        <Alert tone="danger" title={error || "Unable to load health results"}>
-          <Button size="sm" onClick={() => setRetry((value) => value + 1)}>
-            Retry
-          </Button>
-        </Alert>
-      ) : !data.results.length ? (
-        <EmptyState
-          title="No health results found"
-          description={
-            params.size
-              ? "Try changing the selected filters or date range."
-              : "No health checks have produced results yet. Run a Health Check or wait for scheduled execution."
-          }
-        />
-      ) : (
-        <>
-          <div className="hidden min-w-0 md:block">
-            <Table aria-label="Health result history">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Check</TableHead>
-                  <TableHead>Result</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Open details</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.results.map((result) => (
-                  <TableRow
-                    key={result.id}
-                    className="cursor-pointer"
-                    onClick={() => setSelection(result)}
-                  >
-                    <TableCell>
-                      <div>{formatTimestamp(result.timestamp)}</div>
-                      {relativeTime(result.timestamp) ? (
-                        <div className="text-xs text-[var(--text-muted)]">
-                          {relativeTime(result.timestamp)}
+        ) : null}
+        {loading ? (
+          <>
+            <TableSkeleton />
+            <div className="sr-only" role="status">
+              Loading health results
+            </div>
+          </>
+        ) : error ? (
+          <Alert tone="danger" title={error || "Unable to load health results"}>
+            <Button size="sm" onClick={() => setRetry((value) => value + 1)}>
+              Retry
+            </Button>
+          </Alert>
+        ) : !data.results.length ? (
+          <EmptyState
+            title="No health results found"
+            description={
+              params.size
+                ? "Try changing the selected filters or date range."
+                : "No health checks have produced results yet. Run a Health Check or wait for scheduled execution."
+            }
+          />
+        ) : (
+          <>
+            <div className="hidden min-w-0 md:block">
+              <Table
+                aria-label="Health result history"
+                className="health-results-table"
+              >
+                <colgroup>
+                  <col className="health-col-timestamp" />
+                  <col className="health-col-target" />
+                  <col className="health-col-check" />
+                  <col className="health-col-result" />
+                  <col className="health-col-duration" />
+                  <col className="health-col-action" />
+                </colgroup>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>Target</TableHead>
+                    <TableHead>Check</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Open details</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.results.map((result) => (
+                    <TableRow key={result.id}>
+                      <TableCell>
+                        <div className="font-medium">
+                          {formatTimestamp(result.timestamp)}
                         </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        {result.service} · {result.environment}
-                      </div>
-                      <div>{result.instance}</div>
-                      <div className="text-xs text-[var(--text-muted)]">
-                        {result.endpoint || "Instance address"} ·{" "}
-                        {protocolName(result.protocol)} :{result.port}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{result.check}</div>
-                      <div className="text-xs text-[var(--text-muted)]">
-                        {typeName(result.type)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                        {relativeTime(result.timestamp) ? (
+                          <div className="text-xs text-[var(--text-muted)]">
+                            {relativeTime(result.timestamp)}
+                          </div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <TargetSummary result={result} />
+                      </TableCell>
+                      <TableCell>
+                        <div>{result.check}</div>
+                        <div className="text-xs text-[var(--text-muted)]">
+                          {typeName(result.type)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          status={result.success ? "healthy" : "unhealthy"}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={
+                            result.latencyMs == null
+                              ? "text-[var(--text-muted)]"
+                              : undefined
+                          }
+                          title={
+                            result.latencyMs == null
+                              ? "Duration not recorded"
+                              : undefined
+                          }
+                        >
+                          {duration(result.latencyMs)}
+                          {result.latencyMs == null ? (
+                            <span className="sr-only">Not recorded</span>
+                          ) : null}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton
+                          label="View health result details"
+                          title="View details"
+                          variant="ghost"
+                          onClick={() => setSelection(result)}
+                        >
+                          <ArrowRight size={15} />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="md:hidden">
+              <ResourceList label="Health result history">
+                {data.results.map((result) => (
+                  <ResourceRow
+                    key={result.id}
+                    title={
+                      <Button
+                        variant="link"
+                        onClick={() => setSelection(result)}
+                      >
+                        {result.check}
+                      </Button>
+                    }
+                    description={
+                      <>
+                        <span className="font-medium">
+                          {formatTimestamp(result.timestamp)}
+                        </span>
+                        {relativeTime(result.timestamp) ? (
+                          <span className="text-[var(--text-muted)]">
+                            {relativeTime(result.timestamp)}
+                          </span>
+                        ) : null}
+                        <TargetSummary result={result} />
+                        <span>
+                          {result.check} · {typeName(result.type)}
+                        </span>
+                        <span>
+                          <StatusBadge
+                            status={result.success ? "healthy" : "unhealthy"}
+                          />
+                        </span>
+                        <span
+                          className={
+                            result.latencyMs == null
+                              ? "text-[var(--text-muted)]"
+                              : undefined
+                          }
+                          title={
+                            result.latencyMs == null
+                              ? "Duration not recorded"
+                              : undefined
+                          }
+                        >
+                          {duration(result.latencyMs)}
+                          {result.latencyMs == null ? (
+                            <span className="sr-only">Not recorded</span>
+                          ) : null}
+                        </span>
+                      </>
+                    }
+                    status={
                       <StatusBadge
                         status={result.success ? "healthy" : "unhealthy"}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={
-                          result.latencyMs == null
-                            ? "text-[var(--text-muted)]"
-                            : undefined
-                        }
-                        title={
-                          result.latencyMs == null
-                            ? "Duration not recorded"
-                            : undefined
-                        }
-                      >
-                        {duration(result.latencyMs)}
-                        {result.latencyMs == null ? (
-                          <span className="sr-only">Not recorded</span>
-                        ) : null}
-                      </span>
-                    </TableCell>
-                    <TableCell>
+                    }
+                    action={
                       <IconButton
-                        label="View result details"
+                        label="View health result details"
+                        title="View details"
                         variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelection(result);
-                        }}
+                        onClick={() => setSelection(result)}
                       >
                         <ArrowRight size={15} />
                       </IconButton>
-                    </TableCell>
-                  </TableRow>
+                    }
+                  />
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="md:hidden">
-            <ResourceList label="Health result history">
-              {data.results.map((result) => (
-                <ResourceRow
-                  key={result.id}
-                  title={
-                    <Button variant="link" onClick={() => setSelection(result)}>
-                      {result.check}
-                    </Button>
-                  }
-                  description={
-                    <>
-                      <span>{formatTimestamp(result.timestamp)}</span>
-                      <span>
-                        {result.service} · {result.environment} ·{" "}
-                        {result.instance}
-                      </span>
-                      <span>
-                        {result.endpoint || "Instance address"} ·{" "}
-                        {protocolName(result.protocol)} :{result.port}
-                      </span>
-                      <span
-                        className={
-                          result.latencyMs == null
-                            ? "text-[var(--text-muted)]"
-                            : undefined
-                        }
-                        title={
-                          result.latencyMs == null
-                            ? "Duration not recorded"
-                            : undefined
-                        }
-                      >
-                        {duration(result.latencyMs)}
-                        {result.latencyMs == null ? (
-                          <span className="sr-only">Not recorded</span>
-                        ) : null}
-                      </span>
-                    </>
-                  }
-                  status={
-                    <StatusBadge
-                      status={result.success ? "healthy" : "unhealthy"}
-                    />
-                  }
-                  action={
-                    <IconButton
-                      label="View result details"
-                      variant="ghost"
-                      onClick={() => setSelection(result)}
-                    >
-                      <ArrowRight size={15} />
-                    </IconButton>
-                  }
-                />
-              ))}
-            </ResourceList>
-          </div>
-        </>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-2 text-xs text-[var(--text-muted)]">
-        <span>
-          {first}–{last}
-          {hasNext ? "+" : ""}
-          {token ? (
-            <span className="sr-only">Page {Math.floor(token / size) + 1}</span>
-          ) : null}
-        </span>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            disabled={loading || !token}
-            onClick={() => {
-              const next = new URLSearchParams(search);
-              const previous = Math.max(0, token - size);
-              if (previous) next.set("pageToken", String(previous));
-              else next.delete("pageToken");
-              go(next);
-            }}
-          >
-            Previous
-          </Button>
-          <Button
-            size="sm"
-            disabled={loading || !hasNext}
-            onClick={() => {
-              const next = new URLSearchParams(search);
-              next.set("pageToken", data.nextPageToken);
-              go(next);
-            }}
-          >
-            Next
-          </Button>
-        </div>
+              </ResourceList>
+            </div>
+          </>
+        )}
+        <Pagination
+          mode="cursor"
+          page={Math.floor(token / size) + 1}
+          range={`${first}–${last}${hasNext ? "+" : ""}`}
+          canPrevious={!!token}
+          canNext={hasNext}
+          disabled={loading}
+          pageSizeControl={
+            <label className="flex items-center gap-2 whitespace-nowrap text-xs text-[var(--text-muted)]">
+              Rows per page
+              <Select
+                aria-label="Rows per page"
+                value={String(size)}
+                onChange={(e) => update("pageSize", e.target.value)}
+                className="w-[76px]"
+              >
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </Select>
+            </label>
+          }
+          onPrevious={() => {
+            const next = new URLSearchParams(search);
+            const previous = Math.max(0, token - size);
+            if (previous) next.set("pageToken", String(previous));
+            else next.delete("pageToken");
+            go(next);
+          }}
+          onNext={() => {
+            const next = new URLSearchParams(search);
+            next.set("pageToken", data.nextPageToken);
+            go(next);
+          }}
+        />
       </div>
       <ResultDetail
         result={selection}
@@ -596,11 +606,44 @@ export function HealthResultsPage(props: Props) {
   );
 }
 
+function TargetSummary({ result }: { result: HealthResultRecord }) {
+  const endpointTarget = !!result.endpointId && !!result.endpoint;
+  const protocol = protocolName(result.protocol);
+  const port = result.port > 0 ? result.port : null;
+  return (
+    <div className="health-target">
+      <div className="health-target-scope">
+        {result.service} · {result.environment}
+      </div>
+      <div className="health-target-instance">{result.instance}</div>
+      <div className="health-target-detail">
+        {endpointTarget
+          ? `${result.endpoint}${protocol ? ` · ${protocol}` : ""}${port ? ` :${port}` : ""}`
+          : result.address || "Instance-level check"}
+        {!endpointTarget && result.address ? " · Instance target" : null}
+        {!endpointTarget && !result.address ? "Instance-level check" : null}
+      </div>
+    </div>
+  );
+}
+
 function TableSkeleton() {
   return (
-    <div className="grid gap-px rounded-[var(--radius-panel)] border border-[var(--border)] p-2">
+    <div
+      className="health-results-skeleton"
+      aria-label="Loading health results"
+    >
+      <div className="health-results-skeleton-head">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-32" />
+      </div>
       {[1, 2, 3, 4, 5].map((row) => (
-        <Skeleton key={row} className="h-14" />
+        <div className="health-results-skeleton-row" key={row}>
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-16" />
+        </div>
       ))}
     </div>
   );
@@ -664,13 +707,14 @@ function ResultDetail(props: {
                 <dt>Instance</dt>
                 <dd>{result.instance}</dd>
                 <dt>Endpoint</dt>
-                <dd>{result.endpoint || "Instance address"}</dd>
+                <dd>{result.endpoint || "Instance-level check"}</dd>
                 <dt>Address</dt>
                 <dd>{result.address}</dd>
                 <dt>Protocol / port</dt>
                 <dd>
-                  {protocolName(result.protocol) || "Instance address"} :
-                  {result.port}
+                  {result.endpointId && result.endpoint
+                    ? `${protocolName(result.protocol)}${result.port > 0 ? ` :${result.port}` : ""}`
+                    : "Instance target"}
                 </dd>
                 <dt>Path</dt>
                 <dd>{result.path || "Not specified"}</dd>

@@ -182,7 +182,7 @@ func environmentAuthorization(db *storage.Database, next http.Handler) http.Hand
 		}
 		safeCatalog := path == "/api/v1/services" || path == "/api/v1/environments" || strings.Contains(path, "EnvironmentService/List") || strings.Contains(path, "CatalogService/List")
 		publicResource := strings.HasPrefix(path, "/api/v1/services/") || strings.HasPrefix(path, "/api/v1/discovery/")
-		healthProjection := path == "/api/v1/health/checks" || path == "/api/v1/health/results"
+		healthProjection := path == "/api/v1/health/checks" || path == "/api/v1/health/results" || path == "/api/v1/health/status"
 		if !checked && !safeCatalog && !publicResource && !healthProjection && path != "/openapi.json" && path != "/swagger" {
 			deny()
 			return

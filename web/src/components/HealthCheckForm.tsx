@@ -293,8 +293,6 @@ export function HealthCheckForm(props: HealthCheckFormProps) {
           [
             ["intervalSeconds", "Interval (seconds)"],
             ["timeoutSeconds", "Timeout (seconds)"],
-            ["failuresBeforeUnhealthy", "Failure threshold"],
-            ["successesBeforeHealthy", "Recovery threshold"],
           ] as const
         ).map(([key, label]) => (
           <FormField key={key} label={label} error={errors[key]}>

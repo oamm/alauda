@@ -85,8 +85,8 @@ func newHealthCheckCreateCommand() *cobra.Command {
 	c.Flags().BoolVar(&enabled, "enabled", true, "Enable health check")
 	c.Flags().Int32Var(&intervalSeconds, "interval-seconds", 10, "Interval in seconds")
 	c.Flags().Int32Var(&timeoutSeconds, "timeout-seconds", 3, "Timeout in seconds")
-	c.Flags().Int32Var(&failuresBeforeUnhealthy, "failures-before-unhealthy", 3, "Failures before unhealthy")
-	c.Flags().Int32Var(&successesBeforeHealthy, "successes-before-healthy", 2, "Successes before healthy")
+	c.Flags().Int32Var(&failuresBeforeUnhealthy, "failures-before-unhealthy", 3, "Deprecated compatibility field; current health uses the latest result")
+	c.Flags().Int32Var(&successesBeforeHealthy, "successes-before-healthy", 2, "Deprecated compatibility field; current health uses the latest result")
 	c.Flags().StringVar(&description, "description", "", "Health check description")
 	return c
 }

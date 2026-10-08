@@ -1,6 +1,6 @@
 # Alauda Public API
 
-The stable public model is `Service -> Environment -> Instance -> Endpoint -> Health Check`. Deployment records, UUID relationships, and repository identifiers are internal implementation details.
+The stable public model is `Service -> Environment -> Instance -> Endpoint -> Health Check`. Deployment records, UUID relationships, and repository identifiers are internal implementation details. Service catalog records include canonical `healthStatus`; Instance records include canonical `healthState` and `healthy=true` only for Healthy. See [HEALTH_STATE.md](HEALTH_STATE.md).
 
 ## Authentication
 

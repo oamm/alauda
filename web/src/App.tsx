@@ -50,6 +50,7 @@ import {
   createEndpoint,
   createNotificationChannel,
   createService,
+  getHealthStatus,
   createUser,
   credentialCapabilities,
   AvailabilitySummary,
@@ -124,6 +125,16 @@ function endpointMutationError(error: unknown, name: string): string {
 
 function newRegistrationEndpoint(overrides: Partial<EndpointFormValue> = {}) {
   return newEndpoint([], overrides);
+}
+
+function healthStateViews(snapshot: Awaited<ReturnType<typeof getHealthStatus>>): HealthStateView[] {
+  return Object.entries(snapshot.instances).map(([instanceId, status]) => ({
+    instanceId,
+    currentState: `HEALTH_STATE_${status.toUpperCase()}`,
+    monitored: snapshot.monitored?.[instanceId] || false,
+    consecutiveSuccesses: 0,
+    consecutiveFailures: 0,
+  }));
 }
 
 function AuthenticatedApp({
@@ -405,11 +416,10 @@ function AuthenticatedApp({
       if (serviceHealthFilter === "all") {
         return true;
       }
-      const serviceStatus = serviceOperationalStatus(service, incidents);
+      const serviceStatus = serviceOperationalStatus(service);
       return serviceHealthFilter === serviceStatus;
     });
   }, [
-    incidents,
     serviceHealthFilter,
     serviceSearch,
     serviceTagFilter,
@@ -499,6 +509,7 @@ function AuthenticatedApp({
       throw new Error("Selected environment is no longer available.");
     const [
       nextServices,
+      nextStatus,
       nextHealthChecks,
       nextIncidents,
       nextEvents,
@@ -507,6 +518,7 @@ function AuthenticatedApp({
       nextPolicies,
     ] = await Promise.all([
       listServices(environmentKey),
+      getHealthStatus(environmentKey),
       listHealthChecks(),
       listIncidents({ environmentId: environmentId || undefined }),
       listEvents({ environmentId: environmentId || undefined }),
@@ -517,7 +529,10 @@ function AuthenticatedApp({
         : Promise.resolve([]),
     ]);
     setEnvironments(nextEnvironments);
-    setServices(nextServices);
+    setServices(nextServices.map((service) => ({
+      ...service,
+      healthStatus: (nextStatus.services[service.id] || "Unknown") as Service["healthStatus"],
+    })));
     setHealthChecks(nextHealthChecks);
     setIncidents(nextIncidents);
     setEvents(nextEvents);
@@ -543,9 +558,7 @@ function AuthenticatedApp({
         nextInstances.map((instance) => listEndpoints(instance.id)),
       )
     ).flat();
-    // Some deployed API versions do not expose instance state yet. Keep the
-    // topology usable and let the service UI render an explicit unknown state.
-    const nextHealthStates: HealthStateView[] = [];
+    const nextHealthStates = healthStateViews(nextStatus);
     setDeployments(scopedDeployments);
     setInstances(nextInstances);
     setEndpoints(nextEndpoints);
@@ -598,13 +611,33 @@ function AuthenticatedApp({
   }, []);
 
   useEffect(() => {
+    if (!environments.length) return;
+    const timer = window.setInterval(async () => {
+      const environmentKey = environments.find((item) => item.id === selectedEnvironmentId)?.key;
+      try {
+        const snapshot = await getHealthStatus(environmentKey);
+        setServices((current) => current.map((service) => ({
+          ...service,
+          healthStatus: (snapshot.services[service.id] || "Unknown") as Service["healthStatus"],
+        })));
+        setHealthStates(healthStateViews(snapshot));
+      } catch {
+        setServices((current) => current.map((service) => ({ ...service, healthStatus: "Unknown" })));
+        setHealthStates([]);
+        setError("Current health is unavailable.");
+      }
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [environments, selectedEnvironmentId]);
+
+  useEffect(() => {
     const source = new EventSource(
       eventStreamUrl({ environmentId: selectedEnvironmentId || undefined }),
     );
     source.addEventListener("registry-event", (message) => {
       const event = JSON.parse((message as MessageEvent).data) as EventRecord;
       setEvents((current) => [event, ...current].slice(0, 100));
-      loadOperationalData().catch(() => undefined);
+      loadCatalog().catch(() => undefined);
     });
     source.onerror = () => {
       source.close();
@@ -1345,14 +1378,8 @@ function AuthenticatedApp({
     }
     setError("");
     try {
-      const response = await runHealthCheck(id);
-      if (response.state) {
-        const state = response.state;
-        setHealthStates((current) => [
-          ...current.filter((item) => item.instanceId !== state.instanceId),
-          state,
-        ]);
-      }
+      await runHealthCheck(id);
+      await loadCatalog(selectedEnvironmentId);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to run health check",
@@ -1585,9 +1612,6 @@ function AuthenticatedApp({
   const openIncidentCount = incidents.filter(
     (incident) => incident.state === "INCIDENT_STATE_OPEN",
   ).length;
-  const degradedServiceCount = services.filter(
-    (service) => serviceOperationalStatus(service, incidents) === "degraded",
-  ).length;
   void savingRuntimeEdit;
   void registrationSuccess;
   void registrationStep;
@@ -1688,7 +1712,6 @@ function AuthenticatedApp({
       activeView={activeView}
       currentEnvironmentName={currentEnvironmentName}
       darkMode={darkMode}
-      degradedServiceCount={degradedServiceCount}
       environments={environments}
       openIncidentCount={openIncidentCount}
       selectedEnvironmentId={selectedEnvironmentId}
@@ -3795,13 +3818,8 @@ function applicationPath(
   return `/${view}`;
 }
 
-function serviceOperationalStatus(service: Service, incidents: Incident[]) {
-  const hasOpenIncident = incidents.some(
-    (incident) =>
-      incident.serviceId === service.id &&
-      incident.state === "INCIDENT_STATE_OPEN",
-  );
-  return hasOpenIncident ? "degraded" : "healthy";
+function serviceOperationalStatus(service: Service) {
+  return (service.healthStatus || "Unknown").toLowerCase();
 }
 
 function LoginPage({

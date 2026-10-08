@@ -1,5 +1,7 @@
 # Service Discovery
 
+Current Check, Instance and Service state aggregation is defined in [HEALTH_STATE.md](HEALTH_STATE.md). Discovery consumes that shared projection.
+
 Alauda discovery is intentionally small: resolve a Service key in an Environment key, inspect candidates, or resolve a named Endpoint. Discovery respects enabled Instances and Endpoints and excludes known unhealthy or disabled Instances by default. Unknown health is retained as a usable candidate so a newly registered service can be discovered before its first check executes.
 
 Addresses use one backend builder. Input addresses are bare DNS names, IPv4 or IPv6, never schemes, embedded ports, credentials or paths. Ports are 1..65535. HTTP/HTTPS include an escaped path (default `/`); query/fragment/authority paths are rejected. IPv6 authorities are bracketed correctly. TCP/UDP use authority URIs. `grpc://host:port` is a logical cleartext gRPC authority, not an HTTP URL or automatic TLS configuration. No grpcs/TLS inference is supported; clients use the separate protocol field to choose transport.

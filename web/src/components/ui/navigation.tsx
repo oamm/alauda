@@ -24,38 +24,75 @@ export function Breadcrumb({ items }: { items: string[] }) {
     </nav>
   );
 }
-export function Pagination({
-  page,
-  pageCount,
-  onPageChange,
-}: {
-  page: number;
-  pageCount: number;
-  onPageChange: (page: number) => void;
-}) {
+type PaginationProps =
+  | {
+      page: number;
+      pageCount: number;
+      onPageChange: (page: number) => void;
+      mode?: "numbered";
+    }
+  | {
+      mode: "cursor";
+      range: string;
+      page?: number;
+      canPrevious: boolean;
+      canNext: boolean;
+      disabled?: boolean;
+      onPrevious: () => void;
+      onNext: () => void;
+      pageSizeControl?: React.ReactNode;
+      pageCount?: never;
+    };
+
+export function Pagination(props: PaginationProps) {
+  const pagination =
+    props.mode === "cursor"
+      ? {
+          label: props.range,
+          page: props.page,
+          pageSizeControl: props.pageSizeControl,
+          previousDisabled: props.disabled || !props.canPrevious,
+          nextDisabled: props.disabled || !props.canNext,
+          previous: props.onPrevious,
+          next: props.onNext,
+        }
+      : {
+          label: `Page ${props.page} of ${props.pageCount}`,
+          pageSizeControl: undefined,
+          previousDisabled: props.page <= 1,
+          nextDisabled: props.page >= props.pageCount,
+          previous: () => props.onPageChange(props.page - 1),
+          next: () => props.onPageChange(props.page + 1),
+        };
   return (
     <nav
       aria-label="Pagination"
       className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-2 text-xs text-[var(--text-muted)]"
     >
       <span>
-        Page {page} of {pageCount}
+        {pagination.label}
+        {pagination.page ? (
+          <span className="sr-only">Page {pagination.page}</span>
+        ) : null}
       </span>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          Previous
-        </Button>
-        <Button
-          size="sm"
-          disabled={page >= pageCount}
-          onClick={() => onPageChange(page + 1)}
-        >
-          Next
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {pagination.pageSizeControl}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            disabled={pagination.previousDisabled}
+            onClick={pagination.previous}
+          >
+            Previous
+          </Button>
+          <Button
+            size="sm"
+            disabled={pagination.nextDisabled}
+            onClick={pagination.next}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </nav>
   );

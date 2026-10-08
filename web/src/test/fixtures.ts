@@ -153,6 +153,9 @@ export function mockResponse(path: string, init?: RequestInit) {
       ],
     };
   }
+  if (path.includes("/api/v1/health/status")) {
+    return { services: { "svc-1": "Unknown" }, instances: { "inst-1": "Unknown" }, monitored: { "inst-1": true } };
+  }
   if (path.includes("ListHealthChecks")) {
     return {
       healthChecks: [

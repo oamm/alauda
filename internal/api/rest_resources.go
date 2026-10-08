@@ -14,6 +14,7 @@ import (
 // RegisterRESTResources mounts the canonical noun-based, read-only resource API.
 func RegisterRESTResources(mux *http.ServeMux, db *storage.Database) {
 	api := &restResources{
+		db:              db,
 		environmentRepo: storage.NewEnvironmentRepository(db),
 		services:        storage.NewServiceRepository(db),
 	}
@@ -22,6 +23,7 @@ func RegisterRESTResources(mux *http.ServeMux, db *storage.Database) {
 }
 
 type restResources struct {
+	db              *storage.Database
 	environmentRepo *storage.EnvironmentRepository
 	services        *storage.ServiceRepository
 }
@@ -102,8 +104,15 @@ func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		result := make([]map[string]any, 0, len(items))
+		snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), environment.GetId())
+		if err != nil {
+			writeAPIError(w, http.StatusInternalServerError, "failed to load health status")
+			return
+		}
 		for _, item := range items {
-			result = append(result, publicServiceData(item))
+			data := publicServiceData(item)
+			data["healthStatus"] = healthOrUnknown(snapshot.Services[item.Id])
+			result = append(result, data)
 		}
 		writeJSON(w, 200, map[string]any{"services": result, "nextPageToken": next, "pagination": map[string]any{"nextPageToken": next, "totalSize": len(items)}})
 		return
@@ -129,7 +138,14 @@ func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if member {
-		writeJSON(w, 200, publicServiceData(service))
+		snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), environment.GetId())
+		if err != nil {
+			writeAPIError(w, http.StatusInternalServerError, "failed to load health status")
+			return
+		}
+		data := publicServiceData(service)
+		data["healthStatus"] = healthOrUnknown(snapshot.Services[service.Id])
+		writeJSON(w, 200, data)
 		return
 	}
 	writeAPIError(w, http.StatusNotFound, "service not found in environment")

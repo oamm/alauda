@@ -232,6 +232,14 @@ func (r *HealthRepository) PruneHealthResults(ctx context.Context, olderThan tim
 }
 
 func (r *HealthRepository) GetInstanceHealthState(ctx context.Context, instanceID string) (*registryv1.HealthStateView, error) {
+	snapshot, err := r.CurrentHealth(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	status, exists := snapshot.Instances[instanceID]
+	if !exists {
+		return nil, sql.ErrNoRows
+	}
 	row := r.db.QueryRow(ctx, `
 		SELECT instance_id, current_state, consecutive_successes, consecutive_failures, last_transition_time, last_check_time
 		FROM health_states
@@ -248,7 +256,7 @@ func (r *HealthRepository) GetInstanceHealthState(ctx context.Context, instanceI
 	)
 	if err := row.Scan(&id, &currentStateRaw, &successes, &failures, &transitionRaw, &checkRaw); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, err
+			return &registryv1.HealthStateView{InstanceId: instanceID, CurrentState: parseHealthState("HEALTH_STATE_" + strings.ToUpper(status))}, nil
 		}
 		return nil, err
 	}
@@ -266,7 +274,7 @@ func (r *HealthRepository) GetInstanceHealthState(ctx context.Context, instanceI
 
 	return &registryv1.HealthStateView{
 		InstanceId:           id,
-		CurrentState:         parseHealthState(currentStateRaw),
+		CurrentState:         parseHealthState("HEALTH_STATE_" + strings.ToUpper(status)),
 		ConsecutiveSuccesses: successes,
 		ConsecutiveFailures:  failures,
 		LastTransitionTime:   transitionAt,
@@ -514,9 +522,17 @@ func (r *HealthRepository) recordHealthResult(ctx context.Context, check *regist
 	}
 
 	next := transitionState(current, check, result, timestamp)
+	currentStatus, err := currentInstanceHealthTx(ctx, tx, check.GetInstanceId())
+	if err != nil {
+		return nil, err
+	}
+	next.CurrentState = parseHealthState("HEALTH_STATE_" + strings.ToUpper(currentStatus))
 	previousState := registryv1.HealthState_HEALTH_STATE_UNKNOWN
 	if current != nil {
 		previousState = current.GetCurrentState()
+	}
+	if next.GetCurrentState() != previousState {
+		next.LastTransitionTime = timestamppb.New(timestamp)
 	}
 	if current == nil {
 		_, err = tx.ExecContext(ctx, `
@@ -563,7 +579,7 @@ func (r *HealthRepository) recordHealthResult(ctx context.Context, check *regist
 	notifications := make([]alertNotification, 0)
 	if next.GetCurrentState() != previousState {
 		switch next.GetCurrentState() {
-		case registryv1.HealthState_HEALTH_STATE_UNHEALTHY:
+		case registryv1.HealthState_HEALTH_STATE_UNHEALTHY, registryv1.HealthState_HEALTH_STATE_DEGRADED:
 			incidentID, err := openIncidentForInstanceTx(ctx, tx, check, result, timestamp)
 			if err != nil {
 				return nil, err
@@ -572,7 +588,7 @@ func (r *HealthRepository) recordHealthResult(ctx context.Context, check *regist
 				notifications = append(notifications, alertNotification{incidentID: incidentID, notificationType: "unhealthy", notificationTime: timestamp})
 			}
 		case registryv1.HealthState_HEALTH_STATE_HEALTHY:
-			if incidentID == "" && previousState == registryv1.HealthState_HEALTH_STATE_UNHEALTHY {
+			if incidentID == "" && (previousState == registryv1.HealthState_HEALTH_STATE_UNHEALTHY || previousState == registryv1.HealthState_HEALTH_STATE_DEGRADED) {
 				incidentIDs, err := resolveOpenIncidentsForInstanceTx(ctx, tx, next.GetInstanceId(), "health check recovered", result.GetId(), timestamp)
 				if err != nil {
 					return nil, err
@@ -583,13 +599,28 @@ func (r *HealthRepository) recordHealthResult(ctx context.Context, check *regist
 			}
 		}
 	}
-	if incidentID != "" && result.GetSuccess() {
+	if incidentID != "" && next.GetCurrentState() == registryv1.HealthState_HEALTH_STATE_HEALTHY {
 		resolved, err := resolveIncidentTx(ctx, tx, incidentID, "health check recovery verified", "VerifiedRecovery", result.GetId(), "operator", "Incident resolved after recovery verification", timestamp)
 		if err != nil {
 			return nil, err
 		}
 		if resolved {
 			notifications = append(notifications, alertNotification{incidentID: incidentID, notificationType: "recovered", notificationTime: timestamp})
+		}
+	}
+	if next.GetCurrentState() != previousState {
+		var serviceID, environmentID, deploymentID string
+		if err := tx.QueryRowContext(ctx, `SELECT d.service_id,d.environment_id,d.id FROM service_instances si JOIN service_deployments d ON d.id=si.deployment_id WHERE si.id=?`, check.GetInstanceId()).Scan(&serviceID, &environmentID, &deploymentID); err != nil {
+			return nil, err
+		}
+		if err := createEventTx(ctx, tx, &registryv1.Event{
+			Type: "health.changed", Timestamp: timestamppb.New(now),
+			ResourceType: "health_check", ResourceId: check.GetId(),
+			EnvironmentId: environmentID, ServiceId: serviceID, DeploymentId: deploymentID, InstanceId: check.GetInstanceId(),
+			Actor: "health-monitor", Message: "Current health state changed",
+			Metadata: map[string]string{"health_state": next.GetCurrentState().String(), "health_result_id": result.GetId()},
+		}); err != nil {
+			return nil, err
 		}
 	}
 
@@ -845,15 +876,11 @@ func transitionState(current *registryv1.HealthStateView, check *registryv1.Heal
 	if result.GetSuccess() {
 		successes++
 		failures = 0
-		if successes >= positiveOrDefault(check.GetSuccessesBeforeHealthy(), 1) {
-			nextState = registryv1.HealthState_HEALTH_STATE_HEALTHY
-		}
+		nextState = registryv1.HealthState_HEALTH_STATE_HEALTHY
 	} else {
 		failures++
 		successes = 0
-		if failures >= positiveOrDefault(check.GetFailuresBeforeUnhealthy(), 1) {
-			nextState = registryv1.HealthState_HEALTH_STATE_UNHEALTHY
-		}
+		nextState = registryv1.HealthState_HEALTH_STATE_UNHEALTHY
 	}
 
 	if nextState != previousState {
@@ -868,11 +895,4 @@ func transitionState(current *registryv1.HealthStateView, check *registryv1.Heal
 		LastTransitionTime:   timestamppb.New(transitionTime),
 		LastCheckTime:        timestamppb.New(timestamp),
 	}
-}
-
-func positiveOrDefault(value, fallback int32) int32 {
-	if value > 0 {
-		return value
-	}
-	return fallback
 }

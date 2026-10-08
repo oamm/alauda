@@ -325,10 +325,12 @@ export function HealthWorkspace(props: Props) {
                     scope.filter((row) => row.status === "unhealthy").length
                   }
                 />
+                <Stat label="Degraded" value={scope.filter((row) => row.status === "degraded").length} />
                 <Stat
                   label="Unknown"
                   value={scope.filter((row) => row.status === "unknown").length}
                 />
+                <Stat label="Disabled" value={scope.filter((row) => row.status === "disabled").length} />
                 <Stat
                   label="Checks"
                   value={scope.reduce(
@@ -347,7 +349,7 @@ export function HealthWorkspace(props: Props) {
                     setPage(1);
                   }}
                 >
-                  {["all", "healthy", "unhealthy", "unknown"].map((s) => (
+                  {["all", "healthy", "degraded", "unhealthy", "unknown", "disabled"].map((s) => (
                     <option key={s} value={s}>
                       {s === "all"
                         ? "All statuses"
@@ -727,7 +729,9 @@ function CheckCatalog(props: {
             <option value="">All results</option>
             <option value="healthy">Healthy</option>
             <option value="unhealthy">Unhealthy</option>
+            <option value="degraded">Degraded</option>
             <option value="unknown">Unknown</option>
+            <option value="disabled">Disabled</option>
           </Select>
         </FormField>
         <FormField label="Service">

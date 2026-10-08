@@ -124,6 +124,7 @@ func createTestHealthCheck(t *testing.T, ctx context.Context, db *storage.Databa
 	deployment, err := storage.NewDeploymentRepository(db).Create(ctx, &registryv1.CreateDeploymentRequest{
 		ServiceId:     svc.GetId(),
 		EnvironmentId: env.GetId(),
+		HealthEnabled: true,
 	})
 	if err != nil {
 		t.Fatalf("create deployment: %v", err)

@@ -63,6 +63,20 @@ func TestOpenAPIValidatesAndExamplesMatch(t *testing.T) {
 	if err = doc.Components.Schemas["Resolve"].Value.VisitJSON(response); err != nil {
 		t.Fatal(err)
 	}
+	if doc.Paths.Value("/api/v1/health/status") == nil {
+		t.Fatal("missing canonical health status route")
+	}
+	w = f.request("GET", "/api/v1/health/status?environment=stg", "")
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
+	}
+	response = nil
+	if err = json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if err = doc.Components.Schemas["HealthStatusSnapshot"].Value.VisitJSON(response); err != nil {
+		t.Fatal(err)
+	}
 	if doc.Paths.Value("/api/v1/services/{serviceKey}/instances/{instanceName}").Delete.Responses.Value("204") == nil {
 		t.Fatal("missing 204")
 	}

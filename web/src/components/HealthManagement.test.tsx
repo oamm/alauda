@@ -176,7 +176,7 @@ describe("Health result history", () => {
     expect(new URLSearchParams(window.location.search).get("from")).toMatch(
       /Z$/,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
     expect(window.location.search).toBe("");
     await screen.findByRole("table", { name: "Health result history" });
   });
@@ -197,7 +197,7 @@ describe("Health result history", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Next" })).toBeDisabled(),
     );
-    fireEvent.change(screen.getByLabelText("Page size"), {
+    fireEvent.change(screen.getByLabelText("Rows per page"), {
       target: { value: "50" },
     });
     expect(window.location.search).not.toContain("pageToken");
@@ -215,7 +215,9 @@ describe("Health result history", () => {
     expect(table).toHaveTextContent("Production");
     expect(table).toHaveTextContent("Not recorded");
     fireEvent.click(
-      within(table).getByRole("button", { name: "View result details" }),
+      within(table).getByRole("button", {
+        name: "View health result details",
+      }),
     );
     const drawer = screen.getByRole("dialog", { name: "readiness" });
     expect(drawer).toHaveTextContent("Reason");

@@ -1049,9 +1049,11 @@ describe("App", () => {
 
   it("runs checks, refreshes results and uses the returned current state", async () => {
     const original = vi.mocked(fetch).getMockImplementation()!;
-    vi.mocked(fetch).mockImplementation(async (input, init) =>
-      input.toString().includes("RunHealthCheck")
-        ? new Response(
+    let ran = false;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (input.toString().includes("RunHealthCheck")) {
+        ran = true;
+        return new Response(
             JSON.stringify({
               state: {
                 instanceId: "inst-1",
@@ -1061,9 +1063,15 @@ describe("App", () => {
               },
             }),
             { status: 200 },
-          )
-        : original(input, init),
-    );
+          );
+      }
+      if (ran && input.toString().includes("/api/v1/health/status")) {
+        return new Response(JSON.stringify({
+          services: { "svc-1": "Healthy" }, instances: { "inst-1": "Healthy" },
+        }), { status: 200 });
+      }
+      return original(input, init);
+    });
     window.history.replaceState({}, "", "/services/svc-1/health");
     render(<App />);
     await screen.findByText("No health results yet");
@@ -1080,6 +1088,39 @@ describe("App", () => {
           url.toString().includes("RunHealthCheck"),
         ),
     ).toHaveLength(1);
+  });
+
+  it("shows one current health state across the service list, detail and global Health", async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const path = input.toString();
+      if (path.includes("/api/v1/health/status")) {
+        return new Response(JSON.stringify({
+          services: { "svc-1": "Unhealthy" },
+          instances: { "inst-1": "Unhealthy", "inst-2": "Unknown" },
+          monitored: { "inst-1": true, "inst-2": false },
+        }), { status: 200 });
+      }
+      if (path.includes("ListInstances")) {
+        const base = mockResponse(path, init) as { instances: Array<Record<string, unknown>> };
+        return new Response(JSON.stringify({ instances: [
+          ...base.instances,
+          { id: "inst-2", deploymentId: "dep-1", name: "checkout-b", address: "10.0.0.2", port: 8080, enabled: true },
+        ] }), { status: 200 });
+      }
+      return original(input, init);
+    });
+    window.history.replaceState({}, "", "/services/svc-1/health");
+    render(<App />);
+    await waitFor(() => expect(document.querySelector(".service-resource-button")).toHaveTextContent("Unhealthy"));
+    expect(document.querySelector(".service-detail-header-new")).toHaveTextContent("Unhealthy");
+    expect(screen.queryByText("All monitored services operational")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Current health" })).toHaveTextContent(
+      "Instances2Monitored1Healthy0Unhealthy1Unknown1",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Health" }));
+    await waitFor(() => expect(screen.getByRole("group", { name: "Global health" })).toHaveTextContent("Unhealthy1"));
+    expect(screen.getByRole("group", { name: "Global health" })).toHaveTextContent("Unknown1");
   });
 
   it("edits monitoring with the actual update-form values", async () => {

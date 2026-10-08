@@ -82,6 +82,7 @@ func RegisterPublicContractREST(mux *http.ServeMux, db *storage.Database) {
 	mux.HandleFunc("/api/v1/services", api.servicesList)
 	mux.HandleFunc("/api/v1/services/", api.serviceResource)
 	mux.HandleFunc("/api/v1/discovery/", api.discovery)
+	mux.HandleFunc("/api/v1/health/status", api.healthStatus)
 }
 
 type publicContractAPI struct {
@@ -124,8 +125,15 @@ func (a *publicContractAPI) servicesList(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	result := make([]map[string]any, 0, len(items))
+	snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), environmentID)
+	if err != nil {
+		publicStorageError(w, err)
+		return
+	}
 	for _, item := range items {
-		result = append(result, publicServiceData(item))
+		data := publicServiceData(item)
+		data["healthStatus"] = healthOrUnknown(snapshot.Services[item.Id])
+		result = append(result, data)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"services": result, "nextPageToken": next})
 }
@@ -345,15 +353,46 @@ func (a *publicContractAPI) deregister(w http.ResponseWriter, r *http.Request, s
 	w.WriteHeader(http.StatusNoContent)
 }
 
-const effectiveHealthSQL = storage.EffectiveHealthSQL
-
 func (a *publicContractAPI) effectiveHealth(r *http.Request, id string, enabled bool) (string, error) {
 	if !enabled {
 		return "Disabled", nil
 	}
-	var state string
-	err := a.db.QueryRow(r.Context(), "SELECT "+effectiveHealthSQL+" FROM service_instances si JOIN service_deployments d ON d.id=si.deployment_id LEFT JOIN health_states hs ON hs.instance_id=si.id WHERE si.id=?", id).Scan(&state)
-	return state, err
+	snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), "")
+	return healthOrUnknown(snapshot.Instances[id]), err
+}
+
+func healthOrUnknown(state string) string {
+	if state == "" {
+		return "Unknown"
+	}
+	return state
+}
+
+func (a *publicContractAPI) healthStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		publicError(w, 405, "method_not_allowed", "Only GET is supported.", nil)
+		return
+	}
+	environmentID := ""
+	if key := r.URL.Query().Get("environment"); key != "" {
+		env, err := a.environments.GetByKey(r.Context(), key)
+		if err != nil {
+			publicLookupError(w, err, "environment_not_found", "Environment does not exist.")
+			return
+		}
+		if !environmentAllowed(r, env.Id) {
+			publicError(w, 403, "permission_denied", "Credential is not authorized for this environment.", nil)
+			return
+		}
+		environmentID = env.Id
+	}
+	snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), environmentID)
+	if err != nil {
+		publicStorageError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, 200, snapshot)
 }
 
 func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
@@ -399,7 +438,12 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 		publicLookupError(w, err, "service_not_found", "Service does not exist.")
 		return
 	}
-	query := "SELECT si.id,si.name,si.address,COALESCE(si.description,'')," + effectiveHealthSQL + ",e.id,e.name,e.protocol,e.port,COALESCE(e.path,''),e.primary_endpoint FROM services s JOIN service_deployments d ON d.service_id=s.id AND d.environment_id=? AND d.deleted_at IS NULL JOIN service_instances si ON si.deployment_id=d.id AND si.deleted_at IS NULL AND si.enabled=1 JOIN endpoints e ON e.instance_id=si.id AND e.deleted_at IS NULL AND e.enabled=1 LEFT JOIN health_states hs ON hs.instance_id=si.id WHERE s.name=? AND s.deleted_at IS NULL ORDER BY si.name,e.name"
+	query := "SELECT si.id,si.name,si.address,COALESCE(si.description,''),e.id,e.name,e.protocol,e.port,COALESCE(e.path,''),e.primary_endpoint FROM services s JOIN service_deployments d ON d.service_id=s.id AND d.environment_id=? AND d.deleted_at IS NULL JOIN service_instances si ON si.deployment_id=d.id AND si.deleted_at IS NULL AND si.enabled=1 JOIN endpoints e ON e.instance_id=si.id AND e.deleted_at IS NULL AND e.enabled=1 WHERE s.name=? AND s.deleted_at IS NULL ORDER BY si.name,e.name"
+	snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), env.Id)
+	if err != nil {
+		publicStorageError(w, err)
+		return
+	}
 	rows, err := a.db.Query(r.Context(), query, env.Id, serviceKey)
 	if err != nil {
 		publicStorageError(w, err)
@@ -410,10 +454,10 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 	indices := map[string]int{}
 	namedExists := false
 	for rows.Next() {
-		var id, name, host, description, state, eid, ename, protocol, path string
+		var id, name, host, description, eid, ename, protocol, path string
 		var port int32
 		var primary bool
-		if err := rows.Scan(&id, &name, &host, &description, &state, &eid, &ename, &protocol, &port, &path, &primary); err != nil {
+		if err := rows.Scan(&id, &name, &host, &description, &eid, &ename, &protocol, &port, &path, &primary); err != nil {
 			publicStorageError(w, err)
 			return
 		}
@@ -423,6 +467,7 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 		if endpointName != "" && ename != endpointName {
 			continue
 		}
+		state := healthOrUnknown(snapshot.Instances[id])
 		if policy == "healthy" && state != "Healthy" || policy == "usable" && (state == "Unhealthy" || state == "Disabled") {
 			continue
 		}

@@ -827,9 +827,26 @@ Status: AUDITED -> DESIGNED -> IN PROGRESS -> MIGRATED -> VERIFIED within the re
 
 - Control sizing is global: `sm` is 32px, `md` is 36px and `lg` is 40px. Inputs and selects use the shared `md` field height by default; primary, secondary, ghost, danger and link buttons preserve the same height for a given size.
 - IconButton uses a square equivalent of its Button size: 32px, 36px or 40px. Table-row actions use `sm`; toolbar and dialog actions use `md`.
-- StatusBadge and FilterChip use a compact 28px geometry with shared text, padding, radius and icon spacing. Filter chips truncate long values and expose a 20px close hit area.
+- StatusBadge and FilterChip use a compact 26px geometry with shared text, padding, radius and icon spacing. Filter chips truncate long values and expose a 20px close hit area.
 - FilterBar uses shared 12px gaps, shared field-label rhythm and bottom alignment for controls. More filters is a standard compact Button with the sliders icon; Clear all uses the same ghost-button family as its surrounding controls.
 - Health Results keeps the shared PageHeader action treatment, grouped target table alignment and middle-aligned row actions. No page-specific control-sizing CSS is permitted; page-specific CSS may only describe content layout.
+
+## Health Results Visual Model
+
+- The Results page keeps the existing route, query parameters, filtering behavior, server continuation tokens and detail Drawer. Its visual order is PageHeader, one bordered results surface, compact toolbar, optional active-filter row, results content and integrated pagination footer.
+- Columns are Timestamp, Target, Check, Result, Duration and Action. The desktop table uses proportional widths of 22%, 32%, 14%, 14%, 10% and 8%; the shared table header has a restrained neutral surface, stronger muted text and a clear bottom rule. Rows use compact consistent cell padding and subtle hover feedback. The row itself is not interactive; the labeled IconButton opens details.
+- Target hierarchy is three levels: Service · Environment; Instance; then Endpoint · Protocol :Port for endpoint checks, or the actual address / Instance-level check for instance targets. Port zero is never presented as an endpoint port. The same presentation rule applies in desktop rows, mobile rows and the detail Drawer.
+- Absolute timestamp is primary and relative time is secondary. Check name is primary and type is secondary. Missing duration is a muted em dash with the accessible title `Duration not recorded`.
+- The toolbar uses shared 36px controls with aligned labels, compact gaps and the standard More filters button. From and To remain explicit datetime fields. Page size belongs in the shared Pagination footer, not the filter toolbar. Active filter chips render only when their query value is present; unresolved catalog names display the actual selected key.
+- Shared compact sizing: toolbar controls 36px; row IconButton 32px; FilterChip 26px; StatusBadge 26px. Chips use a subtle neutral fill and light border. Status badges use semantic tint, border and dot with readable status text.
+- Row density targets 56–68px for the three-line Target presentation. Loading retains the toolbar and shows table skeleton rows. Empty and query-error feedback stay inside the results surface. Mobile uses contextual stacked result rows and does not force horizontal scrolling.
+
+## Health State Consistency
+
+- Service list, selected Service header, Overview and Service Health render the same backend `healthStatus`; global Health renders the matching backend Instance states. The Service filter uses that same status. Missing results display Unknown, never Healthy.
+- Current status includes Instances, Monitored, Healthy, Unhealthy and Unknown. Degraded and Disabled counts appear when present. Monitoring coverage comes from active enabled checks with usable targets; Enabled remains separate from operational health.
+- A new result or health-change event refreshes the shared status projection. A 30-second refresh also lets old results expire to Unknown. Availability stays a historical percentage; Incident Open/Resolved is a lifecycle state, not an alternate health badge.
+- The backend matrix and freshness rule live in [HEALTH_STATE.md](HEALTH_STATE.md). The UI does not infer health from Incident counts, availability or absent cached state rows. The sidebar reports Incident count without claiming the whole system is Healthy when no Incident is open.
 
 ## Incident Lifecycle and Resolution Semantics
 

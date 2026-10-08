@@ -121,10 +121,11 @@ func TestHealthLifecycleOverConnect(t *testing.T) {
 		t.Fatalf("expected no health results initially")
 	}
 
-	if _, err := healthClient.GetInstanceHealthState(ctx, connect.NewRequest(&registryv1.GetInstanceHealthStateRequest{
+	initialState, err := healthClient.GetInstanceHealthState(ctx, connect.NewRequest(&registryv1.GetInstanceHealthStateRequest{
 		InstanceId: instResp.Msg.GetInstance().GetId(),
-	})); connect.CodeOf(err) != connect.CodeNotFound {
-		t.Fatalf("expected not found for initial health state, got: %v", err)
+	}))
+	if err != nil || initialState.Msg.GetState().GetCurrentState() != registryv1.HealthState_HEALTH_STATE_UNKNOWN {
+		t.Fatalf("expected Unknown for initial health state, got: %v %v", initialState, err)
 	}
 
 	if _, err := healthClient.DeleteHealthCheck(ctx, connect.NewRequest(&registryv1.DeleteHealthCheckRequest{Id: hcID})); err != nil {
@@ -173,6 +174,7 @@ func TestRunHealthCheckOverConnect(t *testing.T) {
 	depResp, err := deploymentClient.CreateDeployment(ctx, connect.NewRequest(&registryv1.CreateDeploymentRequest{
 		ServiceId:     svcResp.Msg.GetService().GetId(),
 		EnvironmentId: envResp.Msg.GetEnvironment().GetId(),
+		HealthEnabled: true,
 	}))
 	if err != nil {
 		t.Fatalf("create deployment: %v", err)

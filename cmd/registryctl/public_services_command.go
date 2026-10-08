@@ -364,7 +364,7 @@ func printPublicTable(value any) {
 		if !ok {
 			continue
 		}
-		columns := map[string][]string{"services": {"name", "displayName", "description"}, "instances": {"name", "address", "enabled", "healthState"}, "endpoints": {"name", "protocol", "port", "path", "primary", "enabled", "address"}, "environments": {"key", "name", "enabled"}, "checks": {"name", "endpoint", "type", "enabled", "intervalSeconds", "timeoutSeconds"}, "results": {"check", "instance", "endpoint", "timestamp", "success", "latencyMs", "statusCode"}}[key]
+		columns := map[string][]string{"services": {"name", "displayName", "healthStatus", "description"}, "instances": {"name", "address", "enabled", "healthState"}, "endpoints": {"name", "protocol", "port", "path", "primary", "enabled", "address"}, "environments": {"key", "name", "enabled"}, "checks": {"name", "endpoint", "type", "enabled", "intervalSeconds", "timeoutSeconds"}, "results": {"check", "instance", "endpoint", "timestamp", "success", "latencyMs", "statusCode"}}[key]
 		headings := make([]string, len(columns))
 		for i, column := range columns {
 			headings[i] = strings.ToUpper(column)

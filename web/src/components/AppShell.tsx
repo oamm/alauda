@@ -16,7 +16,7 @@ import {
 
 import { Environment } from "../api";
 import { ActiveView } from "../types";
-import { Button, Select, StatusBadge } from "./ui";
+import { Button, Select } from "./ui";
 
 type AppShellProps = {
   canAdmin: boolean;
@@ -25,7 +25,6 @@ type AppShellProps = {
   currentEnvironmentName: string;
   darkMode: boolean;
   environments: Environment[];
-  degradedServiceCount: number;
   openIncidentCount: number;
   selectedEnvironmentId: string;
   onEnvironmentChange: (environmentId: string) => void;
@@ -58,7 +57,6 @@ export function AppShell({
   currentEnvironmentName,
   darkMode,
   environments,
-  degradedServiceCount,
   openIncidentCount,
   selectedEnvironmentId,
   onEnvironmentChange,
@@ -111,16 +109,9 @@ export function AppShell({
         </nav>
         <div className="alauda-system-status">
           <div className="alauda-status-heading">
-            <span>System status</span>
-            <StatusBadge
-              status={openIncidentCount === 0 ? "healthy" : "degraded"}
-            />
+            <span>Incidents</span>
           </div>
-          <p>
-            {openIncidentCount === 0
-              ? "All monitored services operational"
-              : `${degradedServiceCount} degraded service${degradedServiceCount === 1 ? "" : "s"} · ${openIncidentCount} open incident${openIncidentCount === 1 ? "" : "s"}`}
-          </p>
+          <p>{openIncidentCount} open incident{openIncidentCount === 1 ? "" : "s"}</p>
         </div>
         <Button
           className="alauda-logout"

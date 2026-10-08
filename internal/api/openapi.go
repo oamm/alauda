@@ -105,8 +105,8 @@ func buildPublicOpenAPI() schemaMap {
 	checkProps["type"] = schemaMap{"type": "string", "enum": []string{"http", "tcp", "dns"}}
 	checkProps["intervalSeconds"] = schemaMap{"type": "integer", "minimum": 1, "maximum": 86400, "default": 30}
 	checkProps["timeoutSeconds"] = schemaMap{"type": "integer", "minimum": 1, "maximum": 300, "default": 5}
-	checkProps["failuresBeforeUnhealthy"] = schemaMap{"type": "integer", "minimum": 1, "default": 3}
-	checkProps["successesBeforeHealthy"] = schemaMap{"type": "integer", "minimum": 1, "default": 2}
+	checkProps["failuresBeforeUnhealthy"] = schemaMap{"type": "integer", "minimum": 1, "default": 3, "deprecated": true, "description": "Compatibility field; current health follows the latest completed result."}
+	checkProps["successesBeforeHealthy"] = schemaMap{"type": "integer", "minimum": 1, "default": 2, "deprecated": true, "description": "Compatibility field; current health follows the latest completed result."}
 	schemas["HealthCheckCreate"] = objectSchema(checkProps, "name", "endpoint", "type")
 	schemas["Instance"].(schemaMap)["properties"].(schemaMap)["healthState"] = schemaMap{"type": "string", "enum": []string{"Healthy", "Unknown", "Degraded", "Unhealthy", "Disabled"}}
 	registration["required"] = []string{"environment", "instance"}
@@ -123,7 +123,9 @@ func buildPublicOpenAPI() schemaMap {
 	ip["address"] = schemaMap{"type": "string", "description": "Bare DNS hostname, IPv4 or IPv6; scheme and embedded port are rejected.", "nullable": true}
 	registration["example"] = schemaMap{"environment": "stg", "instance": schemaMap{"name": "lynx-authentication.lynx", "address": "lynx-authentication.lynx"}, "endpoints": []any{schemaMap{"name": "default", "protocol": "http", "port": 81, "path": "/"}}}
 	schemas["Resolve"] = objectSchema(schemaMap{"service": stringSchema(), "environment": stringSchema(), "instance": stringSchema(), "endpoint": stringSchema(), "address": schemaMap{"type": "string", "format": "uri"}}, "service", "environment", "instance", "endpoint", "address")
-	schemas["Service"] = objectSchema(schemaMap{"id": stringSchema(), "name": key, "displayName": stringSchema(), "description": stringSchema(), "tags": stringMap, "metadata": stringMap}, "id", "name", "displayName", "description", "tags", "metadata")
+	healthStatus := schemaMap{"type": "string", "enum": []string{"Healthy", "Degraded", "Unhealthy", "Unknown", "Disabled"}}
+	schemas["Service"] = objectSchema(schemaMap{"id": stringSchema(), "name": key, "displayName": stringSchema(), "description": stringSchema(), "tags": stringMap, "metadata": stringMap, "healthStatus": healthStatus}, "id", "name", "displayName", "description", "tags", "metadata", "healthStatus")
+	schemas["HealthStatusSnapshot"] = objectSchema(schemaMap{"services": schemaMap{"type": "object", "additionalProperties": healthStatus}, "instances": schemaMap{"type": "object", "additionalProperties": healthStatus}, "monitored": schemaMap{"type": "object", "additionalProperties": schemaMap{"type": "boolean"}}}, "services", "instances", "monitored")
 	schemas["ServiceCreate"] = objectSchema(schemaMap{"name": key, "displayName": stringSchema(), "description": stringSchema(), "tags": stringMap, "metadata": stringMap}, "name")
 	schemas["EnvironmentCreate"] = objectSchema(schemaMap{"key": key, "name": stringSchema(), "description": stringSchema(), "tags": stringMap}, "key")
 	schemas["Environment"] = objectSchema(schemaMap{"id": stringSchema(), "key": key, "name": stringSchema(), "description": stringSchema(), "enabled": schemaMap{"type": "boolean"}, "tier": stringSchema(), "tags": stringMap, "createdAt": schemaMap{"type": "string", "format": "date-time"}, "updatedAt": schemaMap{"type": "string", "format": "date-time"}}, "id", "key", "name", "enabled")
@@ -171,6 +173,8 @@ func buildPublicOpenAPI() schemaMap {
 		paths[path].(schemaMap)[method] = op
 	}
 	add("/api/v1/services", "get", "List Services", "registry.read", "Services", "200", "", false, true)
+	add("/api/v1/health/status", "get", "Read current Service and Instance health snapshot", "health.read", "HealthStatusSnapshot", "200", "", false, false)
+	paths["/api/v1/health/status"].(schemaMap)["get"].(schemaMap)["parameters"] = []any{queryParameter("environment", false, key)}
 	paths["/api/v1/services"].(schemaMap)["get"].(schemaMap)["parameters"] = append(paths["/api/v1/services"].(schemaMap)["get"].(schemaMap)["parameters"].([]any), queryParameter("environment", false, key))
 	add("/api/v1/services", "post", "Explicit Service bootstrap", "registry.write", "Service", "201", "ServiceCreate", false, false)
 	add("/api/v1/environments", "get", "List Environments, including disabled", "registry.read", "Environments", "200", "", false, true)

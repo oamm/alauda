@@ -1,5 +1,7 @@
 # Health Scheduler Architecture
 
+Current Health Check, Instance and Service state semantics are defined in [HEALTH_STATE.md](HEALTH_STATE.md). The diagrams and pseudocode below describe the original scheduler design; threshold transitions and cache examples are historical and are not the current status contract.
+
 The health scheduler is the core subsystem responsible for continuously monitoring service availability through automated health checks. This document describes its design, concurrency model, and execution guarantees.
 
 ---

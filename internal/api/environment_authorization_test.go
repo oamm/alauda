@@ -48,6 +48,7 @@ func TestScopedApplicationKeyCannotBypassEnvironmentBoundary(t *testing.T) {
 		{"GET", "/api/v1/services/private/instances?environment=prod", ""},
 		{"GET", "/api/v1/health/checks?environmentId=" + denied.Id, ""},
 		{"GET", "/api/v1/health/results?environmentId=" + denied.Id, ""},
+		{"GET", "/api/v1/health/status?environment=prod", ""},
 		{"POST", "/registry.v1.EnvironmentService/GetEnvironment", `{"id":"` + denied.Id + `"}`},
 		{"POST", "/registry.v1.CatalogService/GetService", `{"id":"` + service.Id + `"}`},
 		{"POST", "/registry.v1.DeploymentService/GetDeployment", `{"id":"` + runtime.Deployment.Id + `"}`},
@@ -107,7 +108,7 @@ func TestScopedApplicationKeyCannotBypassEnvironmentBoundary(t *testing.T) {
 		t.Fatal("private Service metadata escaped through an unrelated allowed Environment")
 	}
 	// An unrelated allowed filter must not bypass a list's scope predicate.
-	for _, path := range []string{"/api/v1/services/private/instances?environment=stg", "/api/v1/services?environment=stg"} {
+	for _, path := range []string{"/api/v1/services/private/instances?environment=stg", "/api/v1/services?environment=stg", "/api/v1/health/status?environment=stg", "/api/v1/health/status"} {
 		req := httptest.NewRequest("GET", path, nil)
 		req.Header.Set("Authorization", "Bearer "+key.Secret)
 		res := httptest.NewRecorder()

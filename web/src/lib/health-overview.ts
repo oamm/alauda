@@ -36,7 +36,9 @@ export function healthOverviewRows(data: {
       ?.replace("HEALTH_STATE_", "")
       .toLowerCase();
     const status =
-      actual === "healthy" || actual === "unhealthy" ? actual : "unknown";
+      actual === "healthy" || actual === "unhealthy" || actual === "degraded" || actual === "disabled"
+        ? actual
+        : "unknown";
     const reason = !instance.enabled
       ? "Instance disabled"
       : !checks.length
@@ -45,7 +47,7 @@ export function healthOverviewRows(data: {
           ? "Monitoring disabled"
           : status === "unknown"
             ? state?.lastCheckTime
-              ? "Awaiting health transition"
+              ? "Latest result is stale or unavailable"
               : "Current state unavailable"
             : "Monitoring enabled";
     return {

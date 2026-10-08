@@ -76,7 +76,7 @@ func (a *publicContractAPI) createService(w http.ResponseWriter, r *http.Request
 	writeJSON(w, 201, publicServiceData(item))
 }
 func publicServiceData(item *v1.Service) map[string]any {
-	return map[string]any{"name": item.Name, "displayName": item.DisplayName, "description": item.Description, "tags": item.Tags, "metadata": item.Metadata, "id": item.Id}
+	return map[string]any{"name": item.Name, "displayName": item.DisplayName, "description": item.Description, "tags": item.Tags, "metadata": item.Metadata, "id": item.Id, "healthStatus": "Unknown"}
 }
 
 func (a *publicContractAPI) managementContext(w http.ResponseWriter, r *http.Request, key string) (*v1.Service, *v1.Environment, bool) {
@@ -129,10 +129,22 @@ func (a *publicContractAPI) management(w http.ResponseWriter, r *http.Request, p
 			publicError(w, 404, "service_not_found", "Service is not registered in this Environment.", nil)
 			return
 		}
-		writeJSON(w, 200, publicServiceData(svc))
+		snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), env.Id)
+		if err != nil {
+			publicStorageError(w, err)
+			return
+		}
+		data := publicServiceData(svc)
+		data["healthStatus"] = healthOrUnknown(snapshot.Services[svc.Id])
+		writeJSON(w, 200, data)
 		return
 	}
-	query := "SELECT si.id,si.name,si.address,COALESCE(si.description,''),si.enabled," + effectiveHealthSQL + ",si.tags,si.metadata FROM service_instances si JOIN service_deployments d ON d.id=si.deployment_id LEFT JOIN health_states hs ON hs.instance_id=si.id WHERE d.service_id=? AND d.environment_id=? AND d.deleted_at IS NULL AND si.deleted_at IS NULL"
+	query := "SELECT si.id,si.name,si.address,COALESCE(si.description,''),si.enabled,si.tags,si.metadata FROM service_instances si JOIN service_deployments d ON d.id=si.deployment_id WHERE d.service_id=? AND d.environment_id=? AND d.deleted_at IS NULL AND si.deleted_at IS NULL"
+	snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), env.Id)
+	if err != nil {
+		publicStorageError(w, err)
+		return
+	}
 	args := []any{svc.Id, env.Id}
 	if len(parts) >= 3 {
 		query += " AND si.name=?"
@@ -154,7 +166,7 @@ func (a *publicContractAPI) management(w http.ResponseWriter, r *http.Request, p
 	for rows.Next() {
 		var item publicInstance
 		var tags, metadata string
-		if err = rows.Scan(&item.ID, &item.Name, &item.Address, &item.Description, &item.Enabled, &item.HealthState, &tags, &metadata); err != nil {
+		if err = rows.Scan(&item.ID, &item.Name, &item.Address, &item.Description, &item.Enabled, &tags, &metadata); err != nil {
 			rows.Close()
 			publicStorageError(w, err)
 			return
@@ -164,6 +176,7 @@ func (a *publicContractAPI) management(w http.ResponseWriter, r *http.Request, p
 			publicError(w, 500, "server_error", "Unable to read resource attributes.", nil)
 			return
 		}
+		item.HealthState = healthOrUnknown(snapshot.Instances[item.ID])
 		item.Healthy = item.HealthState == "Healthy"
 		items = append(items, item)
 	}

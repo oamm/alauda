@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestRecordHealthResultUpdatesStateWithThresholds(t *testing.T) {
+func TestRecordHealthResultUsesLatestCompletedResult(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDatabase(t)
 	defer db.Close()
@@ -22,8 +22,8 @@ func TestRecordHealthResultUpdatesStateWithThresholds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("record first failure: %v", err)
 	}
-	if firstFailure.GetCurrentState() != registryv1.HealthState_HEALTH_STATE_UNKNOWN {
-		t.Fatalf("first failure state = %s, want UNKNOWN", firstFailure.GetCurrentState())
+	if firstFailure.GetCurrentState() != registryv1.HealthState_HEALTH_STATE_UNHEALTHY {
+		t.Fatalf("first failure state = %s, want UNHEALTHY", firstFailure.GetCurrentState())
 	}
 	if firstFailure.GetConsecutiveFailures() != 1 {
 		t.Fatalf("failures = %d, want 1", firstFailure.GetConsecutiveFailures())
@@ -44,8 +44,8 @@ func TestRecordHealthResultUpdatesStateWithThresholds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("record first success: %v", err)
 	}
-	if firstSuccess.GetCurrentState() != registryv1.HealthState_HEALTH_STATE_UNHEALTHY {
-		t.Fatalf("first success state = %s, want UNHEALTHY", firstSuccess.GetCurrentState())
+	if firstSuccess.GetCurrentState() != registryv1.HealthState_HEALTH_STATE_HEALTHY {
+		t.Fatalf("first success state = %s, want HEALTHY", firstSuccess.GetCurrentState())
 	}
 	if firstSuccess.GetConsecutiveSuccesses() != 1 || firstSuccess.GetConsecutiveFailures() != 0 {
 		t.Fatalf("unexpected counters: successes=%d failures=%d", firstSuccess.GetConsecutiveSuccesses(), firstSuccess.GetConsecutiveFailures())
@@ -167,6 +167,9 @@ func TestListDueHealthCheckTargets(t *testing.T) {
 
 	repo := NewHealthRepository(db)
 	check := createTestHealthCheck(t, ctx, db)
+	if _, err := db.Exec(ctx, "UPDATE service_deployments SET health_enabled=0"); err != nil {
+		t.Fatal(err)
+	}
 	if targets, err := repo.ListDueHealthCheckTargets(ctx, 10); err != nil || len(targets) != 0 {
 		t.Fatalf("monitoring disabled scheduled targets: %d %v", len(targets), err)
 	}
@@ -250,8 +253,8 @@ func TestRecordHealthResultOpensAndResolvesIncidentOnStateTransitions(t *testing
 	if err != nil {
 		t.Fatalf("list open incidents after first failure: %v", err)
 	}
-	if len(openIncidents) != 0 {
-		t.Fatalf("open incidents after first failure = %d, want 0", len(openIncidents))
+	if len(openIncidents) != 1 {
+		t.Fatalf("open incidents after first failure = %d, want 1", len(openIncidents))
 	}
 
 	if _, err := healthRepo.RecordHealthResult(ctx, check, resultAt(false, start.Add(time.Second))); err != nil {
@@ -286,8 +289,8 @@ func TestRecordHealthResultOpensAndResolvesIncidentOnStateTransitions(t *testing
 	if err != nil {
 		t.Fatalf("list open incidents before recovery threshold: %v", err)
 	}
-	if len(openIncidents) != 1 {
-		t.Fatalf("open incidents before recovery threshold = %d, want 1", len(openIncidents))
+	if len(openIncidents) != 0 {
+		t.Fatalf("open incidents after first recovery = %d, want 0", len(openIncidents))
 	}
 
 	if _, err := healthRepo.RecordHealthResult(ctx, check, resultAt(true, start.Add(4*time.Second))); err != nil {
@@ -317,11 +320,15 @@ func TestRecordHealthResultOpensAndResolvesIncidentOnStateTransitions(t *testing
 	if err != nil {
 		t.Fatalf("list events: %v", err)
 	}
-	if len(events) != 2 {
-		t.Fatalf("events = %d, want 2", len(events))
+	if len(events) != 4 {
+		t.Fatalf("events = %d, want 4", len(events))
 	}
-	if events[0].GetType() != "incident.resolved" || events[1].GetType() != "incident.opened" {
-		t.Fatalf("unexpected event order/types: %q, %q", events[0].GetType(), events[1].GetType())
+	types := map[string]int{}
+	for _, event := range events {
+		types[event.GetType()]++
+	}
+	if types["incident.resolved"] != 1 || types["incident.opened"] != 1 || types["health.changed"] != 2 {
+		t.Fatalf("unexpected event types: %+v", types)
 	}
 
 	availability, err := NewAvailabilityRepository(db).Calculate(ctx, &registryv1.GetAvailabilityRequest{
@@ -432,6 +439,7 @@ func createTestHealthCheck(t *testing.T, ctx context.Context, db *Database) *reg
 	deployment, err := NewDeploymentRepository(db).Create(ctx, &registryv1.CreateDeploymentRequest{
 		ServiceId:     svc.GetId(),
 		EnvironmentId: env.GetId(),
+		HealthEnabled: true,
 	})
 	if err != nil {
 		t.Fatalf("create deployment: %v", err)

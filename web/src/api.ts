@@ -27,6 +27,7 @@ export type Service = {
   description?: string;
   tags?: Record<string, string>;
   metadata?: Record<string, string>;
+  healthStatus?: "Healthy" | "Degraded" | "Unhealthy" | "Unknown" | "Disabled";
 };
 
 export type ServiceDeployment = {
@@ -124,6 +125,7 @@ export type HealthStateView = {
   consecutiveSuccesses: number;
   consecutiveFailures: number;
   lastCheckTime?: string;
+  monitored?: boolean;
 };
 
 export type Incident = {
@@ -656,6 +658,16 @@ export async function listServices(environment?: string): Promise<Service[]> {
   const query = new URLSearchParams();
   if (environment) query.set("environment", environment);
   return listPublicPages<Service>("/api/v1/services", "services", query);
+}
+
+export async function getHealthStatus(environment?: string): Promise<{
+  services: Record<string, string>;
+  instances: Record<string, string>;
+  monitored: Record<string, boolean>;
+}> {
+  const query = new URLSearchParams();
+  if (environment) query.set("environment", environment);
+  return restRequest(`/api/v1/health/status${query.size ? `?${query}` : ""}`);
 }
 
 export async function createService(input: {
