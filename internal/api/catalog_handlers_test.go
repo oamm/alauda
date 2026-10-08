@@ -74,6 +74,21 @@ func TestCatalogHandlersLifecycle(t *testing.T) {
 		t.Fatalf("create endpoint: %v", err)
 	}
 	endpointID := endpointResp.Msg.GetEndpoint().GetId()
+	secondEndpoint, err := endpointHandler.CreateEndpoint(ctx, connect.NewRequest(&registryv1.CreateEndpointRequest{
+		InstanceId: instanceID, Name: "metrics", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 9090, Enabled: true,
+	}))
+	if err != nil {
+		t.Fatalf("create second endpoint: %v", err)
+	}
+	_, err = endpointHandler.UpdateEndpoint(ctx, connect.NewRequest(&registryv1.UpdateEndpointRequest{
+		Id: secondEndpoint.Msg.GetEndpoint().GetId(), Name: "http", Enabled: true,
+	}))
+	if connect.CodeOf(err) != connect.CodeAlreadyExists {
+		t.Fatalf("duplicate endpoint rename code = %s, want already_exists: %v", connect.CodeOf(err), err)
+	}
+	if _, err := endpointHandler.DeleteEndpoint(ctx, connect.NewRequest(&registryv1.DeleteEndpointRequest{Id: secondEndpoint.Msg.GetEndpoint().GetId()})); err != nil {
+		t.Fatalf("delete second endpoint: %v", err)
+	}
 
 	if _, err := envHandler.ListEnvironments(ctx, connect.NewRequest(&registryv1.ListEnvironmentsRequest{})); err != nil {
 		t.Fatalf("list environments: %v", err)

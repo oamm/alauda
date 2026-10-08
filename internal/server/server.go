@@ -62,8 +62,7 @@ func (s *Server) Start() error {
 	mux.Handle("/metrics", protectInfrastructure)
 
 	if s.webFS != nil {
-		fileServer := http.FileServer(http.FS(s.webFS))
-		mux.Handle("/", fileServer)
+		mux.Handle("/", frontendHandler(s.webFS))
 	}
 
 	// API routes.

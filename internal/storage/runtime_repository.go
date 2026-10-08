@@ -178,9 +178,6 @@ func (r *RuntimeRepository) createRuntimeEndpoint(ctx context.Context, tx *sql.T
 		return nil, err
 	}
 	enabled := req.GetEnabled()
-	if !enabled {
-		enabled = true
-	}
 
 	if primary {
 		if _, err := tx.ExecContext(ctx, `

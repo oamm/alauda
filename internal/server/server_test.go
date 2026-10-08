@@ -2,12 +2,14 @@ package server
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/company/service-registry/internal/config"
@@ -90,6 +92,8 @@ func TestStartServesHealthzAndShutsDown(t *testing.T) {
 	s.cfg.Server.Port = port
 	s.cfg.Server.ReadTimeout = time.Second
 	s.cfg.Server.WriteTimeout = time.Second
+	const entryPage = "<!doctype html><html><body>Alauda entry page</body></html>"
+	s.webFS = fstest.MapFS{"index.html": {Data: []byte(entryPage)}}
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -112,6 +116,29 @@ func TestStartServesHealthzAndShutsDown(t *testing.T) {
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	baseURL := "http://127.0.0.1:" + strconv.Itoa(port)
+	for _, test := range []struct {
+		path   string
+		status int
+	}{
+		{"/services/e19a03db-a6d3-4abc-aad3-815965cd59c5/health", http.StatusOK},
+		{"/api/v1/auth/me", http.StatusUnauthorized},
+		{"/assets/missing.js", http.StatusNotFound},
+		{"/registry.v1.MissingService/Get", http.StatusNotFound},
+	} {
+		response, err := http.Get(baseURL + test.path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", test.path, err)
+		}
+		body, readErr := io.ReadAll(response.Body)
+		response.Body.Close()
+		if readErr != nil || response.StatusCode != test.status {
+			t.Fatalf("GET %s: status %d, want %d; error %v", test.path, response.StatusCode, test.status, readErr)
+		}
+		if (string(body) == entryPage) != (test.status == http.StatusOK) {
+			t.Fatalf("unexpected entry page response for %s: %s", test.path, body)
+		}
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

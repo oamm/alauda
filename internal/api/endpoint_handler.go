@@ -67,7 +67,7 @@ func (h *endpointHandler) UpdateEndpoint(ctx context.Context, req *connect.Reque
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, connect.NewError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.UpdateEndpointResponse{Endpoint: item}), nil
 }

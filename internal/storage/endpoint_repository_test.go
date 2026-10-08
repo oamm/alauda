@@ -175,3 +175,37 @@ func createEndpointTestInstance(t *testing.T, ctx context.Context, db *Database)
 	}
 	return instance
 }
+
+func TestRegisterRuntimeEndpointEnabledAndPrimarySemantics(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDatabase(t)
+	defer db.Close()
+	seed := createEndpointTestInstance(t, ctx, db)
+	deployment, err := NewDeploymentRepository(db).Get(ctx, seed.GetDeploymentId())
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewRuntimeRepository(db)
+	for _, name := range []string{"second", "third"} {
+		resp, err := repo.RegisterRuntime(ctx, &registryv1.RegisterRuntimeRequest{
+			ServiceId: deployment.GetServiceId(), EnvironmentId: deployment.GetEnvironmentId(),
+			Instance: &registryv1.RuntimeInstanceRegistration{Name: name, Address: "127.0.0.2", Enabled: true},
+			Endpoints: []*registryv1.RuntimeEndpointRegistration{
+				{Name: "default", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 80, Enabled: false},
+				{Name: "metrics", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 80, Enabled: true, Primary: true},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		items, _, err := NewEndpointRepository(db).List(ctx, resp.GetInstance().GetId(), 10, "")
+		if err != nil || len(items) != 2 {
+			t.Fatalf("registered endpoints = %v, error %v", items, err)
+		}
+		for _, endpoint := range items {
+			if endpoint.GetEnabled() != (endpoint.GetName() == "metrics") || endpoint.GetPrimary() != (endpoint.GetName() == "metrics") {
+				t.Fatalf("boolean state not preserved: %+v", endpoint)
+			}
+		}
+	}
+}
