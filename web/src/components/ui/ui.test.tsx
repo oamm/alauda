@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   Button,
+  IconButton,
   Dialog,
   DialogBody,
   DialogContent,
@@ -193,6 +194,31 @@ describe("Alauda UI primitives", () => {
       "bg-[var(--accent)]",
     );
     expect(screen.getByText("Healthy")).toBeInTheDocument();
+  });
+
+  it("keeps button and icon-button sizing contracts explicit", () => {
+    render(
+      <>
+        <Button size="sm">Small</Button>
+        <Button size="md" variant="link">
+          Medium link
+        </Button>
+        <IconButton label="Refresh" size="md">
+          Refresh
+        </IconButton>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "Small" })).toHaveAttribute(
+      "data-size",
+      "sm",
+    );
+    expect(screen.getByRole("button", { name: "Medium link" })).toHaveAttribute(
+      "data-size",
+      "md",
+    );
+    expect(screen.getByRole("button", { name: "Refresh" })).toHaveClass(
+      "alauda-icon-button",
+    );
   });
 
   it("supports keyboard-accessible tabs", async () => {

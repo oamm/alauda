@@ -1,5 +1,9 @@
 :root {
-  --field-height: 36px;
+  --control-height-sm: 32px;
+  --control-height-md: 36px;
+  --control-height-lg: 40px;
+  --chip-height: 28px;
+  --field-height: var(--control-height-md);
   --field-radius: 5px;
   --field-gap: 4px;
   --form-gap: 12px;
@@ -72,6 +76,7 @@ textarea.alauda-control:read-only {
   color: var(--text);
   font-size: 12px;
   font-weight: 500;
+  line-height: 16px;
 }
 .alauda-field-description,
 .alauda-field-error {
@@ -260,34 +265,46 @@ textarea.alauda-control:read-only {
   box-shadow: var(--shadow-panel);
 }
 .alauda-button {
-  min-height: 36px;
-  height: 36px;
+  min-height: var(--control-height-md);
+  height: var(--control-height-md);
   padding: 0 12px;
   border-radius: var(--field-radius);
   line-height: 20px;
   font-size: 13px;
 }
 .alauda-button[data-size="sm"] {
-  height: 32px;
-  min-height: 32px;
+  height: var(--control-height-sm);
+  min-height: var(--control-height-sm);
   padding: 0 10px;
   font-size: 12px;
+}
+.alauda-button[data-size="lg"] {
+  height: var(--control-height-lg);
+  min-height: var(--control-height-lg);
 }
 .alauda-button[data-variant="ghost"],
 .alauda-button[data-variant="link"] {
   border-color: transparent;
 }
 .alauda-button[data-variant="link"] {
-  height: auto;
-  min-height: 24px;
-  padding: 0;
+  padding-inline: 0;
   white-space: normal;
   text-align: left;
 }
 .alauda-button.alauda-icon-button {
-  width: 32px;
-  min-width: 32px;
   padding: 0;
+}
+.alauda-button.alauda-icon-button[data-size="sm"] {
+  width: var(--control-height-sm);
+  min-width: var(--control-height-sm);
+}
+.alauda-button.alauda-icon-button[data-size="md"] {
+  width: var(--control-height-md);
+  min-width: var(--control-height-md);
+}
+.alauda-button.alauda-icon-button[data-size="lg"] {
+  width: var(--control-height-lg);
+  min-width: var(--control-height-lg);
 }
 .alauda-button[data-variant="primary"] {
   background: var(--accent);
@@ -316,8 +333,8 @@ textarea.alauda-control:read-only {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 .alauda-filter-bar > label,
@@ -329,11 +346,59 @@ textarea.alauda-control:read-only {
 .alauda-filter-advanced {
   display: contents;
 }
-.alauda-filter-bar[data-disclosure="persistent"] .alauda-filter-advanced[data-expanded="false"] {
+.alauda-filter-bar[data-disclosure="persistent"]
+  .alauda-filter-advanced[data-expanded="false"] {
   display: none;
 }
 .alauda-filter-bar[data-density="compact"] > .alauda-field {
   flex: 0 1 180px;
+}
+.alauda-filter-bar > .alauda-button {
+  align-self: end;
+}
+.alauda-badge {
+  display: inline-flex;
+  height: var(--chip-height);
+  min-height: var(--chip-height);
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.alauda-filter-chip {
+  display: inline-flex;
+  height: var(--chip-height);
+  min-width: 0;
+  max-width: min(260px, 100%);
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  padding: 0 6px 0 8px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 16px;
+}
+.alauda-filter-chip > button {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.alauda-filter-chip > button:hover {
+  background: var(--surface);
+  color: var(--text);
 }
 .alauda-menu-item {
   padding: var(--space-2) var(--space-3);

@@ -822,3 +822,11 @@ Status: AUDITED -> DESIGNED -> IN PROGRESS -> MIGRATED -> VERIFIED within the re
 - Target display: the table groups Service/Environment, Instance, and Endpoint/Protocol/Port into one compact Target column. Rows open the detail Drawer by row click or a compact arrow action; repeated Details text buttons were removed.
 - Detail interaction: the existing Drawer was recreated around Execution, Target, Health Check and Failure sections, with optional related Service and Instance navigation. Missing duration is shown as a muted em dash with an accessible `Duration not recorded` explanation.
 - Transient feedback: unrelated shell success banners are hidden while Results is active so registration/auth feedback no longer consumes Results page space. Result query failures remain compact contextual error feedback with Retry.
+
+## Control Sizing and Alignment
+
+- Control sizing is global: `sm` is 32px, `md` is 36px and `lg` is 40px. Inputs and selects use the shared `md` field height by default; primary, secondary, ghost, danger and link buttons preserve the same height for a given size.
+- IconButton uses a square equivalent of its Button size: 32px, 36px or 40px. Table-row actions use `sm`; toolbar and dialog actions use `md`.
+- StatusBadge and FilterChip use a compact 28px geometry with shared text, padding, radius and icon spacing. Filter chips truncate long values and expose a 20px close hit area.
+- FilterBar uses shared 12px gaps, shared field-label rhythm and bottom alignment for controls. More filters is a standard compact Button with the sliders icon; Clear all uses the same ghost-button family as its surrounding controls.
+- Health Results keeps the shared PageHeader action treatment, grouped target table alignment and middle-aligned row actions. No page-specific control-sizing CSS is permitted; page-specific CSS may only describe content layout.
