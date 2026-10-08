@@ -437,6 +437,16 @@ func (r *HealthRepository) GetHealthCheckTarget(ctx context.Context, id string) 
 }
 
 func (r *HealthRepository) RecordHealthResult(ctx context.Context, check *registryv1.HealthCheck, result *registryv1.HealthResult) (*registryv1.HealthStateView, error) {
+	return r.recordHealthResult(ctx, check, result, "")
+}
+
+// RecordHealthResultForIncident records a verification result and resolves only
+// the requested incident when that result proves recovery.
+func (r *HealthRepository) RecordHealthResultForIncident(ctx context.Context, check *registryv1.HealthCheck, result *registryv1.HealthResult, incidentID string) (*registryv1.HealthStateView, error) {
+	return r.recordHealthResult(ctx, check, result, incidentID)
+}
+
+func (r *HealthRepository) recordHealthResult(ctx context.Context, check *registryv1.HealthCheck, result *registryv1.HealthResult, incidentID string) (*registryv1.HealthStateView, error) {
 	if check == nil {
 		return nil, errors.New("health check is required")
 	}
@@ -554,8 +564,8 @@ func (r *HealthRepository) RecordHealthResult(ctx context.Context, check *regist
 				notifications = append(notifications, alertNotification{incidentID: incidentID, notificationType: "unhealthy", notificationTime: timestamp})
 			}
 		case registryv1.HealthState_HEALTH_STATE_HEALTHY:
-			if previousState == registryv1.HealthState_HEALTH_STATE_UNHEALTHY {
-				incidentIDs, err := resolveOpenIncidentsForInstanceTx(ctx, tx, next.GetInstanceId(), "health check recovered", timestamp)
+			if incidentID == "" && previousState == registryv1.HealthState_HEALTH_STATE_UNHEALTHY {
+				incidentIDs, err := resolveOpenIncidentsForInstanceTx(ctx, tx, next.GetInstanceId(), "health check recovered", result.GetId(), timestamp)
 				if err != nil {
 					return nil, err
 				}
@@ -563,6 +573,15 @@ func (r *HealthRepository) RecordHealthResult(ctx context.Context, check *regist
 					notifications = append(notifications, alertNotification{incidentID: incidentID, notificationType: "recovered", notificationTime: timestamp})
 				}
 			}
+		}
+	}
+	if incidentID != "" && result.GetSuccess() {
+		resolved, err := resolveIncidentTx(ctx, tx, incidentID, "health check recovery verified", "VerifiedRecovery", result.GetId(), "operator", "Incident resolved after recovery verification", timestamp)
+		if err != nil {
+			return nil, err
+		}
+		if resolved {
+			notifications = append(notifications, alertNotification{incidentID: incidentID, notificationType: "recovered", notificationTime: timestamp})
 		}
 	}
 

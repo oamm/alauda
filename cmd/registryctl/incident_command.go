@@ -18,7 +18,8 @@ func newIncidentCommand() *cobra.Command {
 	}
 	cmd.AddCommand(newIncidentListCommand())
 	cmd.AddCommand(newIncidentGetCommand())
-	cmd.AddCommand(newIncidentResolveCommand())
+	cmd.AddCommand(newIncidentVerifyRecoveryCommand())
+	cmd.AddCommand(newIncidentResolveManuallyCommand())
 	return cmd
 }
 
@@ -79,21 +80,17 @@ func newIncidentGetCommand() *cobra.Command {
 	}
 }
 
-func newIncidentResolveCommand() *cobra.Command {
-	var reason string
+func newIncidentVerifyRecoveryCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "resolve <incident-id>",
-		Short: "Resolve an incident",
+		Use:   "verify-recovery <incident-id>",
+		Short: "Verify that an incident condition has recovered",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := newContext()
 			defer cancel()
 
 			client := registryv1connect.NewIncidentServiceClient(newHTTPClient(), cliConfig.ServerURL)
-			resp, err := client.ResolveIncident(ctx, connect.NewRequest(&registryv1.ResolveIncidentRequest{
-				Id:     args[0],
-				Reason: reason,
-			}))
+			resp, err := client.VerifyIncidentRecovery(ctx, connect.NewRequest(&registryv1.VerifyIncidentRecoveryRequest{Id: args[0]}))
 			if err != nil {
 				return err
 			}
@@ -101,7 +98,32 @@ func newIncidentResolveCommand() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVar(&reason, "reason", "", "Resolution reason")
+	return c
+}
+
+func newIncidentResolveManuallyCommand() *cobra.Command {
+	var note string
+	c := &cobra.Command{
+		Use:   "resolve-manually <incident-id>",
+		Short: "Resolve an incident without verified recovery",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(note) == "" {
+				return fmt.Errorf("--note is required")
+			}
+			ctx, cancel := newContext()
+			defer cancel()
+
+			client := registryv1connect.NewIncidentServiceClient(newHTTPClient(), cliConfig.ServerURL)
+			resp, err := client.ResolveIncidentManually(ctx, connect.NewRequest(&registryv1.ResolveIncidentManuallyRequest{Id: args[0], Note: note}))
+			if err != nil {
+				return err
+			}
+			printProto(resp.Msg)
+			return nil
+		},
+	}
+	c.Flags().StringVar(&note, "note", "", "Required administrative resolution note")
 	return c
 }
 

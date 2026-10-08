@@ -150,7 +150,7 @@ func TestCatalogCommandExecutionPaths(t *testing.T) {
 	incidentID := incidents[0].GetId()
 	runCommand(t, newIncidentListCommand(), "--environment-id", envID, "--service-id", serviceID, "--deployment-id", deploymentID, "--instance-id", instanceID, "--state", "open")
 	runCommand(t, newIncidentGetCommand(), incidentID)
-	runCommand(t, newIncidentResolveCommand(), incidentID, "--reason", "verified")
+	runCommand(t, newIncidentResolveManuallyCommand(), incidentID, "--note", "verified by operator")
 
 	runCommand(t, newEventListCommand(), "--environment-id", envID, "--service-id", serviceID, "--deployment-id", deploymentID, "--instance-id", instanceID, "--type", "incident.resolved")
 

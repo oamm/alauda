@@ -39,14 +39,19 @@ func RegisterConnectHandlersWithMiddleware(mux *http.ServeMux, db *storage.Datab
 	path, handler = registryv1connect.NewEndpointServiceHandler(&endpointHandler{repo: storage.NewEndpointRepository(db)})
 	mux.Handle(path, wrap(handler))
 
+	healthRepo := storage.NewHealthRepositoryWithAlerts(db, alertEngine)
 	path, handler = registryv1connect.NewHealthServiceHandler(&healthHandler{
-		repo:             storage.NewHealthRepositoryWithAlerts(db, alertEngine),
+		repo:             healthRepo,
 		availabilityRepo: storage.NewAvailabilityRepository(db),
 		executor:         healthsvc.NewExecutor(nil),
 	})
 	mux.Handle(path, wrap(handler))
 
-	path, handler = registryv1connect.NewIncidentServiceHandler(&incidentHandler{repo: storage.NewIncidentRepositoryWithAlerts(db, alertEngine)})
+	path, handler = registryv1connect.NewIncidentServiceHandler(&incidentHandler{
+		repo:       storage.NewIncidentRepositoryWithAlerts(db, alertEngine),
+		healthRepo: healthRepo,
+		executor:   healthsvc.NewExecutor(nil),
+	})
 	mux.Handle(path, wrap(handler))
 
 	path, handler = registryv1connect.NewAlertServiceHandler(&alertHandler{repo: alertRepo, engine: alertEngine})
@@ -94,7 +99,9 @@ type healthHandler struct {
 
 type incidentHandler struct {
 	registryv1connect.UnimplementedIncidentServiceHandler
-	repo *storage.IncidentRepository
+	repo       *storage.IncidentRepository
+	healthRepo *storage.HealthRepository
+	executor   *healthsvc.Executor
 }
 
 type alertHandler struct {

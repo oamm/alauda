@@ -30,7 +30,8 @@ func NewIncidentRepositoryWithAlerts(db *Database, dispatcher AlertDispatcher) *
 func (r *IncidentRepository) Get(ctx context.Context, id string) (*registryv1.Incident, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT id, instance_id, deployment_id, environment_id, service_id, state, opened_at,
-		       resolved_at, duration_seconds, reason, impact_summary, tags, metadata
+		       resolved_at, duration_seconds, reason, impact_summary, tags, metadata,
+		       resolution_method, resolution_note, resolution_evidence_health_result_id, resolved_by
 		FROM incidents
 		WHERE id = ?
 	`, id)
@@ -51,7 +52,8 @@ func (r *IncidentRepository) List(ctx context.Context, environmentID, serviceID,
 
 	query := `
 		SELECT id, instance_id, deployment_id, environment_id, service_id, state, opened_at,
-		       resolved_at, duration_seconds, reason, impact_summary, tags, metadata
+		       resolved_at, duration_seconds, reason, impact_summary, tags, metadata,
+		       resolution_method, resolution_note, resolution_evidence_health_result_id, resolved_by
 		FROM incidents
 		WHERE 1 = 1
 	`
@@ -104,10 +106,10 @@ func (r *IncidentRepository) List(ctx context.Context, environmentID, serviceID,
 	return items, nextToken, nil
 }
 
-func (r *IncidentRepository) Resolve(ctx context.Context, id, reason string) (*registryv1.Incident, error) {
+func (r *IncidentRepository) ResolveManually(ctx context.Context, id, note string) (*registryv1.Incident, error) {
 	now := time.Now().UTC()
-	if reason == "" {
-		reason = "resolved manually"
+	if note == "" {
+		note = "resolved manually"
 	}
 
 	tx, err := r.db.BeginTx(ctx)
@@ -116,51 +118,8 @@ func (r *IncidentRepository) Resolve(ctx context.Context, id, reason string) (*r
 	}
 	defer tx.Rollback()
 
-	var instanceID, deploymentID, environmentID, serviceID string
-	err = tx.QueryRowContext(ctx, `
-		SELECT instance_id, deployment_id, environment_id, service_id
-		FROM incidents
-		WHERE id = ? AND state = ?
-	`, id, registryv1.IncidentState_INCIDENT_STATE_OPEN.String()).Scan(&instanceID, &deploymentID, &environmentID, &serviceID)
+	_, err = resolveIncidentTx(ctx, tx, id, note, "ManualOverride", "", "operator", "Incident resolved manually", now)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return r.Get(ctx, id)
-		}
-		return nil, err
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		UPDATE incidents
-		SET state = ?, resolved_at = ?, duration_seconds = CAST((julianday(?) - julianday(opened_at)) * 86400 AS INTEGER),
-		    reason = CASE WHEN reason = '' THEN ? ELSE reason END,
-		    metadata = json_set(metadata, '$.resolution_reason', ?)
-		WHERE id = ? AND state = ?
-	`,
-		registryv1.IncidentState_INCIDENT_STATE_RESOLVED.String(),
-		now.Format(time.RFC3339Nano),
-		now.Format(time.RFC3339Nano),
-		reason,
-		reason,
-		id,
-		registryv1.IncidentState_INCIDENT_STATE_OPEN.String(),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := createEventTx(ctx, tx, &registryv1.Event{
-		Type:          "incident.resolved",
-		Timestamp:     timestamppb.New(now),
-		ResourceType:  "incident",
-		ResourceId:    id,
-		EnvironmentId: environmentID,
-		ServiceId:     serviceID,
-		DeploymentId:  deploymentID,
-		InstanceId:    instanceID,
-		Actor:         "operator",
-		Message:       "Incident resolved manually",
-		Metadata:      map[string]string{"reason": reason},
-	}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -172,6 +131,42 @@ func (r *IncidentRepository) Resolve(ctx context.Context, id, reason string) (*r
 	}
 	r.dispatchAlert(ctx, incident, "recovered", now)
 	return incident, nil
+}
+
+func resolveIncidentTx(ctx context.Context, tx *sql.Tx, id, note, method, evidenceID, actor, message string, resolvedAt time.Time) (bool, error) {
+	var instanceID, deploymentID, environmentID, serviceID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT instance_id, deployment_id, environment_id, service_id
+		FROM incidents
+		WHERE id = ? AND state = ?
+	`, id, registryv1.IncidentState_INCIDENT_STATE_OPEN.String()).Scan(&instanceID, &deploymentID, &environmentID, &serviceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	now := resolvedAt.UTC().Format(time.RFC3339Nano)
+	_, err = tx.ExecContext(ctx, `
+		UPDATE incidents
+		SET state = ?, resolved_at = ?, duration_seconds = CAST((julianday(?) - julianday(opened_at)) * 86400 AS INTEGER),
+		    resolution_method = ?, resolution_note = ?, resolution_evidence_health_result_id = ?,
+		    resolved_by = ?,
+		    metadata = json_set(metadata, '$.resolution_reason', ?)
+		WHERE id = ? AND state = ?
+	`, registryv1.IncidentState_INCIDENT_STATE_RESOLVED.String(), now, now, method, note, evidenceID, actor, note, id, registryv1.IncidentState_INCIDENT_STATE_OPEN.String())
+	if err != nil {
+		return false, err
+	}
+	if err := createEventTx(ctx, tx, &registryv1.Event{
+		Type: "incident.resolved", Timestamp: timestamppb.New(resolvedAt), ResourceType: "incident", ResourceId: id,
+		EnvironmentId: environmentID, ServiceId: serviceID, DeploymentId: deploymentID, InstanceId: instanceID,
+		Actor: actor, Message: message,
+		Metadata: map[string]string{"reason": note, "resolution_method": method, "health_result_id": evidenceID},
+	}); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func openIncidentForInstanceTx(ctx context.Context, tx *sql.Tx, check *registryv1.HealthCheck, result *registryv1.HealthResult, openedAt time.Time) (string, error) {
@@ -264,7 +259,7 @@ func openIncidentForInstanceTx(ctx context.Context, tx *sql.Tx, check *registryv
 	return incidentID, nil
 }
 
-func resolveOpenIncidentsForInstanceTx(ctx context.Context, tx *sql.Tx, instanceID, reason string, resolvedAt time.Time) ([]string, error) {
+func resolveOpenIncidentsForInstanceTx(ctx context.Context, tx *sql.Tx, instanceID, reason, evidenceID string, resolvedAt time.Time) ([]string, error) {
 	if reason == "" {
 		reason = "health check recovered"
 	}
@@ -296,40 +291,15 @@ func resolveOpenIncidentsForInstanceTx(ctx context.Context, tx *sql.Tx, instance
 		return nil, err
 	}
 
-	_, err = tx.ExecContext(ctx, `
-		UPDATE incidents
-		SET state = ?, resolved_at = ?, duration_seconds = CAST((julianday(?) - julianday(opened_at)) * 86400 AS INTEGER),
-		    metadata = json_set(metadata, '$.resolution_reason', ?)
-		WHERE instance_id = ? AND state = ?
-	`,
-		registryv1.IncidentState_INCIDENT_STATE_RESOLVED.String(),
-		resolvedAt.Format(time.RFC3339Nano),
-		resolvedAt.Format(time.RFC3339Nano),
-		reason,
-		instanceID,
-		registryv1.IncidentState_INCIDENT_STATE_OPEN.String(),
-	)
-	if err != nil {
-		return nil, err
-	}
 	incidentIDs := make([]string, 0, len(scopes))
 	for _, scope := range scopes {
-		if err := createEventTx(ctx, tx, &registryv1.Event{
-			Type:          "incident.resolved",
-			Timestamp:     timestamppb.New(resolvedAt),
-			ResourceType:  "incident",
-			ResourceId:    scope.id,
-			EnvironmentId: scope.environmentID,
-			ServiceId:     scope.serviceID,
-			DeploymentId:  scope.deploymentID,
-			InstanceId:    instanceID,
-			Actor:         "health-monitor",
-			Message:       "Incident resolved after instance recovered",
-			Metadata:      map[string]string{"reason": reason},
-		}); err != nil {
+		resolved, err := resolveIncidentTx(ctx, tx, scope.id, reason, "AutoRecovered", evidenceID, "health-monitor", "Incident resolved after instance recovered", resolvedAt)
+		if err != nil {
 			return nil, err
 		}
-		incidentIDs = append(incidentIDs, scope.id)
+		if resolved {
+			incidentIDs = append(incidentIDs, scope.id)
+		}
 	}
 	return incidentIDs, nil
 }
@@ -345,21 +315,25 @@ func (r *IncidentRepository) dispatchAlert(ctx context.Context, incident *regist
 
 func scanIncident(row scanner) (*registryv1.Incident, error) {
 	var (
-		id              string
-		instanceID      string
-		deploymentID    string
-		environmentID   string
-		serviceID       string
-		stateRaw        string
-		openedRaw       string
-		resolvedRaw     sql.NullString
-		durationSeconds sql.NullInt64
-		reason          string
-		impactSummary   sql.NullString
-		tagsRaw         string
-		metadataRaw     string
+		id                   string
+		instanceID           string
+		deploymentID         string
+		environmentID        string
+		serviceID            string
+		stateRaw             string
+		openedRaw            string
+		resolvedRaw          sql.NullString
+		durationSeconds      sql.NullInt64
+		reason               string
+		impactSummary        sql.NullString
+		tagsRaw              string
+		metadataRaw          string
+		resolutionMethod     string
+		resolutionNote       string
+		resolutionEvidenceID string
+		resolvedBy           string
 	)
-	if err := row.Scan(&id, &instanceID, &deploymentID, &environmentID, &serviceID, &stateRaw, &openedRaw, &resolvedRaw, &durationSeconds, &reason, &impactSummary, &tagsRaw, &metadataRaw); err != nil {
+	if err := row.Scan(&id, &instanceID, &deploymentID, &environmentID, &serviceID, &stateRaw, &openedRaw, &resolvedRaw, &durationSeconds, &reason, &impactSummary, &tagsRaw, &metadataRaw, &resolutionMethod, &resolutionNote, &resolutionEvidenceID, &resolvedBy); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -387,17 +361,21 @@ func scanIncident(row scanner) (*registryv1.Incident, error) {
 	}
 
 	item := &registryv1.Incident{
-		Id:            id,
-		InstanceId:    instanceID,
-		DeploymentId:  deploymentID,
-		EnvironmentId: environmentID,
-		ServiceId:     serviceID,
-		State:         parseIncidentState(stateRaw),
-		OpenedAt:      openedAt,
-		ResolvedAt:    resolvedAt,
-		Reason:        reason,
-		Tags:          tags,
-		Metadata:      metadata,
+		Id:                               id,
+		InstanceId:                       instanceID,
+		DeploymentId:                     deploymentID,
+		EnvironmentId:                    environmentID,
+		ServiceId:                        serviceID,
+		State:                            parseIncidentState(stateRaw),
+		OpenedAt:                         openedAt,
+		ResolvedAt:                       resolvedAt,
+		Reason:                           reason,
+		Tags:                             tags,
+		Metadata:                         metadata,
+		ResolutionMethod:                 resolutionMethod,
+		ResolutionNote:                   resolutionNote,
+		ResolutionEvidenceHealthResultId: resolutionEvidenceID,
+		ResolvedBy:                       resolvedBy,
 	}
 	if durationSeconds.Valid {
 		item.DurationSeconds = durationSeconds.Int64

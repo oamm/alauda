@@ -300,6 +300,12 @@ func TestRecordHealthResultOpensAndResolvesIncidentOnStateTransitions(t *testing
 	if resolvedIncidents[0].GetDurationSeconds() <= 0 {
 		t.Fatalf("duration_seconds = %d, want positive", resolvedIncidents[0].GetDurationSeconds())
 	}
+	if resolvedIncidents[0].GetResolutionMethod() != "AutoRecovered" {
+		t.Fatalf("resolution method = %q, want AutoRecovered", resolvedIncidents[0].GetResolutionMethod())
+	}
+	if resolvedIncidents[0].GetResolutionEvidenceHealthResultId() == "" {
+		t.Fatal("automatic recovery has no health result evidence")
+	}
 
 	events, _, err := NewEventRepository(db).List(ctx, EventFilters{InstanceID: check.GetInstanceId()}, 10, "")
 	if err != nil {
@@ -334,6 +340,48 @@ func TestRecordHealthResultOpensAndResolvesIncidentOnStateTransitions(t *testing
 	}
 	if historyCount != 1 {
 		t.Fatalf("availability history rows = %d, want 1", historyCount)
+	}
+}
+
+func TestRecordHealthResultForIncidentVerifiesOnlyTheRequestedIncident(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDatabase(t)
+	defer db.Close()
+
+	healthRepo := NewHealthRepository(db)
+	incidentRepo := NewIncidentRepository(db)
+	check := createTestHealthCheck(t, ctx, db)
+	start := time.Now().UTC()
+	if _, err := healthRepo.RecordHealthResult(ctx, check, resultAt(false, start)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := healthRepo.RecordHealthResult(ctx, check, resultAt(false, start.Add(time.Second))); err != nil {
+		t.Fatal(err)
+	}
+	open, _, err := incidentRepo.List(ctx, "", "", "", check.GetInstanceId(), registryv1.IncidentState_INCIDENT_STATE_OPEN, 10, "")
+	if err != nil || len(open) != 1 {
+		t.Fatalf("open incidents = %d, err=%v", len(open), err)
+	}
+
+	failed := resultAt(false, start.Add(2*time.Second))
+	if _, err := healthRepo.RecordHealthResultForIncident(ctx, check, failed, open[0].GetId()); err != nil {
+		t.Fatal(err)
+	}
+	open, _, err = incidentRepo.List(ctx, "", "", "", check.GetInstanceId(), registryv1.IncidentState_INCIDENT_STATE_OPEN, 10, "")
+	if err != nil || len(open) != 1 {
+		t.Fatalf("failed verification changed incident state: %d, err=%v", len(open), err)
+	}
+
+	success := resultAt(true, start.Add(3*time.Second))
+	if _, err := healthRepo.RecordHealthResultForIncident(ctx, check, success, open[0].GetId()); err != nil {
+		t.Fatal(err)
+	}
+	resolved, _, err := incidentRepo.List(ctx, "", "", "", check.GetInstanceId(), registryv1.IncidentState_INCIDENT_STATE_RESOLVED, 10, "")
+	if err != nil || len(resolved) != 1 {
+		t.Fatalf("successful verification did not resolve incident: %d, err=%v", len(resolved), err)
+	}
+	if resolved[0].GetResolutionMethod() != "VerifiedRecovery" || resolved[0].GetResolutionEvidenceHealthResultId() != success.GetId() {
+		t.Fatalf("verification resolution = %q/%q", resolved[0].GetResolutionMethod(), resolved[0].GetResolutionEvidenceHealthResultId())
 	}
 }
 

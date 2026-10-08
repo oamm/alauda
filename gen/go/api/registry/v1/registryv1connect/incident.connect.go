@@ -39,9 +39,12 @@ const (
 	// IncidentServiceListIncidentsProcedure is the fully-qualified name of the IncidentService's
 	// ListIncidents RPC.
 	IncidentServiceListIncidentsProcedure = "/registry.v1.IncidentService/ListIncidents"
-	// IncidentServiceResolveIncidentProcedure is the fully-qualified name of the IncidentService's
-	// ResolveIncident RPC.
-	IncidentServiceResolveIncidentProcedure = "/registry.v1.IncidentService/ResolveIncident"
+	// IncidentServiceVerifyIncidentRecoveryProcedure is the fully-qualified name of the
+	// IncidentService's VerifyIncidentRecovery RPC.
+	IncidentServiceVerifyIncidentRecoveryProcedure = "/registry.v1.IncidentService/VerifyIncidentRecovery"
+	// IncidentServiceResolveIncidentManuallyProcedure is the fully-qualified name of the
+	// IncidentService's ResolveIncidentManually RPC.
+	IncidentServiceResolveIncidentManuallyProcedure = "/registry.v1.IncidentService/ResolveIncidentManually"
 	// IncidentServiceWatchIncidentsProcedure is the fully-qualified name of the IncidentService's
 	// WatchIncidents RPC.
 	IncidentServiceWatchIncidentsProcedure = "/registry.v1.IncidentService/WatchIncidents"
@@ -51,7 +54,8 @@ const (
 type IncidentServiceClient interface {
 	GetIncident(context.Context, *connect.Request[v1.GetIncidentRequest]) (*connect.Response[v1.GetIncidentResponse], error)
 	ListIncidents(context.Context, *connect.Request[v1.ListIncidentsRequest]) (*connect.Response[v1.ListIncidentsResponse], error)
-	ResolveIncident(context.Context, *connect.Request[v1.ResolveIncidentRequest]) (*connect.Response[v1.ResolveIncidentResponse], error)
+	VerifyIncidentRecovery(context.Context, *connect.Request[v1.VerifyIncidentRecoveryRequest]) (*connect.Response[v1.VerifyIncidentRecoveryResponse], error)
+	ResolveIncidentManually(context.Context, *connect.Request[v1.ResolveIncidentManuallyRequest]) (*connect.Response[v1.ResolveIncidentManuallyResponse], error)
 	WatchIncidents(context.Context, *connect.Request[v1.WatchIncidentsRequest]) (*connect.ServerStreamForClient[v1.Incident], error)
 }
 
@@ -78,10 +82,16 @@ func NewIncidentServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(incidentServiceMethods.ByName("ListIncidents")),
 			connect.WithClientOptions(opts...),
 		),
-		resolveIncident: connect.NewClient[v1.ResolveIncidentRequest, v1.ResolveIncidentResponse](
+		verifyIncidentRecovery: connect.NewClient[v1.VerifyIncidentRecoveryRequest, v1.VerifyIncidentRecoveryResponse](
 			httpClient,
-			baseURL+IncidentServiceResolveIncidentProcedure,
-			connect.WithSchema(incidentServiceMethods.ByName("ResolveIncident")),
+			baseURL+IncidentServiceVerifyIncidentRecoveryProcedure,
+			connect.WithSchema(incidentServiceMethods.ByName("VerifyIncidentRecovery")),
+			connect.WithClientOptions(opts...),
+		),
+		resolveIncidentManually: connect.NewClient[v1.ResolveIncidentManuallyRequest, v1.ResolveIncidentManuallyResponse](
+			httpClient,
+			baseURL+IncidentServiceResolveIncidentManuallyProcedure,
+			connect.WithSchema(incidentServiceMethods.ByName("ResolveIncidentManually")),
 			connect.WithClientOptions(opts...),
 		),
 		watchIncidents: connect.NewClient[v1.WatchIncidentsRequest, v1.Incident](
@@ -95,10 +105,11 @@ func NewIncidentServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // incidentServiceClient implements IncidentServiceClient.
 type incidentServiceClient struct {
-	getIncident     *connect.Client[v1.GetIncidentRequest, v1.GetIncidentResponse]
-	listIncidents   *connect.Client[v1.ListIncidentsRequest, v1.ListIncidentsResponse]
-	resolveIncident *connect.Client[v1.ResolveIncidentRequest, v1.ResolveIncidentResponse]
-	watchIncidents  *connect.Client[v1.WatchIncidentsRequest, v1.Incident]
+	getIncident             *connect.Client[v1.GetIncidentRequest, v1.GetIncidentResponse]
+	listIncidents           *connect.Client[v1.ListIncidentsRequest, v1.ListIncidentsResponse]
+	verifyIncidentRecovery  *connect.Client[v1.VerifyIncidentRecoveryRequest, v1.VerifyIncidentRecoveryResponse]
+	resolveIncidentManually *connect.Client[v1.ResolveIncidentManuallyRequest, v1.ResolveIncidentManuallyResponse]
+	watchIncidents          *connect.Client[v1.WatchIncidentsRequest, v1.Incident]
 }
 
 // GetIncident calls registry.v1.IncidentService.GetIncident.
@@ -111,9 +122,14 @@ func (c *incidentServiceClient) ListIncidents(ctx context.Context, req *connect.
 	return c.listIncidents.CallUnary(ctx, req)
 }
 
-// ResolveIncident calls registry.v1.IncidentService.ResolveIncident.
-func (c *incidentServiceClient) ResolveIncident(ctx context.Context, req *connect.Request[v1.ResolveIncidentRequest]) (*connect.Response[v1.ResolveIncidentResponse], error) {
-	return c.resolveIncident.CallUnary(ctx, req)
+// VerifyIncidentRecovery calls registry.v1.IncidentService.VerifyIncidentRecovery.
+func (c *incidentServiceClient) VerifyIncidentRecovery(ctx context.Context, req *connect.Request[v1.VerifyIncidentRecoveryRequest]) (*connect.Response[v1.VerifyIncidentRecoveryResponse], error) {
+	return c.verifyIncidentRecovery.CallUnary(ctx, req)
+}
+
+// ResolveIncidentManually calls registry.v1.IncidentService.ResolveIncidentManually.
+func (c *incidentServiceClient) ResolveIncidentManually(ctx context.Context, req *connect.Request[v1.ResolveIncidentManuallyRequest]) (*connect.Response[v1.ResolveIncidentManuallyResponse], error) {
+	return c.resolveIncidentManually.CallUnary(ctx, req)
 }
 
 // WatchIncidents calls registry.v1.IncidentService.WatchIncidents.
@@ -125,7 +141,8 @@ func (c *incidentServiceClient) WatchIncidents(ctx context.Context, req *connect
 type IncidentServiceHandler interface {
 	GetIncident(context.Context, *connect.Request[v1.GetIncidentRequest]) (*connect.Response[v1.GetIncidentResponse], error)
 	ListIncidents(context.Context, *connect.Request[v1.ListIncidentsRequest]) (*connect.Response[v1.ListIncidentsResponse], error)
-	ResolveIncident(context.Context, *connect.Request[v1.ResolveIncidentRequest]) (*connect.Response[v1.ResolveIncidentResponse], error)
+	VerifyIncidentRecovery(context.Context, *connect.Request[v1.VerifyIncidentRecoveryRequest]) (*connect.Response[v1.VerifyIncidentRecoveryResponse], error)
+	ResolveIncidentManually(context.Context, *connect.Request[v1.ResolveIncidentManuallyRequest]) (*connect.Response[v1.ResolveIncidentManuallyResponse], error)
 	WatchIncidents(context.Context, *connect.Request[v1.WatchIncidentsRequest], *connect.ServerStream[v1.Incident]) error
 }
 
@@ -148,10 +165,16 @@ func NewIncidentServiceHandler(svc IncidentServiceHandler, opts ...connect.Handl
 		connect.WithSchema(incidentServiceMethods.ByName("ListIncidents")),
 		connect.WithHandlerOptions(opts...),
 	)
-	incidentServiceResolveIncidentHandler := connect.NewUnaryHandler(
-		IncidentServiceResolveIncidentProcedure,
-		svc.ResolveIncident,
-		connect.WithSchema(incidentServiceMethods.ByName("ResolveIncident")),
+	incidentServiceVerifyIncidentRecoveryHandler := connect.NewUnaryHandler(
+		IncidentServiceVerifyIncidentRecoveryProcedure,
+		svc.VerifyIncidentRecovery,
+		connect.WithSchema(incidentServiceMethods.ByName("VerifyIncidentRecovery")),
+		connect.WithHandlerOptions(opts...),
+	)
+	incidentServiceResolveIncidentManuallyHandler := connect.NewUnaryHandler(
+		IncidentServiceResolveIncidentManuallyProcedure,
+		svc.ResolveIncidentManually,
+		connect.WithSchema(incidentServiceMethods.ByName("ResolveIncidentManually")),
 		connect.WithHandlerOptions(opts...),
 	)
 	incidentServiceWatchIncidentsHandler := connect.NewServerStreamHandler(
@@ -166,8 +189,10 @@ func NewIncidentServiceHandler(svc IncidentServiceHandler, opts ...connect.Handl
 			incidentServiceGetIncidentHandler.ServeHTTP(w, r)
 		case IncidentServiceListIncidentsProcedure:
 			incidentServiceListIncidentsHandler.ServeHTTP(w, r)
-		case IncidentServiceResolveIncidentProcedure:
-			incidentServiceResolveIncidentHandler.ServeHTTP(w, r)
+		case IncidentServiceVerifyIncidentRecoveryProcedure:
+			incidentServiceVerifyIncidentRecoveryHandler.ServeHTTP(w, r)
+		case IncidentServiceResolveIncidentManuallyProcedure:
+			incidentServiceResolveIncidentManuallyHandler.ServeHTTP(w, r)
 		case IncidentServiceWatchIncidentsProcedure:
 			incidentServiceWatchIncidentsHandler.ServeHTTP(w, r)
 		default:
@@ -187,8 +212,12 @@ func (UnimplementedIncidentServiceHandler) ListIncidents(context.Context, *conne
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.IncidentService.ListIncidents is not implemented"))
 }
 
-func (UnimplementedIncidentServiceHandler) ResolveIncident(context.Context, *connect.Request[v1.ResolveIncidentRequest]) (*connect.Response[v1.ResolveIncidentResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.IncidentService.ResolveIncident is not implemented"))
+func (UnimplementedIncidentServiceHandler) VerifyIncidentRecovery(context.Context, *connect.Request[v1.VerifyIncidentRecoveryRequest]) (*connect.Response[v1.VerifyIncidentRecoveryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.IncidentService.VerifyIncidentRecovery is not implemented"))
+}
+
+func (UnimplementedIncidentServiceHandler) ResolveIncidentManually(context.Context, *connect.Request[v1.ResolveIncidentManuallyRequest]) (*connect.Response[v1.ResolveIncidentManuallyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("registry.v1.IncidentService.ResolveIncidentManually is not implemented"))
 }
 
 func (UnimplementedIncidentServiceHandler) WatchIncidents(context.Context, *connect.Request[v1.WatchIncidentsRequest], *connect.ServerStream[v1.Incident]) error {

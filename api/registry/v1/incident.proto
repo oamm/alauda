@@ -5,6 +5,7 @@ package registry.v1;
 option go_package = "github.com/company/service-registry/gen/go/registry/v1;registryv1";
 
 import "api/registry/v1/common.proto";
+import "api/registry/v1/health.proto";
 import "google/protobuf/timestamp.proto";
 
 message Incident {
@@ -21,6 +22,10 @@ message Incident {
   string impact_summary = 11;
   map<string, string> tags = 12;
   map<string, string> metadata = 13;
+  string resolution_method = 14;
+  string resolution_note = 15;
+  string resolution_evidence_health_result_id = 16;
+  string resolved_by = 17;
 }
 
 message GetIncidentRequest { string id = 1; }
@@ -40,12 +45,24 @@ message ListIncidentsResponse {
   PaginationResponse pagination = 2;
 }
 
-message ResolveIncidentRequest {
+message VerifyIncidentRecoveryRequest {
   string id = 1;
-  string reason = 2;
 }
 
-message ResolveIncidentResponse { Incident incident = 1; }
+message VerifyIncidentRecoveryResponse {
+  Incident incident = 1;
+  bool recovered = 2;
+  google.protobuf.Timestamp checked_at = 3;
+  HealthResult result = 4;
+  string reason = 5;
+}
+
+message ResolveIncidentManuallyRequest {
+  string id = 1;
+  string note = 2;
+}
+
+message ResolveIncidentManuallyResponse { Incident incident = 1; }
 
 message WatchIncidentsRequest {
   string environment_id = 1;
@@ -55,6 +72,7 @@ message WatchIncidentsRequest {
 service IncidentService {
   rpc GetIncident(GetIncidentRequest) returns (GetIncidentResponse);
   rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse);
-  rpc ResolveIncident(ResolveIncidentRequest) returns (ResolveIncidentResponse);
+  rpc VerifyIncidentRecovery(VerifyIncidentRecoveryRequest) returns (VerifyIncidentRecoveryResponse);
+  rpc ResolveIncidentManually(ResolveIncidentManuallyRequest) returns (ResolveIncidentManuallyResponse);
   rpc WatchIncidents(WatchIncidentsRequest) returns (stream Incident);
 }

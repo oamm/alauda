@@ -23,22 +23,26 @@ const (
 )
 
 type Incident struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	InstanceId      string                 `protobuf:"bytes,2,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	DeploymentId    string                 `protobuf:"bytes,3,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
-	EnvironmentId   string                 `protobuf:"bytes,4,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
-	ServiceId       string                 `protobuf:"bytes,5,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
-	State           IncidentState          `protobuf:"varint,6,opt,name=state,proto3,enum=registry.v1.IncidentState" json:"state,omitempty"`
-	OpenedAt        *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=opened_at,json=openedAt,proto3" json:"opened_at,omitempty"`
-	ResolvedAt      *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=resolved_at,json=resolvedAt,proto3" json:"resolved_at,omitempty"`
-	DurationSeconds int64                  `protobuf:"varint,9,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
-	Reason          string                 `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
-	ImpactSummary   string                 `protobuf:"bytes,11,opt,name=impact_summary,json=impactSummary,proto3" json:"impact_summary,omitempty"`
-	Tags            map[string]string      `protobuf:"bytes,12,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Metadata        map[string]string      `protobuf:"bytes,13,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                            protoimpl.MessageState `protogen:"open.v1"`
+	Id                               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	InstanceId                       string                 `protobuf:"bytes,2,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
+	DeploymentId                     string                 `protobuf:"bytes,3,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
+	EnvironmentId                    string                 `protobuf:"bytes,4,opt,name=environment_id,json=environmentId,proto3" json:"environment_id,omitempty"`
+	ServiceId                        string                 `protobuf:"bytes,5,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
+	State                            IncidentState          `protobuf:"varint,6,opt,name=state,proto3,enum=registry.v1.IncidentState" json:"state,omitempty"`
+	OpenedAt                         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=opened_at,json=openedAt,proto3" json:"opened_at,omitempty"`
+	ResolvedAt                       *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=resolved_at,json=resolvedAt,proto3" json:"resolved_at,omitempty"`
+	DurationSeconds                  int64                  `protobuf:"varint,9,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
+	Reason                           string                 `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
+	ImpactSummary                    string                 `protobuf:"bytes,11,opt,name=impact_summary,json=impactSummary,proto3" json:"impact_summary,omitempty"`
+	Tags                             map[string]string      `protobuf:"bytes,12,rep,name=tags,proto3" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Metadata                         map[string]string      `protobuf:"bytes,13,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ResolutionMethod                 string                 `protobuf:"bytes,14,opt,name=resolution_method,json=resolutionMethod,proto3" json:"resolution_method,omitempty"`
+	ResolutionNote                   string                 `protobuf:"bytes,15,opt,name=resolution_note,json=resolutionNote,proto3" json:"resolution_note,omitempty"`
+	ResolutionEvidenceHealthResultId string                 `protobuf:"bytes,16,opt,name=resolution_evidence_health_result_id,json=resolutionEvidenceHealthResultId,proto3" json:"resolution_evidence_health_result_id,omitempty"`
+	ResolvedBy                       string                 `protobuf:"bytes,17,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
+	unknownFields                    protoimpl.UnknownFields
+	sizeCache                        protoimpl.SizeCache
 }
 
 func (x *Incident) Reset() {
@@ -160,6 +164,34 @@ func (x *Incident) GetMetadata() map[string]string {
 		return x.Metadata
 	}
 	return nil
+}
+
+func (x *Incident) GetResolutionMethod() string {
+	if x != nil {
+		return x.ResolutionMethod
+	}
+	return ""
+}
+
+func (x *Incident) GetResolutionNote() string {
+	if x != nil {
+		return x.ResolutionNote
+	}
+	return ""
+}
+
+func (x *Incident) GetResolutionEvidenceHealthResultId() string {
+	if x != nil {
+		return x.ResolutionEvidenceHealthResultId
+	}
+	return ""
+}
+
+func (x *Incident) GetResolvedBy() string {
+	if x != nil {
+		return x.ResolvedBy
+	}
+	return ""
 }
 
 type GetIncidentRequest struct {
@@ -386,28 +418,27 @@ func (x *ListIncidentsResponse) GetPagination() *PaginationResponse {
 	return nil
 }
 
-type ResolveIncidentRequest struct {
+type VerifyIncidentRecoveryRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ResolveIncidentRequest) Reset() {
-	*x = ResolveIncidentRequest{}
+func (x *VerifyIncidentRecoveryRequest) Reset() {
+	*x = VerifyIncidentRecoveryRequest{}
 	mi := &file_api_registry_v1_incident_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ResolveIncidentRequest) String() string {
+func (x *VerifyIncidentRecoveryRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ResolveIncidentRequest) ProtoMessage() {}
+func (*VerifyIncidentRecoveryRequest) ProtoMessage() {}
 
-func (x *ResolveIncidentRequest) ProtoReflect() protoreflect.Message {
+func (x *VerifyIncidentRecoveryRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_registry_v1_incident_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -419,46 +450,43 @@ func (x *ResolveIncidentRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ResolveIncidentRequest.ProtoReflect.Descriptor instead.
-func (*ResolveIncidentRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use VerifyIncidentRecoveryRequest.ProtoReflect.Descriptor instead.
+func (*VerifyIncidentRecoveryRequest) Descriptor() ([]byte, []int) {
 	return file_api_registry_v1_incident_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ResolveIncidentRequest) GetId() string {
+func (x *VerifyIncidentRecoveryRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *ResolveIncidentRequest) GetReason() string {
-	if x != nil {
-		return x.Reason
-	}
-	return ""
-}
-
-type ResolveIncidentResponse struct {
+type VerifyIncidentRecoveryResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Incident      *Incident              `protobuf:"bytes,1,opt,name=incident,proto3" json:"incident,omitempty"`
+	Recovered     bool                   `protobuf:"varint,2,opt,name=recovered,proto3" json:"recovered,omitempty"`
+	CheckedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
+	Result        *HealthResult          `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
+	Reason        string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ResolveIncidentResponse) Reset() {
-	*x = ResolveIncidentResponse{}
+func (x *VerifyIncidentRecoveryResponse) Reset() {
+	*x = VerifyIncidentRecoveryResponse{}
 	mi := &file_api_registry_v1_incident_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ResolveIncidentResponse) String() string {
+func (x *VerifyIncidentRecoveryResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ResolveIncidentResponse) ProtoMessage() {}
+func (*VerifyIncidentRecoveryResponse) ProtoMessage() {}
 
-func (x *ResolveIncidentResponse) ProtoReflect() protoreflect.Message {
+func (x *VerifyIncidentRecoveryResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_registry_v1_incident_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -470,12 +498,136 @@ func (x *ResolveIncidentResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ResolveIncidentResponse.ProtoReflect.Descriptor instead.
-func (*ResolveIncidentResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use VerifyIncidentRecoveryResponse.ProtoReflect.Descriptor instead.
+func (*VerifyIncidentRecoveryResponse) Descriptor() ([]byte, []int) {
 	return file_api_registry_v1_incident_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ResolveIncidentResponse) GetIncident() *Incident {
+func (x *VerifyIncidentRecoveryResponse) GetIncident() *Incident {
+	if x != nil {
+		return x.Incident
+	}
+	return nil
+}
+
+func (x *VerifyIncidentRecoveryResponse) GetRecovered() bool {
+	if x != nil {
+		return x.Recovered
+	}
+	return false
+}
+
+func (x *VerifyIncidentRecoveryResponse) GetCheckedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CheckedAt
+	}
+	return nil
+}
+
+func (x *VerifyIncidentRecoveryResponse) GetResult() *HealthResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+func (x *VerifyIncidentRecoveryResponse) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ResolveIncidentManuallyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Note          string                 `protobuf:"bytes,2,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveIncidentManuallyRequest) Reset() {
+	*x = ResolveIncidentManuallyRequest{}
+	mi := &file_api_registry_v1_incident_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveIncidentManuallyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveIncidentManuallyRequest) ProtoMessage() {}
+
+func (x *ResolveIncidentManuallyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_incident_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveIncidentManuallyRequest.ProtoReflect.Descriptor instead.
+func (*ResolveIncidentManuallyRequest) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_incident_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ResolveIncidentManuallyRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ResolveIncidentManuallyRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type ResolveIncidentManuallyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Incident      *Incident              `protobuf:"bytes,1,opt,name=incident,proto3" json:"incident,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveIncidentManuallyResponse) Reset() {
+	*x = ResolveIncidentManuallyResponse{}
+	mi := &file_api_registry_v1_incident_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveIncidentManuallyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveIncidentManuallyResponse) ProtoMessage() {}
+
+func (x *ResolveIncidentManuallyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_registry_v1_incident_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveIncidentManuallyResponse.ProtoReflect.Descriptor instead.
+func (*ResolveIncidentManuallyResponse) Descriptor() ([]byte, []int) {
+	return file_api_registry_v1_incident_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ResolveIncidentManuallyResponse) GetIncident() *Incident {
 	if x != nil {
 		return x.Incident
 	}
@@ -492,7 +644,7 @@ type WatchIncidentsRequest struct {
 
 func (x *WatchIncidentsRequest) Reset() {
 	*x = WatchIncidentsRequest{}
-	mi := &file_api_registry_v1_incident_proto_msgTypes[7]
+	mi := &file_api_registry_v1_incident_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +656,7 @@ func (x *WatchIncidentsRequest) String() string {
 func (*WatchIncidentsRequest) ProtoMessage() {}
 
 func (x *WatchIncidentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_registry_v1_incident_proto_msgTypes[7]
+	mi := &file_api_registry_v1_incident_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +669,7 @@ func (x *WatchIncidentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchIncidentsRequest.ProtoReflect.Descriptor instead.
 func (*WatchIncidentsRequest) Descriptor() ([]byte, []int) {
-	return file_api_registry_v1_incident_proto_rawDescGZIP(), []int{7}
+	return file_api_registry_v1_incident_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *WatchIncidentsRequest) GetEnvironmentId() string {
@@ -538,7 +690,7 @@ var File_api_registry_v1_incident_proto protoreflect.FileDescriptor
 
 const file_api_registry_v1_incident_proto_rawDesc = "" +
 	"\n" +
-	"\x1eapi/registry/v1/incident.proto\x12\vregistry.v1\x1a\x1capi/registry/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa4\x05\n" +
+	"\x1eapi/registry/v1/incident.proto\x12\vregistry.v1\x1a\x1capi/registry/v1/common.proto\x1a\x1capi/registry/v1/health.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xeb\x06\n" +
 	"\bIncident\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vinstance_id\x18\x02 \x01(\tR\n" +
@@ -556,7 +708,12 @@ const file_api_registry_v1_incident_proto_rawDesc = "" +
 	" \x01(\tR\x06reason\x12%\n" +
 	"\x0eimpact_summary\x18\v \x01(\tR\rimpactSummary\x123\n" +
 	"\x04tags\x18\f \x03(\v2\x1f.registry.v1.Incident.TagsEntryR\x04tags\x12?\n" +
-	"\bmetadata\x18\r \x03(\v2#.registry.v1.Incident.MetadataEntryR\bmetadata\x1a7\n" +
+	"\bmetadata\x18\r \x03(\v2#.registry.v1.Incident.MetadataEntryR\bmetadata\x12+\n" +
+	"\x11resolution_method\x18\x0e \x01(\tR\x10resolutionMethod\x12'\n" +
+	"\x0fresolution_note\x18\x0f \x01(\tR\x0eresolutionNote\x12N\n" +
+	"$resolution_evidence_health_result_id\x18\x10 \x01(\tR resolutionEvidenceHealthResultId\x12\x1f\n" +
+	"\vresolved_by\x18\x11 \x01(\tR\n" +
+	"resolvedBy\x1a7\n" +
 	"\tTagsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
@@ -582,20 +739,30 @@ const file_api_registry_v1_incident_proto_rawDesc = "" +
 	"\tincidents\x18\x01 \x03(\v2\x15.registry.v1.IncidentR\tincidents\x12?\n" +
 	"\n" +
 	"pagination\x18\x02 \x01(\v2\x1f.registry.v1.PaginationResponseR\n" +
-	"pagination\"@\n" +
-	"\x16ResolveIncidentRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"L\n" +
-	"\x17ResolveIncidentResponse\x121\n" +
+	"pagination\"/\n" +
+	"\x1dVerifyIncidentRecoveryRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xf7\x01\n" +
+	"\x1eVerifyIncidentRecoveryResponse\x121\n" +
+	"\bincident\x18\x01 \x01(\v2\x15.registry.v1.IncidentR\bincident\x12\x1c\n" +
+	"\trecovered\x18\x02 \x01(\bR\trecovered\x129\n" +
+	"\n" +
+	"checked_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAt\x121\n" +
+	"\x06result\x18\x04 \x01(\v2\x19.registry.v1.HealthResultR\x06result\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"D\n" +
+	"\x1eResolveIncidentManuallyRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04note\x18\x02 \x01(\tR\x04note\"T\n" +
+	"\x1fResolveIncidentManuallyResponse\x121\n" +
 	"\bincident\x18\x01 \x01(\v2\x15.registry.v1.IncidentR\bincident\"]\n" +
 	"\x15WatchIncidentsRequest\x12%\n" +
 	"\x0eenvironment_id\x18\x01 \x01(\tR\renvironmentId\x12\x1d\n" +
 	"\n" +
-	"service_id\x18\x02 \x01(\tR\tserviceId2\xe8\x02\n" +
+	"service_id\x18\x02 \x01(\tR\tserviceId2\xf3\x03\n" +
 	"\x0fIncidentService\x12P\n" +
 	"\vGetIncident\x12\x1f.registry.v1.GetIncidentRequest\x1a .registry.v1.GetIncidentResponse\x12V\n" +
-	"\rListIncidents\x12!.registry.v1.ListIncidentsRequest\x1a\".registry.v1.ListIncidentsResponse\x12\\\n" +
-	"\x0fResolveIncident\x12#.registry.v1.ResolveIncidentRequest\x1a$.registry.v1.ResolveIncidentResponse\x12M\n" +
+	"\rListIncidents\x12!.registry.v1.ListIncidentsRequest\x1a\".registry.v1.ListIncidentsResponse\x12q\n" +
+	"\x16VerifyIncidentRecovery\x12*.registry.v1.VerifyIncidentRecoveryRequest\x1a+.registry.v1.VerifyIncidentRecoveryResponse\x12t\n" +
+	"\x17ResolveIncidentManually\x12+.registry.v1.ResolveIncidentManuallyRequest\x1a,.registry.v1.ResolveIncidentManuallyResponse\x12M\n" +
 	"\x0eWatchIncidents\x12\".registry.v1.WatchIncidentsRequest\x1a\x15.registry.v1.Incident0\x01B\xb4\x01\n" +
 	"\x0fcom.registry.v1B\rIncidentProtoP\x01ZEgithub.com/company/service-registry/gen/go/api/registry/v1;registryv1\xa2\x02\x03RXX\xaa\x02\vRegistry.V1\xca\x02\vRegistry\\V1\xe2\x02\x17Registry\\V1\\GPBMetadata\xea\x02\fRegistry::V1b\x06proto3"
 
@@ -611,48 +778,56 @@ func file_api_registry_v1_incident_proto_rawDescGZIP() []byte {
 	return file_api_registry_v1_incident_proto_rawDescData
 }
 
-var file_api_registry_v1_incident_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_api_registry_v1_incident_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_api_registry_v1_incident_proto_goTypes = []any{
-	(*Incident)(nil),                // 0: registry.v1.Incident
-	(*GetIncidentRequest)(nil),      // 1: registry.v1.GetIncidentRequest
-	(*GetIncidentResponse)(nil),     // 2: registry.v1.GetIncidentResponse
-	(*ListIncidentsRequest)(nil),    // 3: registry.v1.ListIncidentsRequest
-	(*ListIncidentsResponse)(nil),   // 4: registry.v1.ListIncidentsResponse
-	(*ResolveIncidentRequest)(nil),  // 5: registry.v1.ResolveIncidentRequest
-	(*ResolveIncidentResponse)(nil), // 6: registry.v1.ResolveIncidentResponse
-	(*WatchIncidentsRequest)(nil),   // 7: registry.v1.WatchIncidentsRequest
-	nil,                             // 8: registry.v1.Incident.TagsEntry
-	nil,                             // 9: registry.v1.Incident.MetadataEntry
-	(IncidentState)(0),              // 10: registry.v1.IncidentState
-	(*timestamppb.Timestamp)(nil),   // 11: google.protobuf.Timestamp
-	(*PaginationRequest)(nil),       // 12: registry.v1.PaginationRequest
-	(*PaginationResponse)(nil),      // 13: registry.v1.PaginationResponse
+	(*Incident)(nil),                        // 0: registry.v1.Incident
+	(*GetIncidentRequest)(nil),              // 1: registry.v1.GetIncidentRequest
+	(*GetIncidentResponse)(nil),             // 2: registry.v1.GetIncidentResponse
+	(*ListIncidentsRequest)(nil),            // 3: registry.v1.ListIncidentsRequest
+	(*ListIncidentsResponse)(nil),           // 4: registry.v1.ListIncidentsResponse
+	(*VerifyIncidentRecoveryRequest)(nil),   // 5: registry.v1.VerifyIncidentRecoveryRequest
+	(*VerifyIncidentRecoveryResponse)(nil),  // 6: registry.v1.VerifyIncidentRecoveryResponse
+	(*ResolveIncidentManuallyRequest)(nil),  // 7: registry.v1.ResolveIncidentManuallyRequest
+	(*ResolveIncidentManuallyResponse)(nil), // 8: registry.v1.ResolveIncidentManuallyResponse
+	(*WatchIncidentsRequest)(nil),           // 9: registry.v1.WatchIncidentsRequest
+	nil,                                     // 10: registry.v1.Incident.TagsEntry
+	nil,                                     // 11: registry.v1.Incident.MetadataEntry
+	(IncidentState)(0),                      // 12: registry.v1.IncidentState
+	(*timestamppb.Timestamp)(nil),           // 13: google.protobuf.Timestamp
+	(*PaginationRequest)(nil),               // 14: registry.v1.PaginationRequest
+	(*PaginationResponse)(nil),              // 15: registry.v1.PaginationResponse
+	(*HealthResult)(nil),                    // 16: registry.v1.HealthResult
 }
 var file_api_registry_v1_incident_proto_depIdxs = []int32{
-	10, // 0: registry.v1.Incident.state:type_name -> registry.v1.IncidentState
-	11, // 1: registry.v1.Incident.opened_at:type_name -> google.protobuf.Timestamp
-	11, // 2: registry.v1.Incident.resolved_at:type_name -> google.protobuf.Timestamp
-	8,  // 3: registry.v1.Incident.tags:type_name -> registry.v1.Incident.TagsEntry
-	9,  // 4: registry.v1.Incident.metadata:type_name -> registry.v1.Incident.MetadataEntry
+	12, // 0: registry.v1.Incident.state:type_name -> registry.v1.IncidentState
+	13, // 1: registry.v1.Incident.opened_at:type_name -> google.protobuf.Timestamp
+	13, // 2: registry.v1.Incident.resolved_at:type_name -> google.protobuf.Timestamp
+	10, // 3: registry.v1.Incident.tags:type_name -> registry.v1.Incident.TagsEntry
+	11, // 4: registry.v1.Incident.metadata:type_name -> registry.v1.Incident.MetadataEntry
 	0,  // 5: registry.v1.GetIncidentResponse.incident:type_name -> registry.v1.Incident
-	12, // 6: registry.v1.ListIncidentsRequest.pagination:type_name -> registry.v1.PaginationRequest
-	10, // 7: registry.v1.ListIncidentsRequest.state:type_name -> registry.v1.IncidentState
+	14, // 6: registry.v1.ListIncidentsRequest.pagination:type_name -> registry.v1.PaginationRequest
+	12, // 7: registry.v1.ListIncidentsRequest.state:type_name -> registry.v1.IncidentState
 	0,  // 8: registry.v1.ListIncidentsResponse.incidents:type_name -> registry.v1.Incident
-	13, // 9: registry.v1.ListIncidentsResponse.pagination:type_name -> registry.v1.PaginationResponse
-	0,  // 10: registry.v1.ResolveIncidentResponse.incident:type_name -> registry.v1.Incident
-	1,  // 11: registry.v1.IncidentService.GetIncident:input_type -> registry.v1.GetIncidentRequest
-	3,  // 12: registry.v1.IncidentService.ListIncidents:input_type -> registry.v1.ListIncidentsRequest
-	5,  // 13: registry.v1.IncidentService.ResolveIncident:input_type -> registry.v1.ResolveIncidentRequest
-	7,  // 14: registry.v1.IncidentService.WatchIncidents:input_type -> registry.v1.WatchIncidentsRequest
-	2,  // 15: registry.v1.IncidentService.GetIncident:output_type -> registry.v1.GetIncidentResponse
-	4,  // 16: registry.v1.IncidentService.ListIncidents:output_type -> registry.v1.ListIncidentsResponse
-	6,  // 17: registry.v1.IncidentService.ResolveIncident:output_type -> registry.v1.ResolveIncidentResponse
-	0,  // 18: registry.v1.IncidentService.WatchIncidents:output_type -> registry.v1.Incident
-	15, // [15:19] is the sub-list for method output_type
-	11, // [11:15] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	15, // 9: registry.v1.ListIncidentsResponse.pagination:type_name -> registry.v1.PaginationResponse
+	0,  // 10: registry.v1.VerifyIncidentRecoveryResponse.incident:type_name -> registry.v1.Incident
+	13, // 11: registry.v1.VerifyIncidentRecoveryResponse.checked_at:type_name -> google.protobuf.Timestamp
+	16, // 12: registry.v1.VerifyIncidentRecoveryResponse.result:type_name -> registry.v1.HealthResult
+	0,  // 13: registry.v1.ResolveIncidentManuallyResponse.incident:type_name -> registry.v1.Incident
+	1,  // 14: registry.v1.IncidentService.GetIncident:input_type -> registry.v1.GetIncidentRequest
+	3,  // 15: registry.v1.IncidentService.ListIncidents:input_type -> registry.v1.ListIncidentsRequest
+	5,  // 16: registry.v1.IncidentService.VerifyIncidentRecovery:input_type -> registry.v1.VerifyIncidentRecoveryRequest
+	7,  // 17: registry.v1.IncidentService.ResolveIncidentManually:input_type -> registry.v1.ResolveIncidentManuallyRequest
+	9,  // 18: registry.v1.IncidentService.WatchIncidents:input_type -> registry.v1.WatchIncidentsRequest
+	2,  // 19: registry.v1.IncidentService.GetIncident:output_type -> registry.v1.GetIncidentResponse
+	4,  // 20: registry.v1.IncidentService.ListIncidents:output_type -> registry.v1.ListIncidentsResponse
+	6,  // 21: registry.v1.IncidentService.VerifyIncidentRecovery:output_type -> registry.v1.VerifyIncidentRecoveryResponse
+	8,  // 22: registry.v1.IncidentService.ResolveIncidentManually:output_type -> registry.v1.ResolveIncidentManuallyResponse
+	0,  // 23: registry.v1.IncidentService.WatchIncidents:output_type -> registry.v1.Incident
+	19, // [19:24] is the sub-list for method output_type
+	14, // [14:19] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_api_registry_v1_incident_proto_init() }
@@ -661,13 +836,14 @@ func file_api_registry_v1_incident_proto_init() {
 		return
 	}
 	file_api_registry_v1_common_proto_init()
+	file_api_registry_v1_health_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_registry_v1_incident_proto_rawDesc), len(file_api_registry_v1_incident_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

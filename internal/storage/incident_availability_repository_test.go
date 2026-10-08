@@ -35,7 +35,7 @@ func TestIncidentResolveClosesOpenIncidentAndDispatchesAlert(t *testing.T) {
 		t.Fatalf("open incidents = %d, want 1", len(openIncidents))
 	}
 
-	resolved, err := incidentRepo.Resolve(ctx, openIncidents[0].GetId(), "")
+	resolved, err := incidentRepo.ResolveManually(ctx, openIncidents[0].GetId(), "operator confirmed maintenance")
 	if err != nil {
 		t.Fatalf("resolve incident: %v", err)
 	}
@@ -45,8 +45,8 @@ func TestIncidentResolveClosesOpenIncidentAndDispatchesAlert(t *testing.T) {
 	if resolved.GetResolvedAt() == nil {
 		t.Fatalf("resolved_at is nil")
 	}
-	if got := resolved.GetMetadata()["resolution_reason"]; got != "resolved manually" {
-		t.Fatalf("resolution_reason = %q, want default", got)
+	if resolved.GetResolutionMethod() != "ManualOverride" || resolved.GetResolutionNote() != "operator confirmed maintenance" {
+		t.Fatalf("manual resolution metadata = %q/%q", resolved.GetResolutionMethod(), resolved.GetResolutionNote())
 	}
 	if len(dispatcher.calls) != 1 || dispatcher.calls[0].notificationType != "recovered" {
 		t.Fatalf("dispatcher calls = %+v, want recovered", dispatcher.calls)
@@ -80,19 +80,19 @@ func TestIncidentResolveReturnsExistingResolvedIncident(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list open incidents: %v", err)
 	}
-	resolved, err := incidentRepo.Resolve(ctx, openIncidents[0].GetId(), "maintenance complete")
+	resolved, err := incidentRepo.ResolveManually(ctx, openIncidents[0].GetId(), "maintenance complete")
 	if err != nil {
 		t.Fatalf("resolve incident: %v", err)
 	}
 
-	again, err := incidentRepo.Resolve(ctx, resolved.GetId(), "ignored")
+	again, err := incidentRepo.ResolveManually(ctx, resolved.GetId(), "ignored")
 	if err != nil {
 		t.Fatalf("resolve already resolved incident: %v", err)
 	}
 	if again.GetId() != resolved.GetId() || again.GetState() != registryv1.IncidentState_INCIDENT_STATE_RESOLVED {
 		t.Fatalf("again = %#v, want existing resolved incident", again)
 	}
-	if _, err := incidentRepo.Resolve(ctx, "missing", "ignored"); !errors.Is(err, sql.ErrNoRows) {
+	if _, err := incidentRepo.ResolveManually(ctx, "missing", "ignored"); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("resolve missing error = %v, want sql.ErrNoRows", err)
 	}
 }
