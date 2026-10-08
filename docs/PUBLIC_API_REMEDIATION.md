@@ -2,6 +2,8 @@
 
 Release verification date: 2026-10-08. Source of truth: the current handlers, repositories, CLI, and authenticated regression tests. This implements the completed audit backlog; it is not a domain-model rewrite.
 
+Subsequent UI integration update: compatibility preservation was explicitly withdrawn. The legacy public catalog/discovery REST facade and RegistryService RPC, generated contract and unused repository have now been deleted. The UI uses public catalog paging and key-addressed UPSERT registration; granular credential scopes, typed errors and non-admin catalog loading have been updated. Active internal editing/health/operational RPCs remain UI dependencies. See UI_API.md for the current boundary. The phase and image verification record below describes the preceding release snapshot, not a promise to retain its removed APIs.
+
 ## Public API readiness
 
 **READY for the documented Service Registry / Service Discovery workflow**, after explicit Service and Environment bootstrap. No CRITICAL/HIGH audit finding remains open. This does not claim Consul wire compatibility, load balancing, or replacement of every Consul feature.

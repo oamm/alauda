@@ -57,14 +57,9 @@ func TestScopedApplicationKeyCannotBypassEnvironmentBoundary(t *testing.T) {
 		{"POST", "/registry.v1.EventService/WatchEvents", `{"environmentId":"` + denied.Id + `"}`},
 		{"POST", "/registry.v1.IncidentService/ListIncidents", `{"environmentId":"` + denied.Id + `"}`},
 		{"GET", "/api/v1/discovery/private/resolve?environment=prod", ""},
-		{"GET", "/api/v1/discovery/services/private?environment=prod", ""},
-		{"GET", "/api/v1/catalog/instances?deploymentId=" + runtime.Deployment.Id, ""},
-		{"GET", "/api/v1/catalog/endpoints?instanceId=" + runtime.Instance.Id, ""},
-		{"GET", "/api/v1/catalog/deployments?environment=prod", ""},
 		{"GET", "/api/v1/events/watch?environmentId=" + denied.Id, ""},
 		{"POST", "/registry.v1.InstanceService/GetInstance", `{"id":"` + runtime.Instance.Id + `"}`},
 		{"POST", "/registry.v1.InstanceService/DeleteInstance", `{"id":"` + runtime.Instance.Id + `"}`},
-		{"POST", "/registry.v1.RegistryService/ResolveService", `{"serviceName":"private","environmentKey":"prod"}`},
 		{"POST", "/registry.v1.InstanceService/ListInstances", "{}"},
 	}
 	// Protobuf is a separate reachable transport, not just Connect JSON.
@@ -112,7 +107,7 @@ func TestScopedApplicationKeyCannotBypassEnvironmentBoundary(t *testing.T) {
 		t.Fatal("private Service metadata escaped through an unrelated allowed Environment")
 	}
 	// An unrelated allowed filter must not bypass a list's scope predicate.
-	for _, path := range []string{"/api/v1/catalog/instances?environment=stg", "/api/v1/catalog/endpoints?environment=stg"} {
+	for _, path := range []string{"/api/v1/services/private/instances?environment=stg", "/api/v1/services?environment=stg"} {
 		req := httptest.NewRequest("GET", path, nil)
 		req.Header.Set("Authorization", "Bearer "+key.Secret)
 		res := httptest.NewRecorder()

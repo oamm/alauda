@@ -40,6 +40,7 @@ import { ServicesWorkspace } from "./components/ServicesWorkspace";
 import { OperationalWorkspace } from "./components/OperationalWorkspace";
 import {
   AlertPolicy,
+  APIError,
   ApplicationKey,
   changePassword,
   ApiToken,
@@ -50,6 +51,7 @@ import {
   createNotificationChannel,
   createService,
   createUser,
+  credentialCapabilities,
   AvailabilitySummary,
   deleteEndpoint,
   deleteHealthCheck,
@@ -83,7 +85,7 @@ import {
   listUsers,
   login,
   logout,
-  registerRuntime,
+  registerServiceInstance,
   resolveIncidentManually,
   revokeApiToken,
   revokeApplicationKey,
@@ -103,6 +105,9 @@ import {
 } from "./api";
 
 function endpointMutationError(error: unknown, name: string): string {
+  if (error instanceof APIError && error.code === "already_exists") {
+    return `An endpoint named "${name}" already exists in this instance. Choose a different name.`;
+  }
   const message =
     error instanceof Error ? error.message : "Failed to update endpoint";
   try {
@@ -121,9 +126,20 @@ function newRegistrationEndpoint(overrides: Partial<EndpointFormValue> = {}) {
   return newEndpoint([], overrides);
 }
 
-function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
+function AuthenticatedApp({
+  onLogout,
+  canAdmin,
+}: {
+  onLogout: () => Promise<void>;
+  canAdmin: boolean;
+}) {
   const initialPath = parseApplicationPath(window.location.pathname);
-  const [activeView, setActiveView] = useState<ActiveView>(initialPath.view);
+  const [activeView, setActiveView] = useState<ActiveView>(
+    !canAdmin &&
+      (initialPath.view === "alerts" || initialPath.view === "security")
+      ? "dashboard"
+      : initialPath.view,
+  );
   const [healthResultsRoute, setHealthResultsRoute] = useState(
     window.location.pathname === "/health/results",
   );
@@ -283,12 +299,12 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   const [tokenForm, setTokenForm] = useState({
     userId: "",
     name: "",
-    scopes: "read",
+    scopes: "registry.read",
     expiresInHours: "720",
   });
   const [applicationKeyForm, setApplicationKeyForm] = useState({
     name: "",
-    scopes: "read",
+    scopes: "discovery.read",
     environmentIds: "",
     expiresInHours: "720",
   });
@@ -475,8 +491,13 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
 
   async function loadCatalog(environmentId = selectedEnvironmentId) {
     setError("");
+    const nextEnvironments = await listEnvironments();
+    const environmentKey = nextEnvironments.find(
+      (environment) => environment.id === environmentId,
+    )?.key;
+    if (environmentId && !environmentKey)
+      throw new Error("Selected environment is no longer available.");
     const [
-      nextEnvironments,
       nextServices,
       nextHealthChecks,
       nextIncidents,
@@ -485,14 +506,15 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       nextChannels,
       nextPolicies,
     ] = await Promise.all([
-      listEnvironments(),
-      listServices(environmentId),
+      listServices(environmentKey),
       listHealthChecks(),
       listIncidents({ environmentId: environmentId || undefined }),
       listEvents({ environmentId: environmentId || undefined }),
       getAvailability({ environmentId: environmentId || undefined }),
-      listNotificationChannels(),
-      listAlertPolicies({ environmentId: environmentId || undefined }),
+      canAdmin ? listNotificationChannels() : Promise.resolve([]),
+      canAdmin
+        ? listAlertPolicies({ environmentId: environmentId || undefined })
+        : Promise.resolve([]),
     ]);
     setEnvironments(nextEnvironments);
     setServices(nextServices);
@@ -601,7 +623,11 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
   useEffect(() => {
     const handlePopState = () => {
       const path = parseApplicationPath(window.location.pathname);
-      setActiveView(path.view);
+      setActiveView(
+        !canAdmin && (path.view === "alerts" || path.view === "security")
+          ? "dashboard"
+          : path.view,
+      );
       setHealthResultsRoute(window.location.pathname === "/health/results");
       if (path.serviceId) setSelectedServiceId(path.serviceId);
       if (path.serviceTab) setServiceTab(path.serviceTab);
@@ -640,6 +666,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     );
   }
   function navigateTo(view: ActiveView) {
+    if (!canAdmin && (view === "alerts" || view === "security")) return;
     setHealthResultsRoute(false);
     setActiveView(view);
     const nextPath = applicationPath(
@@ -812,7 +839,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     setApplicationKeySecret("");
     setApplicationKeyForm({
       name: "",
-      scopes: "read",
+      scopes: "discovery.read",
       environmentIds: "",
       expiresInHours: "720",
     });
@@ -1192,9 +1219,15 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
     setError("");
     setRegistrationSuccess("");
     try {
-      const registration = await registerRuntime({
-        serviceId,
-        environmentId: registrationForm.environmentId,
+      const service = services.find((item) => item.id === serviceId);
+      const environment = environments.find(
+        (item) => item.id === registrationForm.environmentId,
+      );
+      if (!service || !environment)
+        throw new Error("Choose an available service and environment.");
+      const registration = await registerServiceInstance({
+        service: service.name,
+        environment: environment.key,
         instance: {
           name: registrationForm.instanceName,
           address: registrationForm.address,
@@ -1223,7 +1256,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
       setSelectedServiceId(serviceId);
       setServiceTab("instances");
       if (!registration.instance) {
-        throw new Error("RegisterRuntime returned no instance");
+        throw new Error("Registration returned no instance");
       }
       setRegisteredRuntime({
         name: registration.instance.name,
@@ -1651,6 +1684,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
 
   return (
     <AppShell
+      canAdmin={canAdmin}
       activeView={activeView}
       currentEnvironmentName={currentEnvironmentName}
       darkMode={darkMode}
@@ -3109,7 +3143,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
                         Use the minimum permissions required by the workflow.
                       </span>
                       <div className="choice-grid">
-                        {["read", "write", "admin"].map((scope) => {
+                        {credentialCapabilities.map((scope) => {
                           const selected = tokenForm.scopes
                             .split(",")
                             .includes(scope);
@@ -3378,7 +3412,7 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
                           Select the permissions this credential needs.
                         </span>
                         <div className="choice-grid">
-                          {["read", "write", "admin"].map((scope) => {
+                          {credentialCapabilities.map((scope) => {
                             const selected = applicationKeyForm.scopes
                               .split(",")
                               .includes(scope);
@@ -3408,11 +3442,15 @@ function AuthenticatedApp({ onLogout }: { onLogout: () => Promise<void> }) {
                                 <span>
                                   <strong>{scope}</strong>
                                   <small>
-                                    {scope === "read"
-                                      ? "View registry resources"
-                                      : scope === "write"
-                                        ? "Change registry resources"
-                                        : "Administrative access"}
+                                    {scope === "admin"
+                                      ? "Administrative access"
+                                      : scope === "discovery.read"
+                                        ? "Resolve service addresses"
+                                        : scope.endsWith(".read")
+                                          ? "Read resources"
+                                          : scope.endsWith(".write")
+                                            ? "Manage resources"
+                                            : "Execute operations"}
                                   </small>
                                 </span>
                               </label>
@@ -3641,6 +3679,7 @@ function formatEndpointSummary(endpoint?: Endpoint) {
 }
 
 function formatEndpointUrl(endpoint: Endpoint, instance?: ServiceInstance) {
+  if (endpoint.address) return endpoint.address;
   const host = instance?.address || endpoint.instanceId;
   const port = endpoint.port || instance?.port || 0;
   const path = endpoint.path || "";
@@ -3912,6 +3951,7 @@ function PasswordChangePage({ onComplete }: { onComplete: () => void }) {
 }
 
 function App() {
+  const [canAdmin, setCanAdmin] = useState(false);
   const [authState, setAuthState] = useState<
     "loading" | "anonymous" | "authenticated" | "must-change"
   >("loading");
@@ -3923,6 +3963,7 @@ function App() {
     getCurrentSession()
       .then((response) => {
         if (!response.user) throw new Error("Session returned no user");
+        setCanAdmin(Boolean(response.scopes?.includes("admin")));
         setAuthState(
           response.mustChangePassword ? "must-change" : "authenticated",
         );
@@ -3948,7 +3989,8 @@ function App() {
   if (authState === "anonymous")
     return (
       <LoginPage
-        onAuthenticated={(_nextUser, mustChange) => {
+        onAuthenticated={(nextUser, mustChange) => {
+          setCanAdmin(nextUser.role === "Administrator");
           setAuthState(mustChange ? "must-change" : "authenticated");
         }}
       />
@@ -3961,7 +4003,7 @@ function App() {
         }}
       />
     );
-  return <AuthenticatedApp onLogout={handleLogout} />;
+  return <AuthenticatedApp onLogout={handleLogout} canAdmin={canAdmin} />;
 }
 
 export default App;

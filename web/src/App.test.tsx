@@ -80,6 +80,68 @@ describe("App", () => {
     expect(screen.getByText("Checkout service created")).toBeInTheDocument();
   });
 
+  it("loads the Viewer workspace without administrative requests", async () => {
+    window.history.replaceState({}, "", "/security");
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) =>
+      input.toString().includes("/api/v1/auth/me")
+        ? new Response(
+            JSON.stringify({
+              user: { id: "viewer", role: "Viewer" },
+              scopes: ["read"],
+            }),
+            { status: 200 },
+          )
+        : original(input, init),
+    );
+    render(<App />);
+    await screen.findByText("Checkout service created");
+    expect(
+      screen.getByRole("button", { name: "Services" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Security" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Alerts" }),
+    ).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/dashboard");
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(([input]) =>
+          /ListNotificationChannels|ListAlertPolicies|\/auth\/users/.test(
+            input.toString(),
+          ),
+        ),
+    ).toBe(false);
+  });
+
+  it("defaults Application Keys to discovery-only granular permissions", async () => {
+    render(<App />);
+    await screen.findByText("Checkout service created");
+    fireEvent.click(screen.getByRole("button", { name: "Security" }));
+    fireEvent.click(screen.getByRole("button", { name: "Application keys" }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Create application key" })[0],
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Create application key",
+    });
+    expect(
+      within(dialog).getByRole("checkbox", { name: /^discovery\.read/ }),
+    ).toBeChecked();
+    expect(
+      within(dialog).getByRole("checkbox", { name: /^registry\.write/ }),
+    ).not.toBeChecked();
+    expect(
+      within(dialog).getByRole("checkbox", { name: /^admin/ }),
+    ).not.toBeChecked();
+    expect(
+      within(dialog).queryByRole("checkbox", { name: /^read$/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("toggles dark mode", async () => {
     const { container } = render(<App />);
 
@@ -182,12 +244,13 @@ describe("App", () => {
     const registerCall = vi
       .mocked(fetch)
       .mock.calls.find(([input]) =>
-        input.toString().includes("RegisterRuntime"),
+        input.toString().includes("/api/v1/services/checkout/instances"),
       );
     expect(registerCall).toBeDefined();
     const body = JSON.parse(registerCall?.[1]?.body?.toString() ?? "{}");
-    expect(body.serviceId).toBe("svc-1");
-    expect(body.environmentId).toBe("env-1");
+    expect(body.serviceId).toBeUndefined();
+    expect(body.environmentId).toBeUndefined();
+    expect(body.environment).toBe("prod");
     expect(body.deploymentId).toBeUndefined();
     expect(body.instance).toMatchObject({
       name: "checkout-prod-02",
@@ -253,7 +316,7 @@ describe("App", () => {
       vi
         .mocked(fetch)
         .mock.calls.filter(([url]) =>
-          url.toString().includes("RegisterRuntime"),
+          url.toString().includes("/api/v1/services/checkout/instances"),
         ),
     ).toHaveLength(0);
     fireEvent.change(within(dialog).getByLabelText("Endpoint 2 name"), {
@@ -274,11 +337,13 @@ describe("App", () => {
     await screen.findByText("Instance added");
     const call = vi
       .mocked(fetch)
-      .mock.calls.find(([url]) => url.toString().includes("RegisterRuntime"));
+      .mock.calls.find(([url]) =>
+        url.toString().includes("/api/v1/services/checkout/instances"),
+      );
     expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}").endpoints).toEqual([
       {
         name: "default",
-        protocol: "PROTOCOL_HTTP",
+        protocol: "http",
         port: 8080,
         path: "/",
         enabled: true,
@@ -286,7 +351,7 @@ describe("App", () => {
       },
       {
         name: "metrics",
-        protocol: "PROTOCOL_HTTP",
+        protocol: "http",
         port: 8080,
         path: "/",
         enabled: false,
@@ -328,7 +393,9 @@ describe("App", () => {
     await screen.findByText("Instance added");
     const call = vi
       .mocked(fetch)
-      .mock.calls.find(([url]) => url.toString().includes("RegisterRuntime"));
+      .mock.calls.find(([url]) =>
+        url.toString().includes("/api/v1/services/checkout/instances"),
+      );
     expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}").endpoints).toEqual(
       [],
     );
@@ -434,7 +501,7 @@ describe("App", () => {
       vi
         .mocked(fetch)
         .mock.calls.filter(([input]) =>
-          input.toString().includes("RegisterRuntime"),
+          input.toString().includes("/api/v1/services/checkout/instances"),
         ),
     ).toHaveLength(1);
   });
@@ -530,7 +597,7 @@ describe("App", () => {
       vi
         .mocked(fetch)
         .mock.calls.filter(([url]) =>
-          url.toString().includes("RegisterRuntime"),
+          url.toString().includes("/api/v1/services/checkout/instances"),
         ),
     ).toHaveLength(0);
   });

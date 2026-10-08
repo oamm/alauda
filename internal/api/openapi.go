@@ -213,7 +213,6 @@ func buildPublicOpenAPI() schemaMap {
 		op["description"] = "Enabled Environment/Instances/Endpoints only. usable excludes known Unhealthy/Disabled and allows Unknown/Degraded; healthy requires fresh Healthy; all includes health states but not disabled lifecycle resources. Missing checks, disabled monitoring and stale health become Unknown. Healthy candidates rank first, then name order. Resolve selects named Endpoint, otherwise Primary, then lexicographic Endpoint name. No load balancing. Cache-Control: no-store."
 	}
 
-	schemas["LegacyResponse"] = schemaMap{"type": "object", "description": "Compatibility DTO; protobuf-specific IDs remain. Not a stable public integration model.", "additionalProperties": true}
 	schemas["Resolve"].(schemaMap)["example"] = schemaMap{"service": "Authentication.Grpc", "environment": "stg", "instance": "lynx-authentication.lynx", "endpoint": "default", "address": "http://lynx-authentication.lynx:81/"}
 	exampleInstance := publicInstance{Name: "lynx-authentication.lynx", Address: "lynx-authentication.lynx", Enabled: true, HealthState: "Unknown"}
 	exampleEndpoint := publicEndpoint{Name: "default", Protocol: "http", Port: 81, Path: "/", Primary: true, Enabled: true, Address: "http://lynx-authentication.lynx:81/"}
@@ -223,19 +222,7 @@ func buildPublicOpenAPI() schemaMap {
 	schemas["ProblemDetails"].(schemaMap)["example"] = problem.Details{Type: "https://alauda.dev/problems/service-not-found", Title: "Not Found", Status: 404, Code: "service_not_found", Detail: "Service does not exist."}
 	schemas["ServiceCreate"].(schemaMap)["example"] = schemaMap{"name": "Authentication.Grpc"}
 	schemas["EnvironmentCreate"].(schemaMap)["example"] = schemaMap{"key": "stg", "name": "Staging"}
-	for _, path := range []string{"/api/v1/catalog/environments", "/api/v1/catalog/services", "/api/v1/catalog/deployments", "/api/v1/catalog/instances", "/api/v1/catalog/endpoints", "/api/v1/discovery/services/{serviceName}"} {
-		params := []any{}
-		if strings.Contains(path, "{") {
-			params = append(params, schemaMap{"name": "serviceName", "in": "path", "required": true, "schema": key}, queryParameter("environment", true, key), queryParameter("healthyOnly", false, schemaMap{"type": "boolean", "default": false}))
-		} else {
-			params = append(params, queryParameter("pageSize", false, schemaMap{"type": "integer", "maximum": 200, "default": 50}), queryParameter("pageToken", false, stringSchema()))
-			for _, name := range []string{"environment", "environmentId", "serviceId", "deploymentId", "instanceId", "includeDisabled"} {
-				params = append(params, queryParameter(name, false, stringSchema()))
-			}
-		}
-		paths[path] = schemaMap{"get": schemaMap{"summary": "Legacy compatibility operation", "deprecated": true, "tags": []string{"LEGACY"}, "parameters": params, "responses": publicSpecResponses("200", "LegacyResponse"), "description": "Use the key-addressed PUBLIC operations. Environment restrictions and safe health filtering also apply to legacy discovery."}}
-	}
-	return schemaMap{"openapi": "3.0.3", "info": schemaMap{"title": "Alauda Public API", "version": "1.0.0", "description": "Stable Service / Environment / Instance / Endpoint / Health Check contract. Bearer API tokens and Application Keys supported. Legacy read/write scopes map to documented capabilities; admin grants all. Scoped credentials cannot bootstrap global resources. Connect RPC and legacy catalog/discovery remain compatibility surfaces, not this stable public contract; see docs/API.md."}, "servers": []any{schemaMap{"url": "/"}}, "security": []any{schemaMap{"bearerAuth": []string{}}}, "components": schemaMap{"securitySchemes": schemaMap{"bearerAuth": schemaMap{"type": "http", "scheme": "bearer"}}, "schemas": schemas}, "paths": paths}
+	return schemaMap{"openapi": "3.0.3", "info": schemaMap{"title": "Alauda Public API", "version": "1.0.0", "description": "Stable Service / Environment / Instance / Endpoint / Health Check contract. Bearer API tokens and Application Keys supported. Legacy read/write scopes map to documented capabilities; admin grants all. Scoped credentials cannot bootstrap global resources. Connect RPCs used by the UI are internal contracts. Removed catalog/discovery compatibility APIs are not supported; see docs/API.md."}, "servers": []any{schemaMap{"url": "/"}}, "security": []any{schemaMap{"bearerAuth": []string{}}}, "components": schemaMap{"securitySchemes": schemaMap{"bearerAuth": schemaMap{"type": "http", "scheme": "bearer"}}, "schemas": schemas}, "paths": paths}
 }
 
 const swaggerHTML = `<!doctype html>

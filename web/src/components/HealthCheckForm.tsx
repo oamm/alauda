@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  APIError,
   createHealthCheck,
   updateHealthCheck,
   type HealthCheck,
@@ -139,13 +140,9 @@ export function HealthCheckForm(props: HealthCheckFormProps) {
     } catch (e) {
       let message =
         e instanceof Error ? e.message : "Could not save health monitoring.";
-      try {
-        const parsed = JSON.parse(message);
-        message =
-          parsed.code === "already_exists"
-            ? "A check with this name already exists on this instance."
-            : parsed.message || message;
-      } catch {}
+      if (e instanceof APIError && e.code === "already_exists") {
+        message = "A check with this name already exists on this instance.";
+      }
       setError(message);
     } finally {
       setSaving(false);

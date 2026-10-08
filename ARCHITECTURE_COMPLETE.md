@@ -82,7 +82,7 @@ The following comprehensive design documents have been created:
 - `IncidentService` - Incident tracking
 - `AlertService` - Alert policies & notification channels
 - `EventService` - Event streaming & history
-- `RegistryService` - Service discovery lookups
+- Public REST discovery - key-addressed Service/Environment lookup and resolve-one
 
 ### Database Schema
 - 17 normalized tables

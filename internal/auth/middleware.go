@@ -94,7 +94,7 @@ func RequiredScope(method, path string) Scope {
 	if strings.HasPrefix(path, "/api/v1/audit-logs") || strings.HasPrefix(path, "/api/v1/alerts/") || strings.Contains(path, "AlertService/") {
 		return ScopeAdmin
 	}
-	if strings.HasPrefix(path, "/api/v1/discovery/") || strings.Contains(path, "RegistryService/Resolve") {
+	if strings.HasPrefix(path, "/api/v1/discovery/") {
 		return ScopeDiscoveryRead
 	}
 	read := method == http.MethodGet || strings.Contains(path, "/Get") || strings.Contains(path, "/List") || strings.Contains(path, "/Watch")
@@ -116,7 +116,7 @@ func RequiredScope(method, path string) Scope {
 	if strings.Contains(path, "EventService/") || strings.HasPrefix(path, "/api/v1/events/") {
 		return ScopeEventsRead
 	}
-	if strings.HasPrefix(path, "/api/v1/services") || strings.HasPrefix(path, "/api/v1/environments") || strings.HasPrefix(path, "/api/v1/catalog/") || strings.Contains(path, "Service/") {
+	if strings.HasPrefix(path, "/api/v1/services") || strings.HasPrefix(path, "/api/v1/environments") || strings.Contains(path, "Service/") {
 		if read {
 			return ScopeRegistryRead
 		}

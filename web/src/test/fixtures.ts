@@ -121,7 +121,7 @@ export function mockResponse(path: string, init?: RequestInit) {
       token: "sr_test",
     };
   }
-  if (path.includes("ListEnvironments")) {
+  if (path.includes("/api/v1/environments?")) {
     return {
       environments: [
         {
@@ -134,7 +134,12 @@ export function mockResponse(path: string, init?: RequestInit) {
       ],
     };
   }
-  if (path.includes("ListServices")) {
+  if (
+    path.includes("/api/v1/services?") ||
+    (path === "/api/v1/services" && init?.method === "POST")
+  ) {
+    if (init?.method === "POST")
+      return { id: "svc-2", ...JSON.parse(init.body?.toString() ?? "{}") };
     return {
       services: [
         {
@@ -327,34 +332,26 @@ export function mockResponse(path: string, init?: RequestInit) {
       ],
     };
   }
-  if (path.includes("RegisterRuntime")) {
+  if (path.includes("/api/v1/services/checkout/instances")) {
     return {
-      deployment: {
-        id: "dep-1",
-        serviceId: "svc-1",
-        environmentId: "env-1",
-        healthEnabled: true,
-        alertsEnabled: true,
-        alertCooldownMinutes: 15,
-      },
+      service: "checkout",
+      environment: "prod",
       instance: {
         id: "inst-2",
-        deploymentId: "dep-1",
         name: "checkout-prod-02",
         address: "10.0.0.2",
-        port: 0,
         enabled: true,
       },
       endpoints: [
         {
           id: "end-2",
-          instanceId: "inst-2",
           name: "http",
-          protocol: "PROTOCOL_HTTP",
+          protocol: "http",
           port: 8080,
           path: "/",
           enabled: true,
           primary: true,
+          address: "http://10.0.0.2:8080/",
         },
       ],
     };

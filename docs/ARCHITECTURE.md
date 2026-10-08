@@ -346,38 +346,10 @@ Dashboard reflects new status
 - `IncidentService`: Query incidents
 - `AlertService`: Configure alerts and notification channels
 - `EventService`: Stream events and query history
-- `RegistryService`: Lookup services for discovery
 
 ### Core Lookup API
 
-```
-ResolveService {
-  service: string
-  environment: string
-  healthyOnly?: bool
-  tags?: map<string, string>
-}
-→
-{
-  service: string
-  environment: string
-  instances: [
-    {
-      name: string
-      address: string
-      status: HealthState
-      endpoints: [
-        {
-          name: string
-          protocol: Protocol
-          port: int32
-          path?: string
-        }
-      ]
-    }
-  ]
-}
-```
+Public discovery is GET /api/v1/discovery/{serviceKey}?environment={key}; resolve-one adds /resolve. Responses provide named Instances/Endpoints and canonical addresses, with no Deployment relationship to reconstruct. RegistryService discovery RPCs were removed. See [SERVICE_DISCOVERY.md](SERVICE_DISCOVERY.md) for health and selection semantics.
 
 ### Versioning
 

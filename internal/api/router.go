@@ -46,7 +46,6 @@ func RegisterRoutesWithConfig(mux *http.ServeMux, db *storage.Database, cfg *con
 	registerAlertREST(apiMux, storage.NewAlertRepository(db), alerts.NewEngine(storage.NewAlertRepository(db), nil))
 	registerAuthREST(apiMux, authHandler{service: authService, repo: authRepo, cookieName: cookieName, audit: auditRepo})
 	registerAuditREST(apiMux, auditRepo)
-	RegisterExternalCatalogREST(apiMux, db)
 	RegisterRESTResources(apiMux, db)
 	RegisterPublicContractREST(apiMux, db)
 

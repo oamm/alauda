@@ -29,6 +29,9 @@ COPY internal ./internal
 COPY api ./api
 COPY gen ./gen
 
+# Embed the same freshly built UI that is shipped in the runtime image.
+COPY --from=frontend-builder /app/web/dist ./internal/webstatic/dist
+
 # Build the server and public CLI binaries
 RUN CGO_ENABLED=1 GOOS=linux go build \
     -ldflags="-w -s" \

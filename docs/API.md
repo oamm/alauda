@@ -4,9 +4,9 @@
 
 PUBLIC: the key-addressed Service/Environment/Instance/Endpoint/Health Check facade in [PUBLIC_API.md](PUBLIC_API.md), with validated OpenAPI at /openapi.json.
 
-LEGACY: /api/v1/catalog/*, /api/v1/discovery/services/* and singular ID-addressed CLI commands. OpenAPI marks retained legacy REST operations deprecated. Legacy discovery now excludes disabled, invalid-address and known-unhealthy candidates; healthyOnly requires fresh Healthy state. This is an intentional safety tightening, not a DTO removal.
+REMOVED: `/api/v1/catalog/*`, `/api/v1/discovery/services/*` and RegistryService discovery RPCs. Their implementations and generated discovery contracts have been deleted. Use the public catalog and discovery routes; no API compatibility layer is retained.
 
-INTERNAL: Connect/RPC protobuf contracts below and browser-specific /api/v1/health/checks and /api/v1/health/results projections remain used by the frontend and legacy CLI. They are not the stable public integration contract; Deployment IDs remain in compatibility DTOs and browser projections retain their existing pagination. No RPC is removed in this release.
+INTERNAL: Connect/RPC protobuf contracts below and browser-specific /api/v1/health/checks and /api/v1/health/results projections are active UI/operational dependencies, not dead compatibility APIs. They are not the stable public integration contract. UI registration and catalog reads now use the public REST facade; topology/editing/operations still use internal RPCs. See [UI_API.md](UI_API.md) for the remaining migration boundary.
 
 ADMIN: user/token/Application Key/session administration, audit logs, notification channels, alert policies and notification testing. Notification testing is POST-only and requires admin. The previous GET side effect is intentionally removed.
 
@@ -42,7 +42,7 @@ New integrations should use the human-readable REST facade documented in [PUBLIC
 - `GET /api/v1/discovery/{serviceKey}?environment={environmentKey}`
 - `GET /api/v1/discovery/{serviceKey}/resolve?environment={environmentKey}&endpoint={endpointName}`
 
-The existing Connect services and ID-based catalog/discovery routes remain for backward compatibility and are deprecated for new consumers.
+The unused catalog/discovery compatibility APIs have been removed. Active Connect services remain internal UI/operational dependencies until their replacements exist; they are not a backward-compatibility promise.
 
 The API is organized into logical services around domain boundaries:
 
@@ -55,7 +55,6 @@ The API is organized into logical services around domain boundaries:
 - `IncidentService` (incidents)
 - `AlertService` (alerts and policies)
 - `EventService` (event stream and history)
-- `RegistryService` (service lookup for discovery)
 
 ### Public registration vocabulary
 
@@ -82,7 +81,6 @@ api/
     │   ├── incident.proto
     │   ├── alert.proto
     │   ├── event.proto
-    │   ├── registry.proto
     │   └── common.proto
     └── buf.yaml
 ```
@@ -678,9 +676,7 @@ precedence, and idempotency semantics.
   "environment": "staging",
   "name": "authentication-01",
   "address": "lynx-authentication.lynx",
-  "endpoints": [
-    { "protocol": "grpc", "port": 81, "primary": true }
-  ]
+  "endpoints": [{ "protocol": "grpc", "port": 81, "primary": true }]
 }
 ```
 
@@ -1144,80 +1140,9 @@ message ListEventsResponse {
 
 ---
 
-## Registry Lookup (registry.proto)
+## Public Discovery
 
-```protobuf
-syntax = "proto3";
-
-package registry.v1;
-
-import "registry/v1/common.proto";
-
-service RegistryService {
-  rpc ResolveService(ResolveServiceRequest) returns (ResolveServiceResponse);
-  rpc ResolveEndpoint(ResolveEndpointRequest) returns (ResolveEndpointResponse);
-}
-
-// Lightweight service discovery response
-message ResolveServiceRequest {
-  string service_name = 1;
-  string environment_key = 2;
-  bool healthy_only = 3;  // Default: true
-  repeated Tag tag_filters = 4;  // Optional tag-based filtering
-}
-
-message ResolvedInstance {
-  string id = 1;
-  string name = 2;
-  string address = 3;
-  int32 port = 4;
-  HealthState status = 5;
-  int32 latency_ms = 6;  // Latest health check latency
-  repeated ResolvedEndpoint endpoints = 7;
-  repeated Tag tags = 8;
-}
-
-message ResolvedEndpoint {
-  string id = 1;
-  string name = 2;
-  Protocol protocol = 3;
-  int32 port = 4;
-  string path = 5;
-  bool enabled = 6;
-}
-
-message ResolveServiceResponse {
-  string service = 1;
-  string environment = 2;
-  repeated ResolvedInstance instances = 3;
-  int32 total_instances = 4;
-  int32 healthy_instances = 5;
-  int32 unhealthy_instances = 6;
-}
-
-// Single endpoint lookup
-message ResolveEndpointRequest {
-  string service_name = 1;
-  string environment_key = 2;
-  string endpoint_name = 3;  // e.g., "http", "grpc"
-  bool healthy_only = 4;
-}
-
-message ResolvedEndpointInstance {
-  string instance_name = 1;
-  string address = 2;
-  int32 port = 3;
-  string url = 4;  // Computed: e.g., "https://10.20.1.15:8080"
-  HealthState status = 5;
-  int32 latency_ms = 6;
-}
-
-message ResolveEndpointResponse {
-  repeated ResolvedEndpointInstance instances = 1;
-  int32 total_instances = 2;
-  int32 healthy_instances = 3;
-}
-```
+Service discovery uses GET /api/v1/discovery/{serviceKey} and GET /api/v1/discovery/{serviceKey}/resolve with an Environment key. The old RegistryService protobuf discovery contract was removed. See [SERVICE_DISCOVERY.md](SERVICE_DISCOVERY.md) for supported health policies, deterministic endpoint selection and canonical addresses.
 
 ---
 
@@ -1300,9 +1225,9 @@ plugins:
 
 ### Service Lookup
 
-- `ResolveService`: Primary discovery API (returns all instances with health)
-- `ResolveEndpoint`: Convenience for single-endpoint lookup
-- Both return lightweight responses (no full entity details)
+- Public discovery returns named usable candidates in one HTTP request.
+- Resolve-one returns a canonical address with deterministic selection.
+- The removed RegistryService contract is not supported.
 - Designed for service-to-service discovery (applications asking "where is this service?")
 
 This API provides a clean, idiomatic gRPC interface for all registry operations.

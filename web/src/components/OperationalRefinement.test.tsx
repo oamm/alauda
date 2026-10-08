@@ -399,16 +399,22 @@ describe("Environments management", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const body = JSON.parse(String(init?.body));
-        const second = body.pagination.pageToken === "next";
-        const field = input.toString().includes("ListEnvironments")
+        const isPublic = input.toString().startsWith("/api/v1/environments?");
+        const second = isPublic
+          ? new URL(input.toString(), "http://localhost").searchParams.get(
+              "pageToken",
+            ) === "next"
+          : JSON.parse(String(init?.body)).pagination.pageToken === "next";
+        const field = isPublic
           ? "environments"
           : input.toString().includes("ListDeployments")
             ? "deployments"
             : "instances";
         return response({
           [field]: [{ id: second ? "second" : "first" }],
-          pagination: { nextPageToken: second ? "" : "next" },
+          ...(isPublic
+            ? { nextPageToken: second ? "" : "next" }
+            : { pagination: { nextPageToken: second ? "" : "next" } }),
         });
       }),
     );

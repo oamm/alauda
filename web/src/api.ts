@@ -68,6 +68,7 @@ export type Endpoint = {
   primary: boolean;
   tags?: Record<string, string>;
   metadata?: Record<string, string>;
+  address?: string;
 };
 
 export type HealthCheck = {
@@ -248,16 +249,8 @@ export type ApplicationKey = {
   createdBy: string;
 };
 
-type ListServicesResponse = {
-  services?: Service[];
-};
-
 type CreateEnvironmentResponse = {
   environment?: Environment;
-};
-
-type CreateServiceResponse = {
-  service?: Service;
 };
 
 type UpdateServiceResponse = {
@@ -284,10 +277,14 @@ type UpdateInstanceResponse = {
 
 type DeleteInstanceResponse = Record<string, never>;
 
-type RegisterRuntimeResponse = {
-  deployment?: ServiceDeployment;
-  instance?: ServiceInstance;
-  endpoints?: Endpoint[];
+type RegistrationResponse = {
+  service: string;
+  environment: string;
+  instance: Pick<
+    ServiceInstance,
+    "id" | "name" | "address" | "description" | "enabled"
+  >;
+  endpoints: Endpoint[];
 };
 
 type ListInstancesResponse = {
@@ -424,6 +421,124 @@ function authHeaders(): Record<string, string> {
   return bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {};
 }
 
+export const credentialCapabilities = [
+  "discovery.read",
+  "registry.read",
+  "registry.write",
+  "health.read",
+  "health.write",
+  "health.execute",
+  "incident.read",
+  "incident.resolve",
+  "events.read",
+  "admin",
+] as const;
+
+export class APIError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly fields: Record<string, string[]> = {},
+  ) {
+    super(message);
+    this.name = "APIError";
+  }
+}
+
+async function responseError(
+  response: Response,
+  fallback: string,
+): Promise<APIError> {
+  const text = await response.text();
+  try {
+    const data = JSON.parse(text);
+    const fields: Record<string, string[]> = {};
+    if (data.errors && typeof data.errors === "object") {
+      for (const [key, messages] of Object.entries(data.errors)) {
+        if (
+          Array.isArray(messages) &&
+          messages.every((message) => typeof message === "string")
+        ) {
+          fields[key] = messages;
+        }
+      }
+    }
+    const detail =
+      [data.detail, data.message, data.error, data.title].find(
+        (value) => typeof value === "string" && value.trim(),
+      ) || fallback;
+    const validation = Object.keys(fields)
+      .sort()
+      .map((key) => `${key}: ${fields[key].join(" ")}`)
+      .join("; ");
+    return new APIError(
+      validation ? `${detail} ${validation}` : detail,
+      response.status,
+      data.code,
+      fields,
+    );
+  } catch {
+    const readable = text.trim();
+    return new APIError(
+      readable &&
+        readable.length <= 512 &&
+        !/[<>{}]|SQLITE|constraint failed/i.test(readable)
+        ? readable
+        : fallback,
+      response.status,
+    );
+  }
+}
+
+async function restRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await authenticatedFetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+      ...init.headers,
+    },
+  });
+  if (!response.ok)
+    throw await responseError(
+      response,
+      `Request failed with status ${response.status}`,
+    );
+  return response.json() as Promise<T>;
+}
+
+async function listPublicPages<T>(
+  path: string,
+  field: string,
+  query = new URLSearchParams(),
+): Promise<T[]> {
+  const items: T[] = [];
+  const seen = new Set<string>();
+  let pageToken = "";
+  do {
+    if (seen.has(pageToken))
+      throw new Error(
+        "The resource list could not finish loading. Try refreshing.",
+      );
+    seen.add(pageToken);
+    const params = new URLSearchParams(query);
+    params.set("pageSize", "100");
+    if (pageToken) params.set("pageToken", pageToken);
+    const response = await restRequest<
+      Record<string, unknown> & { nextPageToken?: string }
+    >(`${path}?${params}`);
+    if (!Array.isArray(response[field]))
+      throw new Error("Invalid resource list response.");
+    items.push(...(response[field] as T[]));
+    pageToken = response.nextPageToken || "";
+  } while (pageToken);
+  return items;
+}
+
 async function connectRequest<TResponse>(
   path: string,
   body: Record<string, unknown>,
@@ -438,8 +553,10 @@ async function connectRequest<TResponse>(
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Request failed with status ${response.status}`);
+    throw await responseError(
+      response,
+      `Request failed with status ${response.status}`,
+    );
   }
 
   return response.json() as Promise<TResponse>;
@@ -457,11 +574,7 @@ async function authenticatedFetch(
 }
 
 export async function listEnvironments(): Promise<Environment[]> {
-  return listTopologyPages<Environment>(
-    "/registry.v1.EnvironmentService/ListEnvironments",
-    "environments",
-    { includeDisabled: true },
-  );
+  return listPublicPages<Environment>("/api/v1/environments", "environments");
 }
 
 export async function createEnvironment(input: {
@@ -539,15 +652,10 @@ export async function listEnvironmentTopology() {
   return { deployments, instances };
 }
 
-export async function listServices(environmentId?: string): Promise<Service[]> {
-  const response = await connectRequest<ListServicesResponse>(
-    "/registry.v1.CatalogService/ListServices",
-    {
-      environmentId: environmentId || undefined,
-      pagination: { pageSize: 100 },
-    },
-  );
-  return response.services ?? [];
+export async function listServices(environment?: string): Promise<Service[]> {
+  const query = new URLSearchParams();
+  if (environment) query.set("environment", environment);
+  return listPublicPages<Service>("/api/v1/services", "services", query);
 }
 
 export async function createService(input: {
@@ -555,14 +663,10 @@ export async function createService(input: {
   displayName: string;
   description: string;
 }): Promise<Service> {
-  const response = await connectRequest<CreateServiceResponse>(
-    "/registry.v1.CatalogService/CreateService",
-    input,
-  );
-  if (!response.service) {
-    throw new Error("CreateService returned no service");
-  }
-  return response.service;
+  return restRequest<Service>("/api/v1/services", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function updateService(input: {
@@ -685,9 +789,9 @@ export async function deleteInstance(id: string): Promise<void> {
   );
 }
 
-export async function registerRuntime(input: {
-  serviceId: string;
-  environmentId: string;
+export async function registerServiceInstance(input: {
+  service: string;
+  environment: string;
   instance: {
     name: string;
     address: string;
@@ -702,15 +806,31 @@ export async function registerRuntime(input: {
     enabled: boolean;
     primary: boolean;
   }[];
-}): Promise<RegisterRuntimeResponse> {
-  const response = await connectRequest<RegisterRuntimeResponse>(
-    "/registry.v1.InstanceService/RegisterRuntime",
-    input,
+}): Promise<RegistrationResponse> {
+  const { service, ...registration } = input;
+  const response = await restRequest<RegistrationResponse>(
+    `/api/v1/services/${encodeURIComponent(service)}/instances`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...registration,
+        endpoints: registration.endpoints.map((endpoint) => ({
+          ...endpoint,
+          protocol: endpoint.protocol.replace(/^PROTOCOL_/, "").toLowerCase(),
+        })),
+      }),
+    },
   );
-  if (!response.deployment || !response.instance) {
-    throw new Error("RegisterRuntime returned no runtime registration");
-  }
-  return response;
+  if (!response.instance?.id || !Array.isArray(response.endpoints))
+    throw new Error("Registration returned no instance or endpoints.");
+  return {
+    ...response,
+    endpoints: response.endpoints.map((endpoint) => ({
+      ...endpoint,
+      instanceId: response.instance.id,
+      protocol: `PROTOCOL_${endpoint.protocol.toUpperCase()}`,
+    })),
+  };
 }
 
 export async function listEndpoints(instanceId?: string): Promise<Endpoint[]> {
@@ -803,7 +923,7 @@ export async function queryHealthChecks(
     { headers: authHeaders(), signal },
   );
   if (!response.ok)
-    throw new Error((await response.text()) || "Unable to load health checks");
+    throw await responseError(response, "Unable to load health checks");
   return response.json();
 }
 
@@ -925,9 +1045,7 @@ export async function queryHealthResults(
     { headers: authHeaders(), signal },
   );
   if (!response.ok)
-    throw new Error(
-      (await response.text()) || "Unable to query health results",
-    );
+    throw await responseError(response, "Unable to query health results");
   const payload = await response.json();
   if (!payload || !Array.isArray(payload.results))
     throw new Error(
@@ -1152,11 +1270,13 @@ export async function testNotificationChannel(
       headers: authHeaders(),
     },
   );
-  const text = await response.text();
   if (!response.ok) {
-    throw new Error(text || `Request failed with status ${response.status}`);
+    throw await responseError(
+      response,
+      `Request failed with status ${response.status}`,
+    );
   }
-  return text;
+  return response.text();
 }
 
 export async function login(input: {
@@ -1169,7 +1289,7 @@ export async function login(input: {
     body: JSON.stringify(input),
   });
   if (!response.ok) {
-    throw new Error((await response.text()) || "Login failed");
+    throw await responseError(response, "Login failed");
   }
   return response.json() as Promise<LoginResponse>;
 }
@@ -1177,7 +1297,7 @@ export async function login(input: {
 export async function getCurrentSession(): Promise<CurrentSessionResponse> {
   const response = await authenticatedFetch(`${apiBaseUrl}/api/v1/auth/me`);
   if (!response.ok) {
-    throw new Error((await response.text()) || "Session unavailable");
+    throw await responseError(response, "Session unavailable");
   }
   return response.json() as Promise<CurrentSessionResponse>;
 }
@@ -1190,7 +1310,7 @@ export async function logout(): Promise<void> {
     },
   );
   if (!response.ok && response.status !== 401) {
-    throw new Error((await response.text()) || "Logout failed");
+    throw await responseError(response, "Logout failed");
   }
 }
 
@@ -1207,7 +1327,7 @@ export async function changePassword(input: {
     },
   );
   if (!response.ok) {
-    throw new Error((await response.text()) || "Password update failed");
+    throw await responseError(response, "Password update failed");
   }
 }
 
@@ -1216,7 +1336,7 @@ export async function listUsers(): Promise<UserAccount[]> {
     headers: authHeaders(),
   });
   if (!response.ok) {
-    throw new Error((await response.text()) || "List users failed");
+    throw await responseError(response, "List users failed");
   }
   const payload = (await response.json()) as ListUsersResponse;
   return payload.users ?? [];
@@ -1235,7 +1355,7 @@ export async function createUser(input: {
     body: JSON.stringify(input),
   });
   if (!response.ok) {
-    throw new Error((await response.text()) || "Create user failed");
+    throw await responseError(response, "Create user failed");
   }
   const payload = (await response.json()) as CreateUserResponse;
   if (!payload.user) {
@@ -1253,7 +1373,7 @@ export async function listApiTokens(userId: string): Promise<ApiToken[]> {
     },
   );
   if (!response.ok) {
-    throw new Error((await response.text()) || "List tokens failed");
+    throw await responseError(response, "List tokens failed");
   }
   const payload = (await response.json()) as ListApiTokensResponse;
   return payload.tokens ?? [];
@@ -1274,7 +1394,7 @@ export async function createApiToken(input: {
     },
   );
   if (!response.ok) {
-    throw new Error((await response.text()) || "Create token failed");
+    throw await responseError(response, "Create token failed");
   }
   return response.json() as Promise<CreateApiTokenResponse>;
 }
@@ -1288,7 +1408,7 @@ export async function revokeApiToken(id: string): Promise<void> {
     },
   );
   if (!response.ok) {
-    throw new Error((await response.text()) || "Revoke token failed");
+    throw await responseError(response, "Revoke token failed");
   }
 }
 
@@ -1298,7 +1418,7 @@ export async function listApplicationKeys(): Promise<ApplicationKey[]> {
     { headers: authHeaders() },
   );
   if (!response.ok)
-    throw new Error((await response.text()) || "List application keys failed");
+    throw await responseError(response, "List application keys failed");
   const payload = (await response.json()) as ListApplicationKeysResponse;
   return payload.keys ?? [];
 }
@@ -1318,7 +1438,7 @@ export async function createApplicationKey(input: {
     },
   );
   if (!response.ok)
-    throw new Error((await response.text()) || "Create application key failed");
+    throw await responseError(response, "Create application key failed");
   return response.json() as Promise<CreateApplicationKeyResponse>;
 }
 
@@ -1331,7 +1451,7 @@ export async function revokeApplicationKey(id: string): Promise<void> {
     },
   );
   if (!response.ok)
-    throw new Error((await response.text()) || "Revoke application key failed");
+    throw await responseError(response, "Revoke application key failed");
 }
 
 export async function listSessions(): Promise<Session[]> {
@@ -1342,7 +1462,7 @@ export async function listSessions(): Promise<Session[]> {
     },
   );
   if (!response.ok) {
-    throw new Error((await response.text()) || "List sessions failed");
+    throw await responseError(response, "List sessions failed");
   }
   const payload = (await response.json()) as ListSessionsResponse;
   return payload.sessions ?? [];
@@ -1357,6 +1477,6 @@ export async function revokeSession(id: string): Promise<void> {
     },
   );
   if (!response.ok) {
-    throw new Error((await response.text()) || "Revoke session failed");
+    throw await responseError(response, "Revoke session failed");
   }
 }

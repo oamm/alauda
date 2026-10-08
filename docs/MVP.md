@@ -127,8 +127,7 @@ This monorepo contains the complete Service Registry system in a single reposito
 │   │       ├── health.proto
 │   │       ├── incident.proto
 │   │       ├── alert.proto
-│   │       ├── event.proto
-│   │       └── registry.proto
+│   │       └── event.proto
 │   └── buf.yaml
 │
 ├── gen/                             # Generated code (git ignored)
