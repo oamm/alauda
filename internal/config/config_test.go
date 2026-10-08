@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -78,6 +79,54 @@ func TestLoadAppliesEnvironmentOverrides(t *testing.T) {
 	}
 	if !cfg.RateLimit.Enabled || cfg.RateLimit.RequestsPerMinute != 120 || cfg.RateLimit.Burst != 12 {
 		t.Fatalf("rate limit env overrides not applied: %+v", cfg.RateLimit)
+	}
+}
+
+func TestLoadBuildsPostgresURLFromComponentEnvironment(t *testing.T) {
+	t.Setenv("REGISTRY_CONFIG", filepath.Join(t.TempDir(), "missing.yaml"))
+	t.Setenv("REGISTRY_DEV_MODE", "true")
+	t.Setenv("ALAUDA_POSTGRES_HOST", "host.docker.internal")
+	t.Setenv("ALAUDA_POSTGRES_PORT", "5432")
+	t.Setenv("ALAUDA_POSTGRES_USER", "elephas")
+	t.Setenv("ALAUDA_POSTGRES_PASSWORD", "15Qx(8qo<%,2")
+	t.Setenv("ALAUDA_POSTGRES_DATABASE", "alauda")
+	t.Setenv("ALAUDA_POSTGRES_SSLMODE", "disable")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	parsed, err := url.Parse(cfg.Storage.Connection)
+	if err != nil {
+		t.Fatalf("parse generated connection: %v", err)
+	}
+	if cfg.Storage.Provider != "postgres" || parsed.Scheme != "postgres" || parsed.Host != "host.docker.internal:5432" || parsed.Path != "/alauda" {
+		t.Fatalf("unexpected generated connection: provider=%s connection=%s", cfg.Storage.Provider, cfg.Storage.Connection)
+	}
+	if parsed.User.Username() != "elephas" {
+		t.Fatalf("username = %q, want elephas", parsed.User.Username())
+	}
+	if password, _ := parsed.User.Password(); password != "15Qx(8qo<%,2" {
+		t.Fatalf("password = %q, want original password", password)
+	}
+	if parsed.Query().Get("sslmode") != "disable" {
+		t.Fatalf("sslmode = %q, want disable", parsed.Query().Get("sslmode"))
+	}
+}
+
+func TestLoadUnwrapsQuotedDatabaseURL(t *testing.T) {
+	t.Setenv("REGISTRY_CONFIG", filepath.Join(t.TempDir(), "missing.yaml"))
+	t.Setenv("REGISTRY_DEV_MODE", "true")
+	t.Setenv("ALAUDA_STORAGE_PROVIDER", "postgres")
+	t.Setenv("ALAUDA_DATABASE_URL", "'postgres://elephas:secret@db.example.test:5432/alauda?sslmode=require'")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Storage.Connection != "postgres://elephas:secret@db.example.test:5432/alauda?sslmode=require" {
+		t.Fatalf("connection = %q", cfg.Storage.Connection)
 	}
 }
 

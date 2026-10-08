@@ -2,8 +2,11 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -146,7 +149,10 @@ func Load() (*Config, error) {
 		cfg.Storage.Provider = provider
 	}
 	if connection := os.Getenv("ALAUDA_DATABASE_URL"); connection != "" {
-		cfg.Storage.Connection = connection
+		cfg.Storage.Connection = unwrapEnvValue(connection)
+	} else if postgresEnvironmentPresent() {
+		cfg.Storage.Provider = "postgres"
+		cfg.Storage.Connection = postgresConnectionFromEnvironment(cfg.Storage.Connection)
 	}
 	if workers := os.Getenv("REGISTRY_HEALTH_WORKERS"); workers != "" {
 		if parsed, err := strconv.Atoi(workers); err == nil && parsed > 0 {
@@ -203,6 +209,94 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func postgresEnvironmentPresent() bool {
+	for _, name := range []string{
+		"ALAUDA_POSTGRES_HOST",
+		"ALAUDA_POSTGRES_PORT",
+		"ALAUDA_POSTGRES_USER",
+		"ALAUDA_POSTGRES_PASSWORD",
+		"ALAUDA_POSTGRES_DATABASE",
+		"ALAUDA_POSTGRES_SSLMODE",
+	} {
+		if os.Getenv(name) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func postgresConnectionFromEnvironment(fallback string) string {
+	parsed, _ := url.Parse(fallback)
+	user := "registry"
+	password := "dev_password"
+	host := "localhost"
+	port := "5432"
+	database := "registry"
+	sslmode := "disable"
+
+	if parsed != nil && parsed.Scheme == "postgres" {
+		if parsed.User != nil {
+			user = parsed.User.Username()
+			if value, ok := parsed.User.Password(); ok {
+				password = value
+			}
+		}
+		if parsed.Hostname() != "" {
+			host = parsed.Hostname()
+		}
+		if parsed.Port() != "" {
+			port = parsed.Port()
+		}
+		if path := strings.TrimPrefix(parsed.Path, "/"); path != "" {
+			database = path
+		}
+		if value := parsed.Query().Get("sslmode"); value != "" {
+			sslmode = value
+		}
+	}
+
+	if value := os.Getenv("ALAUDA_POSTGRES_USER"); value != "" {
+		user = value
+	}
+	if value := os.Getenv("ALAUDA_POSTGRES_PASSWORD"); value != "" {
+		password = value
+	}
+	if value := os.Getenv("ALAUDA_POSTGRES_HOST"); value != "" {
+		host = value
+	}
+	if value := os.Getenv("ALAUDA_POSTGRES_PORT"); value != "" {
+		port = value
+	}
+	if value := os.Getenv("ALAUDA_POSTGRES_DATABASE"); value != "" {
+		database = value
+	}
+	if value := os.Getenv("ALAUDA_POSTGRES_SSLMODE"); value != "" {
+		sslmode = value
+	}
+
+	connection := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(user, password),
+		Host:   net.JoinHostPort(host, port),
+		Path:   "/" + database,
+	}
+	query := connection.Query()
+	query.Set("sslmode", sslmode)
+	connection.RawQuery = query.Encode()
+	return connection.String()
+}
+
+func unwrapEnvValue(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) < 2 {
+		return value
+	}
+	if (value[0] == '\'' && value[len(value)-1] == '\'') || (value[0] == '"' && value[len(value)-1] == '"') {
+		return value[1 : len(value)-1]
+	}
+	return value
 }
 
 func (c *Config) Validate() error {

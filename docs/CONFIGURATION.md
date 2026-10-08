@@ -49,6 +49,12 @@ rateLimit:
 | `REGISTRY_STORAGE_PATH`                   | SQLite database path                          |
 | `ALAUDA_STORAGE_PROVIDER`                 | `postgres` (default) or `sqlite`              |
 | `ALAUDA_DATABASE_URL`                     | PostgreSQL URL or SQLite database file        |
+| `ALAUDA_POSTGRES_HOST`                    | PostgreSQL host when building the URL from components |
+| `ALAUDA_POSTGRES_PORT`                    | PostgreSQL port when building the URL from components |
+| `ALAUDA_POSTGRES_USER`                    | PostgreSQL user when building the URL from components |
+| `ALAUDA_POSTGRES_PASSWORD`                | PostgreSQL password when building the URL from components |
+| `ALAUDA_POSTGRES_DATABASE`                | PostgreSQL database when building the URL from components |
+| `ALAUDA_POSTGRES_SSLMODE`                 | PostgreSQL sslmode when building the URL from components |
 | `REGISTRY_HEALTH_WORKERS`                 | Health worker count                           |
 | `REGISTRY_TELEMETRY_ENABLED`              | Enable OpenTelemetry provider                 |
 | `REGISTRY_OTLP_ENDPOINT`                  | OTLP endpoint reserved for exporter wiring    |
