@@ -12,9 +12,66 @@ env:
   IMAGE_REPOSITORY: alauda
 
 jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: alauda
+          POSTGRES_USER: alauda
+          POSTGRES_PASSWORD: alauda_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alauda -d alauda"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CGO_ENABLED: "1"
+      CC: gcc
+      GOCACHE: ${{ github.workspace }}/.artifacts/gocache
+      GOMODCACHE: ${{ github.workspace }}/.artifacts/gomodcache
+      ALAUDA_TEST_POSTGRES_URL: postgres://alauda:alauda_dev@localhost:5432/alauda?sslmode=disable
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Run Go tests
+        shell: bash
+        run: go test -count=1 $(go list ./... | grep -v '/web/' | grep -v '/gen/')
+
+      - name: Run frontend tests
+        run: npm test -- --run
+        working-directory: web
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: web
+
   publish:
     name: Build and publish image
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
 

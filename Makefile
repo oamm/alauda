@@ -120,7 +120,11 @@ docker-build: proto
 	docker build -t $(IMAGE) .
 	@echo "Image: $(IMAGE)"
 
-docker-push: docker-build
+docker-push:
+	@echo "Running tests before publishing Docker image..."
+	$(MAKE) test
+	@echo "Building Docker image..."
+	$(MAKE) docker-build IMAGE=$(IMAGE)
 	@echo "Pushing Docker image..."
 	docker push $(IMAGE)
 
