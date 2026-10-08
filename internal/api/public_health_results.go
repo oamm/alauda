@@ -49,7 +49,7 @@ func (a *publicContractAPI) healthResults(w http.ResponseWriter, r *http.Request
 			args = append(args, parsed.UTC().Format(time.RFC3339Nano))
 		}
 	}
-	q += " ORDER BY h.timestamp DESC,h.id DESC LIMIT ? OFFSET ?"
+	q += " ORDER BY julianday(h.timestamp) DESC,h.id DESC LIMIT ? OFFSET ?"
 	args = append(args, size+1, offset)
 	rows, err := a.db.Query(r.Context(), q, args...)
 	if err != nil {

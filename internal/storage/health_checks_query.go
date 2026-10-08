@@ -69,11 +69,11 @@ func (r *HealthRepository) QueryHealthChecks(ctx context.Context, q HealthChecks
 		return HealthChecksQueryResult{}, err
 	}
 	var total int
-	if err := r.db.GetDB().QueryRowContext(ctx, "SELECT COUNT(*) FROM ("+base+")", args...).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM ("+base+")", args...).Scan(&total); err != nil {
 		return HealthChecksQueryResult{}, err
 	}
 	args = append(args, q.PageSize, (q.Page-1)*q.PageSize)
-	rows, err := r.db.GetDB().QueryContext(ctx, base+" ORDER BY hc.name COLLATE NOCASE ASC, hc.id ASC LIMIT ? OFFSET ?", args...)
+	rows, err := r.db.QueryContext(ctx, base+" ORDER BY hc.name COLLATE NOCASE ASC, hc.id ASC LIMIT ? OFFSET ?", args...)
 	if err != nil {
 		return HealthChecksQueryResult{}, err
 	}
@@ -120,12 +120,12 @@ func (r *HealthRepository) QueryHealthChecks(ctx context.Context, q HealthChecks
 func healthChecksQuerySQL(q HealthChecksQuery) (string, []any, error) {
 	latest := `(
 		SELECT CASE WHEN hr.success = 1 THEN 'healthy' ELSE 'unhealthy' END
-		FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY hr.timestamp DESC, hr.id DESC LIMIT 1
+		FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY julianday(hr.timestamp) DESC, hr.id DESC LIMIT 1
 	)`
-	latestAt := `(SELECT hr.timestamp FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY hr.timestamp DESC, hr.id DESC LIMIT 1)`
-	latestDuration := `(SELECT hr.latency_ms FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY hr.timestamp DESC, hr.id DESC LIMIT 1)`
-	latestCode := `(SELECT hr.status_code FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY hr.timestamp DESC, hr.id DESC LIMIT 1)`
-	latestError := `(SELECT COALESCE(NULLIF(hr.error_message, ''), hr.error_type) FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY hr.timestamp DESC, hr.id DESC LIMIT 1)`
+	latestAt := `(SELECT hr.timestamp FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY julianday(hr.timestamp) DESC, hr.id DESC LIMIT 1)`
+	latestDuration := `(SELECT hr.latency_ms FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY julianday(hr.timestamp) DESC, hr.id DESC LIMIT 1)`
+	latestCode := `(SELECT hr.status_code FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY julianday(hr.timestamp) DESC, hr.id DESC LIMIT 1)`
+	latestError := `(SELECT COALESCE(NULLIF(hr.error_message, ''), hr.error_type) FROM health_results hr WHERE hr.health_check_id = hc.id ORDER BY julianday(hr.timestamp) DESC, hr.id DESC LIMIT 1)`
 	query := `SELECT hc.id, hc.name, hc.enabled, hc.type, hc.interval_seconds, hc.timeout_seconds,
 		hc.failures_before_unhealthy, hc.successes_before_healthy, COALESCE(hc.description, ''),
 		COALESCE(json_extract(hc.metadata, '$.path'), ''), COALESCE(json_extract(hc.metadata, '$.expectedStatus'), ''),

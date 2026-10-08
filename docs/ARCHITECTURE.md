@@ -236,7 +236,7 @@ Dashboard reflects new status
 - **Pattern**: `ServiceRepository`, `HealthRepository`, `IncidentRepository`
 - **Reasoning**: Clear intent, type-safe, testable
 - **No Generic**: Avoid `Repository[T]` unless concrete benefit
-- **Implementation**: SQLite backend, PostgreSQL possible later
+- **Implementation**: PostgreSQL and SQLite adapters behind the storage layer
 
 ### 9. OpenTelemetry for Observability
 

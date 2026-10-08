@@ -79,7 +79,7 @@ func (r *IncidentRepository) List(ctx context.Context, environmentID, serviceID,
 		args = append(args, state.String())
 	}
 	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
-	query += ` ORDER BY opened_at DESC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(opened_at) DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -134,7 +134,7 @@ func (r *IncidentRepository) ResolveManually(ctx context.Context, id, note strin
 	return incident, nil
 }
 
-func resolveIncidentTx(ctx context.Context, tx *sql.Tx, id, note, method, evidenceID, actor, message string, resolvedAt time.Time) (bool, error) {
+func resolveIncidentTx(ctx context.Context, tx transaction, id, note, method, evidenceID, actor, message string, resolvedAt time.Time) (bool, error) {
 	var instanceID, deploymentID, environmentID, serviceID string
 	err := tx.QueryRowContext(ctx, `
 		SELECT instance_id, deployment_id, environment_id, service_id
@@ -170,7 +170,7 @@ func resolveIncidentTx(ctx context.Context, tx *sql.Tx, id, note, method, eviden
 	return true, nil
 }
 
-func openIncidentForInstanceTx(ctx context.Context, tx *sql.Tx, check *registryv1.HealthCheck, result *registryv1.HealthResult, openedAt time.Time) (string, error) {
+func openIncidentForInstanceTx(ctx context.Context, tx transaction, check *registryv1.HealthCheck, result *registryv1.HealthResult, openedAt time.Time) (string, error) {
 	var existingID string
 	err := tx.QueryRowContext(ctx, `
 		SELECT id
@@ -260,7 +260,7 @@ func openIncidentForInstanceTx(ctx context.Context, tx *sql.Tx, check *registryv
 	return incidentID, nil
 }
 
-func resolveOpenIncidentsForInstanceTx(ctx context.Context, tx *sql.Tx, instanceID, reason, evidenceID string, resolvedAt time.Time) ([]string, error) {
+func resolveOpenIncidentsForInstanceTx(ctx context.Context, tx transaction, instanceID, reason, evidenceID string, resolvedAt time.Time) ([]string, error) {
 	if reason == "" {
 		reason = "health check recovered"
 	}

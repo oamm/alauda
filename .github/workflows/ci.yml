@@ -8,11 +8,26 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: alauda
+          POSTGRES_USER: alauda
+          POSTGRES_PASSWORD: alauda_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alauda -d alauda"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       CGO_ENABLED: "1"
       CC: gcc
       GOCACHE: ${{ github.workspace }}/.artifacts/gocache
       GOMODCACHE: ${{ github.workspace }}/.artifacts/gomodcache
+      ALAUDA_TEST_POSTGRES_URL: postgres://alauda:alauda_dev@localhost:5432/alauda?sslmode=disable
 
     steps:
       - name: Check out repository
@@ -51,5 +66,5 @@ jobs:
         working-directory: web
 
       - name: Check Markdown formatting
-        run: npm exec prettier -- --check ../docs/MVP.md ../docs/README.md ../docs/ARCHITECTURE.md ../docs/DEPLOYMENT.md ../docs/CONFIGURATION.md ../docs/API.md ../docs/CLI.md
+        run: npm exec prettier -- --check ../docs/MVP.md ../docs/README.md ../docs/ARCHITECTURE.md ../docs/DEPLOYMENT.md ../docs/STORAGE.md ../docs/CONFIGURATION.md ../docs/API.md ../docs/CLI.md
         working-directory: web

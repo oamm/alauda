@@ -54,8 +54,8 @@ func (r *AvailabilityRepository) Calculate(ctx context.Context, req *registryv1.
 	query := `
 		SELECT opened_at, resolved_at
 		FROM incidents
-		WHERE opened_at < ?
-		  AND COALESCE(resolved_at, ?) > ?
+		WHERE julianday(opened_at) < julianday(?)
+		  AND julianday(COALESCE(resolved_at, ?)) > julianday(?)
 	`
 	args := []any{
 		end.Format(time.RFC3339Nano),
@@ -79,7 +79,7 @@ func (r *AvailabilityRepository) Calculate(ctx context.Context, req *registryv1.
 		args = append(args, req.GetInstanceId())
 	}
 	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
-	query += ` ORDER BY opened_at ASC`
+	query += ` ORDER BY julianday(opened_at) ASC`
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

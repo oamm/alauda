@@ -34,6 +34,8 @@ type ServerConfig struct {
 
 // StorageConfig represents storage configuration
 type StorageConfig struct {
+	Provider    string        `yaml:"provider"`
+	Connection  string        `yaml:"connectionString"`
 	Path        string        `yaml:"path"`
 	BusyTimeout time.Duration `yaml:"busyTimeout"`
 }
@@ -100,6 +102,20 @@ func Load() (*Config, error) {
 		if err := yaml.Unmarshal(data, cfg); err != nil {
 			return nil, err
 		}
+		var legacyStorage struct {
+			Storage struct {
+				Provider   string `yaml:"provider"`
+				Connection string `yaml:"connectionString"`
+				Path       string `yaml:"path"`
+			} `yaml:"storage"`
+		}
+		if err := yaml.Unmarshal(data, &legacyStorage); err != nil {
+			return nil, err
+		}
+		if legacyStorage.Storage.Provider == "" && legacyStorage.Storage.Connection == "" && legacyStorage.Storage.Path != "" {
+			cfg.Storage.Provider = "sqlite"
+			cfg.Storage.Connection = legacyStorage.Storage.Path
+		}
 	}
 
 	// Override with environment variables
@@ -121,6 +137,16 @@ func Load() (*Config, error) {
 	}
 	if dbPath := os.Getenv("REGISTRY_STORAGE_PATH"); dbPath != "" {
 		cfg.Storage.Path = dbPath
+		if os.Getenv("ALAUDA_STORAGE_PROVIDER") == "" && os.Getenv("ALAUDA_DATABASE_URL") == "" {
+			cfg.Storage.Provider = "sqlite"
+			cfg.Storage.Connection = dbPath
+		}
+	}
+	if provider := os.Getenv("ALAUDA_STORAGE_PROVIDER"); provider != "" {
+		cfg.Storage.Provider = provider
+	}
+	if connection := os.Getenv("ALAUDA_DATABASE_URL"); connection != "" {
+		cfg.Storage.Connection = connection
 	}
 	if workers := os.Getenv("REGISTRY_HEALTH_WORKERS"); workers != "" {
 		if parsed, err := strconv.Atoi(workers); err == nil && parsed > 0 {
@@ -189,8 +215,21 @@ func (c *Config) Validate() error {
 	if c.Server.ReadTimeout <= 0 || c.Server.WriteTimeout <= 0 {
 		return fmt.Errorf("server read/write timeouts must be positive")
 	}
-	if c.Storage.Path == "" {
-		return fmt.Errorf("storage.path is required")
+	if c.Storage.Provider == "" {
+		c.Storage.Provider = "postgres"
+	}
+	if c.Storage.Provider != "postgres" && c.Storage.Provider != "sqlite" {
+		return fmt.Errorf("unsupported storage provider %q; supported values: postgres, sqlite", c.Storage.Provider)
+	}
+	if c.Storage.Connection == "" {
+		if c.Storage.Provider == "postgres" {
+			c.Storage.Connection = "postgres://registry:dev_password@localhost:5432/registry?sslmode=disable"
+		} else {
+			c.Storage.Connection = c.Storage.Path
+		}
+	}
+	if c.Storage.Provider == "sqlite" && c.Storage.Connection == "" {
+		return fmt.Errorf("storage.connectionString is required for SQLite")
 	}
 	if c.Health.WorkerCount <= 0 {
 		return fmt.Errorf("health.workerCount must be positive")
@@ -241,6 +280,8 @@ func defaultConfig() *Config {
 			WriteTimeout: 15 * time.Second,
 		},
 		Storage: StorageConfig{
+			Provider:    "postgres",
+			Connection:  "postgres://registry:dev_password@localhost:5432/registry?sslmode=disable",
 			Path:        "./data/registry.db",
 			BusyTimeout: 5 * time.Second,
 		},

@@ -175,10 +175,10 @@ The target token scale is intentionally small: spacing 4/8/12/16/24/32; control 
 | Incidents | Dense list/detail and screen-local actions | Filtering, resolve, navigation | ResourceList + detail | AUDITED |
 | Alerts | Policy/channel modes and local forms | CRUD and channel test | Settings tabs + tables | AUDITED |
 | Events | Filtered history and local table patterns | Filters, streaming, navigation | Table + filters | AUDITED |
-| Security / Users | Settings sections in monolith, local forms | User list/create and roles | Settings layout + Table | AUDITED |
-| Security / API tokens | Modal and table duplicate control styles | Scoped create, expiry, revoke | Settings layout + Dialog + Table | AUDITED |
-| Security / Application keys | One-off secret dialog and row styling | Create, show/copy secret once, revoke | Settings layout + Dialog + Table | AUDITED |
-| Security / Sessions | Section-triggered loading and raw rows | List and revoke | Settings layout + Table | AUDITED |
+| Security / Users | Former monolith branch and local forms removed | User list/create and roles | Shared workspace + Table/ResourceList + Dialog | VERIFIED |
+| Security / API tokens | Former duplicate modal/table styles removed | Owner-scoped create, expiry, revoke | Shared workspace + Dialog + Table/ResourceList | VERIFIED |
+| Security / Application keys | Former one-off secret dialog/rows removed | Create, show/copy secret once, revoke | Shared workspace + Dialog + Table/ResourceList | VERIFIED |
+| Security / Sessions | Former raw rows and section-triggered loading removed | List and revoke | Shared workspace + Table/ResourceList + Dialog | VERIFIED |
 
 Information-architecture decisions recorded during audit:
 
@@ -218,7 +218,7 @@ Information-architecture decisions recorded during audit:
 | Phase 2 — Application shell | Login, sidebar, top shell, page container, context/account actions | Auth boundary and shell behavior verified | VERIFIED |
 | Phase 3 — Services | Services and all service detail tabs | Service workflows and visual gate verified | VERIFIED |
 | Phase 4 — Operations | Dashboard, Environments, Incidents, Alerts, Events | Operational behavior and responsive gate verified | VERIFIED |
-| Phase 5 — Security | Users, tokens, application keys, sessions | Security behavior, permissions, and secret handling verified | PLANNED |
+| Phase 5 — Security | Users, tokens, application keys, sessions | Security behavior, permissions, and secret handling verified | VERIFIED |
 | Phase 6 — Cleanup | Remove old CSS/components/dependencies after consumers migrate | No legacy UI consumers remain | PLANNED |
 | Phase 7 — Verification | Visual, responsive, accessibility, behavior, build/test QA | Complete hard-reset definition satisfied | PLANNED |
 
@@ -229,7 +229,7 @@ Information-architecture decisions recorded during audit:
 - [ ] Services filter, paginate, select, bulk delete, create, edit, and delete.
 - [ ] Instance, endpoint, and health-check mutations preserve API payloads and refresh behavior.
 - [ ] Availability, incidents, alerts, and events retain queries, filters, navigation, and side effects.
-- [ ] Security workflows preserve roles, token scopes/expiry, one-time application-key secret behavior, and session revoke.
+- [x] Security workflows preserve roles, token scopes/expiry, one-time application-key secret behavior, and session revoke.
 - [ ] Loading, empty, error, retry, success, and partial success states exist for migrated screens.
 - [ ] EventSource and other subscriptions clean up on scope changes/unmount.
 - [ ] Existing frontend and backend tests remain intact.
@@ -856,3 +856,11 @@ Status: AUDITED -> DESIGNED -> IN PROGRESS -> MIGRATED -> VERIFIED within the re
 - Scheduled recovery continues to resolve active incidents after the health state recovers, recording `AutoRecovered` and the successful Health Result as evidence. Conditional incident updates and one resolution event per open-to-resolved transition provide idempotency across scheduled and user-triggered work.
 - Incident records now persist `resolution_method`, `resolution_note`, `resolved_by` and `resolution_evidence_health_result_id`. The explicit API operations are `VerifyIncidentRecovery` and `ResolveIncidentManually`; the legacy ambiguous Resolve RPC was removed.
 - Incident list default state is Open. Open rows offer Verify recovery when supported, Resolve manually and Details. Resolved rows offer Details only and show resolution method, note and evidence in the detail dialog. Service, environment and instance names are preferred over internal IDs in the list/detail presentation.
+
+## Security
+
+- Users, API tokens, Application keys and Sessions remain separate tabs under the standard PageHeader. Security uses the same compact description, full-width workspace, underline Tabs, SectionHeader, FilterBar, StatusBadge, Table, mobile ResourceList, ActionMenu and Pagination as other resource screens. No Security-only breadcrumb or duplicate page title remains.
+- Each tab has one section heading and aligned primary action. Users provide create/list and role visibility; the backend offers no user edit/delete operation, so the Actions cell is empty rather than a misleading dash. API tokens are owner-scoped because the current endpoint lists one owner's tokens at a time; the Owner filter makes this explicit. Keys show Environment access; Sessions show client and last activity.
+- Shared DialogHeader, DialogBody and DialogFooter wrap user, token and key creation and revoke confirmation. Forms use FormField, Input/PasswordInput, Select, Checkbox and FormSection. Token and key secrets appear only in the creation dialog, with copy-once guidance, never in lists or general success messages. Closing the dialog clears the secret from UI state.
+- Lists use client-side search/status filtering and 25-row pages because the current Security admin endpoints return complete arrays without pagination. Tablet tables hide lower-priority columns; mobile renders structured ResourceRows with the same status/actions.
+- Removed the unreachable inline Security forms, custom tab buttons, grid-table classes, local modal shells and Security-specific CSS. Authentication and authorization APIs are unchanged. Root has no special protected-user UI claim because that restriction is not exposed by the current backend contract.

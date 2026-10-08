@@ -84,7 +84,7 @@ func (r *DeploymentRepository) List(ctx context.Context, serviceID, environmentI
 		args = append(args, environmentID)
 	}
 	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
-	query += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(created_at) ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)

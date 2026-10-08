@@ -220,7 +220,7 @@ func (r *AlertRepository) ListAlertPolicies(ctx context.Context, deploymentID, e
 		query += ` AND environment_id = ?`
 		args = append(args, environmentID)
 	}
-	query += ` ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(created_at) DESC, id DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -413,7 +413,7 @@ func (r *AlertRepository) policyOnCooldown(ctx context.Context, policyID, notifi
 		SELECT attempted_at
 		FROM alert_attempts
 		WHERE policy_id = ? AND notification_type = ? AND success = 1
-		ORDER BY attempted_at DESC
+		ORDER BY julianday(attempted_at) DESC
 		LIMIT 1
 	`, policyID, notificationType).Scan(&lastAttemptRaw)
 	if err != nil {
@@ -429,7 +429,7 @@ func (r *AlertRepository) policyOnCooldown(ctx context.Context, policyID, notifi
 	return at.UTC().Before(lastAttempt.Add(time.Duration(cooldownMinutes) * time.Minute)), nil
 }
 
-func replacePolicyChannelsTx(ctx context.Context, tx *sql.Tx, policyID string, channelIDs []string) error {
+func replacePolicyChannelsTx(ctx context.Context, tx transaction, policyID string, channelIDs []string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM alert_policy_channels WHERE policy_id = ?`, policyID); err != nil {
 		return err
 	}

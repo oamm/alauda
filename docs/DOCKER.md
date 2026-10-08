@@ -4,8 +4,13 @@ The production image contains the registry server and the public CLI.
 
 ```bash
 docker build -t alauda/service-registry:latest .
-docker run --rm -p 9700:9700 -v alauda-data:/data alauda/service-registry:latest
+docker run --rm -p 9700:9700 -v alauda-data:/data \
+  -e ALAUDA_STORAGE_PROVIDER=sqlite \
+  -e ALAUDA_DATABASE_URL=/data/alauda.db \
+  alauda/service-registry:latest
 ```
+
+The standalone example selects SQLite for a single-node deployment. For PostgreSQL, set `ALAUDA_STORAGE_PROVIDER=postgres` and `ALAUDA_DATABASE_URL` to the external database URL. The container does not start or provision PostgreSQL.
 
 The container starts the server through `/usr/local/bin/registry server`. The canonical CLI is `/usr/local/bin/alauda`; `registryctl` remains a compatibility alias:
 

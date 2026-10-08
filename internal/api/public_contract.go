@@ -8,7 +8,6 @@ import (
 	"github.com/company/service-registry/internal/address"
 	"github.com/company/service-registry/internal/contract"
 	"github.com/company/service-registry/internal/problem"
-	"github.com/mattn/go-sqlite3"
 	"io"
 	"net/http"
 	"sort"
@@ -306,22 +305,16 @@ func publicLookupError(w http.ResponseWriter, err error, code, detail string) {
 	}
 }
 func publicStorageError(w http.ResponseWriter, err error) {
-	var sqliteError sqlite3.Error
-	if errors.As(err, &sqliteError) {
-		switch sqliteError.Code {
-		case sqlite3.ErrConstraint:
-			if sqliteError.ExtendedCode == sqlite3.ErrConstraintCheck || sqliteError.ExtendedCode == sqlite3.ErrConstraintNotNull {
-				publicError(w, 400, "validation_failed", "Resource fields failed validation.", nil)
-				return
-			}
-			publicError(w, 409, "resource_conflict", "The requested resource conflicts with existing state.", nil)
-			return
-		case sqlite3.ErrBusy, sqlite3.ErrLocked:
-			publicError(w, 503, "temporarily_unavailable", "Retry the operation.", nil)
-			return
-		}
+	switch storage.ClassifyError(err) {
+	case storage.ErrorInvalid:
+		publicError(w, 400, "validation_failed", "Resource fields failed validation.", nil)
+	case storage.ErrorConflict, storage.ErrorPrecondition:
+		publicError(w, 409, "resource_conflict", "The requested resource conflicts with existing state.", nil)
+	case storage.ErrorUnavailable:
+		publicError(w, 503, "temporarily_unavailable", "Retry the operation.", nil)
+	default:
+		publicError(w, 500, "server_error", "The operation could not be completed.", nil)
 	}
-	publicError(w, 500, "server_error", "The operation could not be completed.", nil)
 }
 
 func (a *publicContractAPI) deregister(w http.ResponseWriter, r *http.Request, serviceKey, instanceName string) {

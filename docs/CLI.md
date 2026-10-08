@@ -70,16 +70,16 @@ Public query output supports --output table, json, yaml. Resolve additionally su
 
 Public lists accept pageSize/pageToken through --page-size/--page-token where shown in help. Use nextPageToken to continue; the CLI does not silently fetch every page.
 
-| Exit | Meaning |
-| --- | --- |
-| 0 | Success |
-| 2 | Validation or CLI usage |
-| 3 | Authentication |
-| 4 | Permission denied |
-| 5 | Resource not found |
-| 6 | Conflict or failed precondition |
-| 7 | No eligible discovery candidate |
-| 8 | Network or server failure |
+| Exit | Meaning                         |
+| ---- | ------------------------------- |
+| 0    | Success                         |
+| 2    | Validation or CLI usage         |
+| 3    | Authentication                  |
+| 4    | Permission denied               |
+| 5    | Resource not found              |
+| 6    | Conflict or failed precondition |
+| 7    | No eligible discovery candidate |
+| 8    | Network or server failure       |
 
 ## Compatibility boundary
 

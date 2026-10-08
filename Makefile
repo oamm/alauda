@@ -40,15 +40,8 @@ setup:
 # Development
 
 dev:
-	@echo "Starting development environment..."
-	docker-compose -f docker-compose.yml up -d
-	@echo ""
-	@echo "Services starting:"
-	@echo "  Registry API:  http://localhost:9700"
-	@echo "  Database:      localhost:5432 (postgres - future)"
-	@echo ""
-	@echo "To view logs: docker-compose logs -f"
-	@echo "To stop:      docker-compose down"
+	@echo "Starting Alauda development with PostgreSQL..."
+	@if command -v pwsh >/dev/null 2>&1; then pwsh -NoProfile -File scripts/run-app.ps1 -DatabaseProvider postgres; else powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-app.ps1 -DatabaseProvider postgres; fi
 
 dev-server:
 	@echo "Starting registry server with hot reload..."
@@ -133,7 +126,7 @@ docker-push: docker-build
 
 docker-run:
 	@echo "Running Docker container..."
-	docker run -p 9700:9700 -v ${PWD}/data:/data service-registry:latest
+	docker run -p 9700:9700 -v ${PWD}/data:/data -e ALAUDA_STORAGE_PROVIDER=sqlite -e ALAUDA_DATABASE_URL=/data/alauda.db service-registry:latest
 
 # Database Migrations
 

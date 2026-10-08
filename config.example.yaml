@@ -5,7 +5,9 @@ server:
   devMode: true
 
 storage:
-  path: "./data/registry.db"
+  provider: postgres
+  connectionString: "postgres://alauda:change-me@localhost:5432/alauda?sslmode=disable"
+  path: "./data/alauda.db"
   busyTimeout: 5s
 
 health:

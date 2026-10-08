@@ -138,7 +138,7 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
 	defer cancel()
 
-	err := s.db.GetDB().PingContext(ctx)
+	err := s.db.Ready(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, `{"status":"not_ready","reason":"database_unavailable"}`)
@@ -161,7 +161,7 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 	defer cancel()
 	dbUp := 1
-	if err := s.db.GetDB().PingContext(ctx); err != nil {
+	if err := s.db.Ready(ctx); err != nil {
 		dbUp = 0
 	}
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")

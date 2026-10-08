@@ -13,7 +13,6 @@ import (
 	"github.com/company/service-registry/internal/address"
 	"github.com/company/service-registry/internal/contract"
 	"github.com/google/uuid"
-	"github.com/mattn/go-sqlite3"
 )
 
 type RuntimeRepository struct {
@@ -36,7 +35,7 @@ func (r *RuntimeRepository) RegisterRuntime(ctx context.Context, req *registryv1
 		return nil, err
 	}
 
-	tx, err := r.db.GetDB().BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +88,11 @@ func (r *RuntimeRepository) RegisterRuntimeUpsert(ctx context.Context, req *regi
 // RegisterPublicRuntime merges presence-aware fields inside the existing transaction.
 // Serialization prevents competing read-then-write snapshots within this database.
 func (r *RuntimeRepository) RegisterPublicRuntime(ctx context.Context, serviceID, environmentID string, patch contract.Registration) (*registryv1.RegisterRuntimeResponse, error) {
-	r.db.runtimeMu.Lock()
-	defer r.db.runtimeMu.Unlock()
+	unlock := r.db.AcquireRegistrationLock()
+	defer unlock()
 	for attempt := 0; ; attempt++ {
 		result, err := r.registerPublicRuntimeOnce(ctx, serviceID, environmentID, patch)
-		var sqliteError sqlite3.Error
-		if err == nil || attempt >= 9 || !errors.As(err, &sqliteError) || (sqliteError.Code != sqlite3.ErrBusy && sqliteError.Code != sqlite3.ErrLocked) {
+		if err == nil || attempt >= 9 || ClassifyError(err) != ErrorUnavailable {
 			return result, err
 		}
 		timer := time.NewTimer(time.Duration(attempt+1) * 10 * time.Millisecond)
@@ -108,13 +106,16 @@ func (r *RuntimeRepository) RegisterPublicRuntime(ctx context.Context, serviceID
 }
 
 func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, serviceID, environmentID string, patch contract.Registration) (*registryv1.RegisterRuntimeResponse, error) {
-	tx, err := r.db.GetDB().BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 	deployment, err := r.resolveDeployment(ctx, tx, serviceID, environmentID)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.db.LockRegistrationScope(ctx, tx, deployment.GetId()); err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -283,7 +284,7 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 	return &registryv1.RegisterRuntimeResponse{Deployment: deployment, Instance: existing, Endpoints: items}, nil
 }
 
-func (r *RuntimeRepository) upsertRuntimeEndpoint(ctx context.Context, tx *sql.Tx, instanceID string, req *registryv1.RuntimeEndpointRegistration, primary bool) (*registryv1.Endpoint, error) {
+func (r *RuntimeRepository) upsertRuntimeEndpoint(ctx context.Context, tx transaction, instanceID string, req *registryv1.RuntimeEndpointRegistration, primary bool) (*registryv1.Endpoint, error) {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	tagsJSON, _ := json.Marshal(req.GetTags())
 	metadataJSON, _ := json.Marshal(req.GetMetadata())
@@ -341,7 +342,7 @@ func validateRuntimeRegistration(req *registryv1.RegisterRuntimeRequest) error {
 	return nil
 }
 
-func (r *RuntimeRepository) resolveDeployment(ctx context.Context, tx *sql.Tx, serviceID, environmentID string) (*registryv1.ServiceDeployment, error) {
+func (r *RuntimeRepository) resolveDeployment(ctx context.Context, tx transaction, serviceID, environmentID string) (*registryv1.ServiceDeployment, error) {
 	row := tx.QueryRowContext(ctx, `
 		SELECT id, service_id, environment_id, health_enabled, alerts_enabled, alert_cooldown_minutes,
 		       tags, metadata, created_at, updated_at
@@ -386,7 +387,7 @@ func (r *RuntimeRepository) resolveDeployment(ctx context.Context, tx *sql.Tx, s
 	return scanDeployment(row)
 }
 
-func (r *RuntimeRepository) createRuntimeInstance(ctx context.Context, tx *sql.Tx, deploymentID string, req *registryv1.RuntimeInstanceRegistration) (*registryv1.ServiceInstance, error) {
+func (r *RuntimeRepository) createRuntimeInstance(ctx context.Context, tx transaction, deploymentID string, req *registryv1.RuntimeInstanceRegistration) (*registryv1.ServiceInstance, error) {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	id := uuid.NewString()
 	tagsJSON, err := json.Marshal(req.GetTags())
@@ -419,7 +420,7 @@ func (r *RuntimeRepository) createRuntimeInstance(ctx context.Context, tx *sql.T
 	return scanInstance(row)
 }
 
-func (r *RuntimeRepository) createRuntimeEndpoint(ctx context.Context, tx *sql.Tx, instanceID string, req *registryv1.RuntimeEndpointRegistration, primary bool) (*registryv1.Endpoint, error) {
+func (r *RuntimeRepository) createRuntimeEndpoint(ctx context.Context, tx transaction, instanceID string, req *registryv1.RuntimeEndpointRegistration, primary bool) (*registryv1.Endpoint, error) {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	id := uuid.NewString()
 	tagsJSON, err := json.Marshal(req.GetTags())

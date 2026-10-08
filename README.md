@@ -9,7 +9,7 @@ Alauda is a self-hosted service registry and operational control plane for regis
 - REST and ConnectRPC APIs with OpenAPI documentation
 - Web console for day-to-day operations
 - `alauda` CLI for automation and public management workflows
-- SQLite-backed persistence with Docker support
+- PostgreSQL and SQLite-backed persistence
 - Runtime registration and service discovery workflows
 
 ## Quick Start With Docker
@@ -26,12 +26,14 @@ Run the registry with a persistent data directory:
 docker run --name alauda-registry \
   -p 9700:9700 \
   -v "$(pwd)/data:/data" \
+  -e ALAUDA_STORAGE_PROVIDER=sqlite \
+  -e ALAUDA_DATABASE_URL=/data/alauda.db \
   YOUR_DOCKERHUB_USERNAME/service-registry:latest
 ```
 
 Open `http://localhost:9700` after the container starts. Replace `YOUR_DOCKERHUB_USERNAME` with the Docker Hub account that publishes your image.
 
-The image stores its SQLite database under `/data`. Configuration can be supplied with the project configuration file or environment variables; see [Configuration](docs/CONFIGURATION.md) and [Docker](docs/DOCKER.md).
+The default configuration uses PostgreSQL. For a single-node SQLite deployment, mount `/data` and set `ALAUDA_STORAGE_PROVIDER=sqlite` and `ALAUDA_DATABASE_URL=/data/alauda.db`. See [Storage Providers](docs/STORAGE.md), [Configuration](docs/CONFIGURATION.md), and [Docker](docs/DOCKER.md).
 
 ## Build From Source
 
@@ -61,10 +63,58 @@ Build and run a local image:
 
 ```sh
 make docker-build IMAGE=alauda/service-registry:local
-docker run --rm -p 9700:9700 -v "$(pwd)/data:/data" alauda/service-registry:local
+docker run --rm -p 9700:9700 -v "$(pwd)/data:/data" -e ALAUDA_STORAGE_PROVIDER=sqlite -e ALAUDA_DATABASE_URL=/data/alauda.db alauda/service-registry:local
 ```
 
-Start the local development dependencies with `make dev`. Run the frontend separately with `make dev-ui` when you need the Vite development server.
+Start the recommended PostgreSQL development workflow with `./scripts/dev.sh` or `make dev`. To use a local SQLite file instead, run `./scripts/dev.sh --db sqlite`. Run the frontend separately with `make dev-ui` when you need the Vite development server.
+
+## Local Development Tutorial
+
+Install dependencies once:
+
+```sh
+make setup
+```
+
+Start the full development app with PostgreSQL:
+
+```sh
+make dev
+```
+
+Or run the helper script directly:
+
+```sh
+./scripts/dev.sh
+```
+
+On Windows PowerShell, use the underlying script:
+
+```powershell
+.\scripts\run-app.ps1 -DatabaseProvider postgres
+```
+
+The script starts PostgreSQL with Docker Compose, applies migrations, builds the embedded UI, and serves Alauda at `http://127.0.0.1:9700`. On the first run it creates the `root` administrator and prints a temporary password. Sign in with that temporary password, then change it when prompted.
+
+To use SQLite instead of PostgreSQL:
+
+```sh
+./scripts/dev.sh --db sqlite
+```
+
+Reset the local development initial password when you lose it or want to rotate it:
+
+```sh
+./scripts/dev.sh --reset-dev-password
+```
+
+On Windows PowerShell:
+
+```powershell
+.\scripts\run-app.ps1 -DatabaseProvider postgres -ResetDevPassword
+```
+
+The reset keeps the existing development database and records, revokes existing sessions, writes a new temporary password to the bootstrap credential file, and prints it in the terminal. After signing in, change the password again.
 
 ## API and Documentation
 

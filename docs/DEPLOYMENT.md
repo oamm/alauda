@@ -11,12 +11,16 @@ Use `server.devMode: false`. Production API resources are protected by default. 
 
 ## Health And Metrics
 
-| Endpoint   | Purpose                 |
-| ---------- | ----------------------- |
-| `/healthz` | Process liveness        |
-| `/readyz`  | Database readiness      |
+| Endpoint   | Purpose                                |
+| ---------- | -------------------------------------- |
+| `/healthz` | Process liveness                       |
+| `/readyz`  | Database readiness                     |
 | `/version` | Binary version metadata; authenticated |
 | `/metrics` | Prometheus text metrics; authenticated |
+
+## Storage Providers
+
+PostgreSQL is recommended for production clusters, multiple Alauda replicas, HA, and higher write concurrency. SQLite supports local and single-node deployments with low or moderate write volume. See [Storage Providers](STORAGE.md) for configuration and limitations.
 
 ## SQLite Backups
 

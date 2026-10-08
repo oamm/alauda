@@ -5,27 +5,22 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
-	"github.com/mattn/go-sqlite3"
+	"github.com/company/service-registry/internal/storage"
 )
 
 func codeForStorageError(err error) connect.Code {
 	if errors.Is(err, sql.ErrNoRows) {
 		return connect.CodeNotFound
 	}
-	var sqlite sqlite3.Error
-	if errors.As(err, &sqlite) {
-		if sqlite.Code == sqlite3.ErrConstraint {
-			if sqlite.ExtendedCode == sqlite3.ErrConstraintForeignKey {
-				return connect.CodeFailedPrecondition
-			}
-			if sqlite.ExtendedCode == sqlite3.ErrConstraintCheck || sqlite.ExtendedCode == sqlite3.ErrConstraintNotNull {
-				return connect.CodeInvalidArgument
-			}
-			return connect.CodeAlreadyExists
-		}
-		if sqlite.Code == sqlite3.ErrBusy || sqlite.Code == sqlite3.ErrLocked {
-			return connect.CodeUnavailable
-		}
+	switch storage.ClassifyError(err) {
+	case storage.ErrorConflict:
+		return connect.CodeAlreadyExists
+	case storage.ErrorInvalid:
+		return connect.CodeInvalidArgument
+	case storage.ErrorPrecondition:
+		return connect.CodeFailedPrecondition
+	case storage.ErrorUnavailable:
+		return connect.CodeUnavailable
 	}
 	return connect.CodeInternal
 }

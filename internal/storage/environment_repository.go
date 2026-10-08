@@ -81,7 +81,7 @@ func (r *EnvironmentRepository) List(ctx context.Context, includeDisabled bool, 
 		query += ` AND enabled = 1`
 	}
 	query, args = appendEnvironmentAccess(ctx, query, "id", args)
-	query += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(created_at) ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)

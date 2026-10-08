@@ -47,7 +47,7 @@ func (r *Repository) ResetDevelopmentBootstrap(ctx context.Context, username, cr
 		return nil, fmt.Errorf("find development bootstrap administrator: %w", err)
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := tx.ExecContext(ctx, "UPDATE users SET password_hash = ?, must_change_password = 1, updated_at = ? WHERE id = ?", hash, now, userID); err != nil {
+	if _, err := tx.ExecContext(ctx, "UPDATE users SET password_hash = ?, must_change_password = TRUE, updated_at = ? WHERE id = ?", hash, now, userID); err != nil {
 		return nil, fmt.Errorf("reset development bootstrap password: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", now, userID); err != nil {
@@ -103,7 +103,7 @@ func (r *Repository) Bootstrap(ctx context.Context, username, email, credentialP
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO users (id, username, email, display_name, password_hash, role, enabled, must_change_password, tags, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 1, 1, '{}', ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, TRUE, TRUE, '{}', ?, ?)
 	`, rootID, username, email, "Root Administrator", hash, string(RoleAdministrator), now, now); err != nil {
 		return nil, fmt.Errorf("create bootstrap administrator: %w", err)
 	}
@@ -250,7 +250,7 @@ func (r *Repository) ChangePassword(ctx context.Context, userID, password string
 	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec(ctx, "UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?", hash, time.Now().UTC().Format(time.RFC3339Nano), userID)
+	_, err = r.db.Exec(ctx, "UPDATE users SET password_hash = ?, must_change_password = FALSE, updated_at = ? WHERE id = ?", hash, time.Now().UTC().Format(time.RFC3339Nano), userID)
 	return err
 }
 

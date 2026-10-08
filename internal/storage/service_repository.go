@@ -92,7 +92,7 @@ func (r *ServiceRepository) List(ctx context.Context, environmentID string, page
 		query += " AND EXISTS (" + sub + ")"
 		args = append(args, subargs...)
 	}
-	query += ` ORDER BY s.created_at ASC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(s.created_at) ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)

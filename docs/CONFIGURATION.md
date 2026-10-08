@@ -19,7 +19,9 @@ server:
   writeTimeout: 15s
 
 storage:
-  path: "./data/registry.db"
+  provider: postgres
+  connectionString: "postgres://alauda:change-me@localhost:5432/alauda?sslmode=require"
+  path: "./data/alauda.db"
   busyTimeout: 5s
 
 auth:
@@ -38,26 +40,28 @@ rateLimit:
 
 ## Environment Variables
 
-| Variable                                  | Description                                |
-| ----------------------------------------- | ------------------------------------------ |
-| `REGISTRY_CONFIG`                         | YAML config file path                      |
-| `REGISTRY_ADDRESS`                        | HTTP bind address                          |
-| `REGISTRY_PORT`                           | HTTP bind port                             |
-| `REGISTRY_DEV_MODE`                       | Enables development bypasses               |
-| `REGISTRY_STORAGE_PATH`                   | SQLite database path                       |
-| `REGISTRY_HEALTH_WORKERS`                 | Health worker count                        |
-| `REGISTRY_TELEMETRY_ENABLED`              | Enable OpenTelemetry provider              |
-| `REGISTRY_OTLP_ENDPOINT`                  | OTLP endpoint reserved for exporter wiring |
-| `REGISTRY_AUTH_ENABLED`                   | Require auth for API routes                |
-| `REGISTRY_BOOTSTRAP_ADMIN_USERNAME`       | Bootstrap admin username                   |
-| `REGISTRY_BOOTSTRAP_ADMIN_EMAIL`          | Bootstrap admin email                      |
-| `REGISTRY_BOOTSTRAP_CREDENTIAL_PATH`     | One-time restricted bootstrap credential file |
-| `REGISTRY_AUTH_SESSION_COOKIE`            | Browser session cookie name                |
-| `REGISTRY_AUTH_TOKEN_TTL`                 | Login token TTL, for example `24h`         |
-| `REGISTRY_RATE_LIMIT_ENABLED`             | Enable API rate limiting                   |
-| `REGISTRY_RATE_LIMIT_REQUESTS_PER_MINUTE` | Per-client refill rate                     |
-| `REGISTRY_RATE_LIMIT_BURST`               | Per-client burst capacity                  |
+| Variable                                  | Description                                   |
+| ----------------------------------------- | --------------------------------------------- |
+| `REGISTRY_CONFIG`                         | YAML config file path                         |
+| `REGISTRY_ADDRESS`                        | HTTP bind address                             |
+| `REGISTRY_PORT`                           | HTTP bind port                                |
+| `REGISTRY_DEV_MODE`                       | Enables development bypasses                  |
+| `REGISTRY_STORAGE_PATH`                   | SQLite database path                          |
+| `ALAUDA_STORAGE_PROVIDER`                 | `postgres` (default) or `sqlite`              |
+| `ALAUDA_DATABASE_URL`                     | PostgreSQL URL or SQLite database file        |
+| `REGISTRY_HEALTH_WORKERS`                 | Health worker count                           |
+| `REGISTRY_TELEMETRY_ENABLED`              | Enable OpenTelemetry provider                 |
+| `REGISTRY_OTLP_ENDPOINT`                  | OTLP endpoint reserved for exporter wiring    |
+| `REGISTRY_AUTH_ENABLED`                   | Require auth for API routes                   |
+| `REGISTRY_BOOTSTRAP_ADMIN_USERNAME`       | Bootstrap admin username                      |
+| `REGISTRY_BOOTSTRAP_ADMIN_EMAIL`          | Bootstrap admin email                         |
+| `REGISTRY_BOOTSTRAP_CREDENTIAL_PATH`      | One-time restricted bootstrap credential file |
+| `REGISTRY_AUTH_SESSION_COOKIE`            | Browser session cookie name                   |
+| `REGISTRY_AUTH_TOKEN_TTL`                 | Login token TTL, for example `24h`            |
+| `REGISTRY_RATE_LIMIT_ENABLED`             | Enable API rate limiting                      |
+| `REGISTRY_RATE_LIMIT_REQUESTS_PER_MINUTE` | Per-client refill rate                        |
+| `REGISTRY_RATE_LIMIT_BURST`               | Per-client burst capacity                     |
 
 ## Validation
 
-The server validates port ranges, required storage paths, positive health scheduler values, token TTL, rate-limit values, and security bootstrap settings before startup. Production authentication cannot be disabled.
+The server validates the storage provider, positive health scheduler values, token TTL, rate-limit values, and security bootstrap settings before startup. Production authentication cannot be disabled. See [Storage Providers](STORAGE.md) for development and deployment guidance.

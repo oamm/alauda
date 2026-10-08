@@ -91,6 +91,8 @@ server:
   readTimeout: 3s
   writeTimeout: 4s
 storage:
+  provider: sqlite
+  connectionString: ":memory:"
   path: ":memory:"
 health:
   workerCount: 3
@@ -124,7 +126,8 @@ func TestValidateRejectsInvalidCoreSettings(t *testing.T) {
 	}{
 		{name: "empty address", mutate: func(c *Config) { c.Server.Address = "" }},
 		{name: "nonpositive timeouts", mutate: func(c *Config) { c.Server.ReadTimeout = 0 }},
-		{name: "empty storage path", mutate: func(c *Config) { c.Storage.Path = "" }},
+		{name: "empty SQLite connection", mutate: func(c *Config) { c.Storage.Provider = "sqlite"; c.Storage.Connection = ""; c.Storage.Path = "" }},
+		{name: "unsupported provider", mutate: func(c *Config) { c.Storage.Provider = "mysql" }},
 		{name: "nonpositive workers", mutate: func(c *Config) { c.Health.WorkerCount = 0 }},
 		{name: "nonpositive interval", mutate: func(c *Config) { c.Health.CheckInterval = 0 }},
 		{name: "nonpositive queue", mutate: func(c *Config) { c.Health.CheckQueueCapacity = 0 }},

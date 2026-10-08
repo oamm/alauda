@@ -4,6 +4,8 @@ Welcome to the complete architectural specification for the Service Registry MVP
 
 This repository contains the complete blueprint for a modern, lightweight, self-hosted service registry and service health administration platform.
 
+For storage provider configuration, local development, migration, and backup guidance, see [STORAGE.md](STORAGE.md).
+
 ---
 
 ## 📚 Documentation Structure
@@ -44,7 +46,7 @@ The following documents provide the complete architectural and implementation bl
 
 ### Database Design
 
-**[DATABASE.md](DATABASE.md)** - Complete SQLite schema specification
+**[DATABASE.md](DATABASE.md)** - SQLite schema specification; see [STORAGE.md](STORAGE.md) for supported providers
 
 - 17 normalized tables with all columns, types, and constraints
 - Foreign key relationships and cascade rules

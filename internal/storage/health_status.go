@@ -43,10 +43,10 @@ func AggregateHealth(healthy, unhealthy, unknown int) string {
 // CurrentHealth reads the latest completed execution of each active check.
 // The same snapshot drives public catalog, management, discovery and the UI.
 func (r *HealthRepository) CurrentHealth(ctx context.Context, environmentID string) (HealthStatusSnapshot, error) {
-	return currentHealth(ctx, r.db.GetDB(), environmentID, "", environmentAccess(ctx))
+	return currentHealth(ctx, r.db, environmentID, "", environmentAccess(ctx))
 }
 
-func currentInstanceHealthTx(ctx context.Context, tx *sql.Tx, instanceID string) (string, error) {
+func currentInstanceHealthTx(ctx context.Context, tx transaction, instanceID string) (string, error) {
 	snapshot, err := currentHealth(ctx, tx, "", instanceID, nil)
 	return snapshot.Instances[instanceID], err
 }

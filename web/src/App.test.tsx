@@ -121,7 +121,7 @@ describe("App", () => {
     render(<App />);
     await screen.findByText("Checkout service created");
     fireEvent.click(screen.getByRole("button", { name: "Security" }));
-    fireEvent.click(screen.getByRole("button", { name: "Application keys" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Application keys" }));
     fireEvent.click(
       screen.getAllByRole("button", { name: "Create application key" })[0],
     );
@@ -191,9 +191,9 @@ describe("App", () => {
       expect(screen.getAllByText("admin").length).toBeGreaterThan(0),
     );
     expect(screen.queryByText("Sign in to Alauda")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Users" }));
-    expect(screen.getByText("automation")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "API tokens" }));
+    expect(screen.getByRole("table", { name: "Users" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "API tokens" }));
+    expect((await screen.findAllByText("automation")).length).toBeGreaterThan(0);
     expect(
       screen.getByRole("button", { name: "Create API token" }),
     ).toBeInTheDocument();

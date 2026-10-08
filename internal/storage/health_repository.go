@@ -223,7 +223,7 @@ func (r *HealthRepository) DeleteHealthCheck(ctx context.Context, id string) err
 func (r *HealthRepository) PruneHealthResults(ctx context.Context, olderThan time.Time) (int64, error) {
 	result, err := r.db.Exec(ctx, `
 		DELETE FROM health_results
-		WHERE timestamp < ?
+		WHERE julianday(timestamp) < julianday(?)
 	`, olderThan.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return 0, err
@@ -309,7 +309,7 @@ func (r *HealthRepository) ListHealthResults(ctx context.Context, healthCheckID,
 		args = append(args, instanceID)
 	}
 	query, args = appendEnvironmentAccess(ctx, query, "(SELECT d.environment_id FROM service_instances i JOIN service_deployments d ON d.id=i.deployment_id WHERE i.id=health_results.instance_id)", args)
-	query += ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(timestamp) DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -405,7 +405,7 @@ func (r *HealthRepository) ListDueHealthCheckTargets(ctx context.Context, limit 
 			latest.last_timestamp IS NULL
 			OR julianday(latest.last_timestamp) <= julianday('now') - (CAST(hc.interval_seconds AS REAL) / 86400.0)
 		  )
-		ORDER BY COALESCE(latest.last_timestamp, hc.created_at) ASC
+		ORDER BY julianday(COALESCE(latest.last_timestamp, hc.created_at)) ASC
 		LIMIT ?
 	`, limit)
 	if err != nil {
@@ -815,7 +815,7 @@ func nullInt32(v int32) any {
 	return v
 }
 
-func getHealthStateForUpdate(ctx context.Context, tx *sql.Tx, instanceID string) (*registryv1.HealthStateView, error) {
+func getHealthStateForUpdate(ctx context.Context, tx transaction, instanceID string) (*registryv1.HealthStateView, error) {
 	row := tx.QueryRowContext(ctx, `
 		SELECT instance_id, current_state, consecutive_successes, consecutive_failures, last_transition_time, last_check_time
 		FROM health_states

@@ -70,7 +70,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			db, err := storage.NewDatabase(context.Background(), cfg.Storage.Path)
+			db, err := storage.Open(context.Background(), cfg.Storage)
 			if err != nil {
 				return err
 			}
@@ -109,8 +109,10 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(cfg.Storage.Path), 0o755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+	if cfg.Storage.Provider == "sqlite" {
+		if err := os.MkdirAll(filepath.Dir(cfg.Storage.Connection), 0o755); err != nil {
+			return fmt.Errorf("failed to create data directory: %w", err)
+		}
 	}
 
 	// Initialize telemetry
@@ -122,12 +124,17 @@ func runServer(cmd *cobra.Command, args []string) error {
 	defer tp.Shutdown(context.Background())
 
 	// Initialize database
-	db, err := storage.NewDatabase(context.Background(), cfg.Storage.Path)
+	db, err := storage.Open(context.Background(), cfg.Storage)
 	if err != nil {
 		slog.Error("Failed to initialize database", slog.Any("error", err))
 		return err
 	}
 	defer db.Close()
+	if cfg.Storage.Provider == "postgres" {
+		slog.Info("Storage provider: PostgreSQL")
+	} else {
+		slog.Info("Storage provider: SQLite", slog.String("database", cfg.Storage.Connection))
+	}
 
 	// Run migrations
 	if err := storage.RunMigrations(context.Background(), db); err != nil {

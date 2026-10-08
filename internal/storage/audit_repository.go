@@ -142,7 +142,7 @@ func (r *AuditRepository) List(ctx context.Context, filters AuditFilters, pageSi
 		query += ` AND environment_id = ?`
 		args = append(args, filters.EnvironmentID)
 	}
-	query += ` ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(timestamp) DESC, id DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)

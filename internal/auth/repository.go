@@ -68,7 +68,7 @@ func (r *Repository) CreateUser(ctx context.Context, input CreateUserInput) (*Us
 	id := uuid.NewString()
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO users (id, username, email, display_name, password_hash, role, enabled, must_change_password, tags, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?)
 	`, id, input.Username, input.Email, input.DisplayName, passwordHash, string(input.Role), input.MustChangePassword, string(tagsJSON), now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (r *Repository) CreateToken(ctx context.Context, input CreateTokenInput) (*
 	id := uuid.NewString()
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO api_tokens (id, user_id, name, token_hash, scopes, environment_ids, expires_at, enabled, created_at, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?)
 	`, id, input.UserID, input.Name, tokenHash, string(scopesJSON), string(envJSON), nullTime(input.ExpiresAt), now.Format(time.RFC3339Nano), input.CreatedBy)
 	if err != nil {
 		return nil, err
@@ -216,7 +216,7 @@ func (r *Repository) ListTokens(ctx context.Context, userID string) ([]*APIToken
 }
 
 func (r *Repository) RevokeToken(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx, `UPDATE api_tokens SET enabled = 0 WHERE id = ?`, id)
+	_, err := r.db.Exec(ctx, `UPDATE api_tokens SET enabled = FALSE WHERE id = ?`, id)
 	return err
 }
 
@@ -240,7 +240,7 @@ func (r *Repository) CreateApplicationKey(ctx context.Context, input CreateAppli
 	now := time.Now().UTC()
 	_, err = r.db.Exec(ctx, `
 		INSERT INTO application_keys (id, name, secret_hash, scopes, environment_ids, expires_at, enabled, created_at, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, TRUE, ?, ?)
 	`, id, input.Name, secretHash, string(scopesJSON), string(environmentsJSON), nullTime(input.ExpiresAt), now.Format(time.RFC3339Nano), input.CreatedBy)
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func (r *Repository) FindApplicationKeyBySecret(ctx context.Context, secret stri
 }
 
 func (r *Repository) RevokeApplicationKey(ctx context.Context, id string) error {
-	result, err := r.db.Exec(ctx, `UPDATE application_keys SET enabled = 0 WHERE id = ?`, id)
+	result, err := r.db.Exec(ctx, `UPDATE application_keys SET enabled = FALSE WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}

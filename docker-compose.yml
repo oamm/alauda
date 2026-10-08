@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   registry:
     build:
@@ -11,7 +9,8 @@ services:
     environment:
       REGISTRY_ENV: development
       REGISTRY_LOG_LEVEL: debug
-      REGISTRY_STORAGE_PATH: /data/registry.db
+      ALAUDA_STORAGE_PROVIDER: postgres
+      ALAUDA_DATABASE_URL: postgres://registry:dev_password@postgres:5432/registry?sslmode=disable
       REGISTRY_HEALTH_WORKERS: "20"
       REGISTRY_TELEMETRY_ENABLED: "true"
     volumes:
@@ -19,7 +18,8 @@ services:
       - registry_data:/data
     command: go run cmd/registry/main.go --dev
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - registry
 
@@ -30,13 +30,13 @@ services:
       POSTGRES_USER: registry
       POSTGRES_PASSWORD: dev_password
     ports:
-      - "5432:5432"
+      - "${ALAUDA_POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - registry
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U registry"]
+      test: ["CMD-SHELL", "pg_isready -U registry -d registry"]
       interval: 10s
       timeout: 5s
       retries: 5

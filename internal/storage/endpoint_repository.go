@@ -33,7 +33,7 @@ func (r *EndpointRepository) Create(ctx context.Context, req *registryv1.CreateE
 		return nil, err
 	}
 
-	tx, err := r.db.GetDB().BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (r *EndpointRepository) List(ctx context.Context, instanceID string, pageSi
 	}
 
 	query, args = appendEnvironmentAccess(ctx, query, "(SELECT d.environment_id FROM service_instances i JOIN service_deployments d ON d.id=i.deployment_id WHERE i.id=endpoints.instance_id)", args)
-	query += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(created_at) ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize+1, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -177,7 +177,7 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 		path = &req.Path
 	}
 
-	tx, err := r.db.GetDB().BeginTx(ctx, nil)
+	tx, err := r.db.BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}

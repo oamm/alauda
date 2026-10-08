@@ -72,7 +72,7 @@ func (r *EventRepository) List(ctx context.Context, filters EventFilters, pageSi
 
 	query, args := eventListQuery(filters)
 	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
-	query += ` ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?`
+	query += ` ORDER BY julianday(timestamp) DESC, id DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -106,7 +106,7 @@ func (r *EventRepository) ListSince(ctx context.Context, filters EventFilters, a
 	}
 	query, args := eventListQuery(filters)
 	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
-	query += ` AND timestamp > ? ORDER BY timestamp ASC, id ASC LIMIT ?`
+	query += ` AND julianday(timestamp) > julianday(?) ORDER BY julianday(timestamp) ASC, id ASC LIMIT ?`
 	args = append(args, after.Format(time.RFC3339Nano), limit)
 
 	rows, err := r.db.Query(ctx, query, args...)
@@ -126,7 +126,7 @@ func (r *EventRepository) ListSince(ctx context.Context, filters EventFilters, a
 	return items, rows.Err()
 }
 
-func createEventTx(ctx context.Context, tx *sql.Tx, event *registryv1.Event) error {
+func createEventTx(ctx context.Context, tx transaction, event *registryv1.Event) error {
 	if event.Id == "" {
 		event.Id = uuid.NewString()
 	}
