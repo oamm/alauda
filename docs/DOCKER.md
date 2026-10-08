@@ -37,6 +37,12 @@ docker run --name alauda -p 9700:9700 -d \
   oamm/alauda:latest
 ```
 
+On first production startup, the container writes the one-time root bootstrap credential to `/data/bootstrap-admin-credential`. Mount `/data` to persist it, or read it directly from the running container:
+
+```bash
+docker exec alauda cat /data/bootstrap-admin-credential
+```
+
 The container starts the server through `/usr/local/bin/registry server`. The canonical CLI is `/usr/local/bin/alauda`; `registryctl` remains a compatibility alias:
 
 ```bash

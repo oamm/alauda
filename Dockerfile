@@ -63,6 +63,8 @@ COPY --from=frontend-builder /app/web/dist ./web/dist
 # Create data directory
 RUN mkdir -p /data && chown -R registry:registry /data
 
+ENV REGISTRY_BOOTSTRAP_CREDENTIAL_PATH=/data/bootstrap-admin-credential
+
 USER registry
 
 EXPOSE 9700
