@@ -5,7 +5,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -26,7 +25,7 @@ func TestEventSSEStreamsEventsThroughHardeningMiddleware(t *testing.T) {
 
 func testEventSSEStreamsEvents(t *testing.T, wrap func(http.Handler) http.Handler) {
 	ctx := context.Background()
-	db, err := storage.NewDatabase(ctx, filepath.Join(t.TempDir(), "registry-test.db"))
+	db, err := storage.NewDatabase(ctx, fixtureDatabasePath(t))
 	if err != nil {
 		t.Fatalf("new database: %v", err)
 	}
@@ -49,8 +48,17 @@ func testEventSSEStreamsEvents(t *testing.T, wrap func(http.Handler) http.Handle
 
 	mux := http.NewServeMux()
 	registerEventSSE(mux, eventRepo)
-	server := httptest.NewServer(wrap(mux))
+	finished := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { defer close(finished); wrap(mux).ServeHTTP(w, r) }))
 	defer server.Close()
+	defer func() {
+		server.CloseClientConnections()
+		select {
+		case <-finished:
+		case <-time.After(3 * time.Second):
+			t.Error("stream handler did not finish")
+		}
+	}()
 
 	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()

@@ -2,7 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/company/service-registry/internal/contract"
+	"github.com/company/service-registry/internal/problem"
 	"net/http"
+	"reflect"
+	"strings"
 )
 
 func RegisterOpenAPI(mux *http.ServeMux, wrap func(http.Handler) http.Handler) {
@@ -26,68 +30,212 @@ func RegisterOpenAPI(mux *http.ServeMux, wrap func(http.Handler) http.Handler) {
 	mux.Handle("/swagger", wrap(swagger))
 }
 
-var openAPISpec = map[string]any{
-	"openapi": "3.0.3",
-	"info": map[string]any{
-		"title":       "Alauda Service Registry API",
-		"version":     "1.0.0",
-		"description": "Read-only catalog and service discovery API for external clients.",
-	},
-	"servers": []map[string]string{{"url": "/"}},
-	"components": map[string]any{
-		"securitySchemes": map[string]any{
-			"bearerAuth": map[string]string{"type": "http", "scheme": "bearer"},
-		},
-		"schemas": map[string]any{
-			"Pagination":      map[string]any{"type": "object", "properties": map[string]any{"nextPageToken": map[string]string{"type": "string"}, "totalSize": map[string]string{"type": "integer", "format": "int32"}}},
-			"CatalogResponse": map[string]any{"type": "object", "additionalProperties": true},
-			"Error":           map[string]any{"type": "object", "required": []string{"error"}, "properties": map[string]string{"error": "string"}},
-		},
-	},
-	"security": []map[string][]string{{"bearerAuth": {}}},
-	"paths": map[string]any{
-		"/api/v1/environments":                                         canonicalPath("List enabled environments."),
-		"/api/v1/environments/{environmentKey}":                        canonicalPath("Get an environment by its public key.", "environmentKey"),
-		"/api/v1/environments/{environmentKey}/services":               canonicalPath("List services deployed in an environment.", "environmentKey"),
-		"/api/v1/environments/{environmentKey}/services/{serviceName}": canonicalPath("Get a service deployed in an environment.", "environmentKey", "serviceName"),
-		"/api/v1/catalog/environments":                                 catalogPath("List enabled or all environments.", "includeDisabled"),
-		"/api/v1/catalog/services":                                     catalogPath("List services, optionally filtered by environment.", "environmentId", "environment"),
-		"/api/v1/catalog/deployments":                                  catalogPath("List service deployments.", "serviceId", "environmentId", "environment"),
-		"/api/v1/catalog/instances":                                    catalogPath("List service instances.", "deploymentId"),
-		"/api/v1/catalog/endpoints":                                    catalogPath("List instance endpoints.", "instanceId"),
-		"/api/v1/discovery/services/{serviceName}/resolve": map[string]any{"get": map[string]any{
-			"summary":    "Resolve a service in an environment",
-			"parameters": []map[string]any{{"name": "serviceName", "in": "path", "required": true, "schema": map[string]string{"type": "string"}}, {"name": "environment", "in": "query", "required": true, "schema": map[string]string{"type": "string"}}, {"name": "healthyOnly", "in": "query", "schema": map[string]string{"type": "boolean", "default": "false"}}},
-			"responses":  standardResponses(),
-		}},
-	},
-}
+var openAPISpec = buildPublicOpenAPI()
 
-func catalogPath(summary string, filters ...string) map[string]any {
-	parameters := []map[string]any{{"name": "pageSize", "in": "query", "schema": map[string]any{"type": "integer", "minimum": 1, "maximum": 200, "default": 50}}, {"name": "pageToken", "in": "query", "schema": map[string]string{"type": "string"}}}
-	for _, filter := range filters {
-		parameters = append(parameters, map[string]any{"name": filter, "in": "query", "schema": map[string]string{"type": "string"}})
-	}
-	return map[string]any{"get": map[string]any{"summary": summary, "parameters": parameters, "responses": standardResponses()}}
-}
+type schemaMap = map[string]any
 
-func canonicalPath(summary string, pathParameters ...string) map[string]any {
-	parameters := make([]map[string]any, 0, len(pathParameters))
-	for _, name := range pathParameters {
-		parameters = append(parameters, map[string]any{"name": name, "in": "path", "required": true, "schema": map[string]string{"type": "string"}})
-	}
-	return map[string]any{"get": map[string]any{"summary": summary, "parameters": parameters, "responses": standardResponses()}}
+func schemaRef(name string) schemaMap { return schemaMap{"$ref": "#/components/schemas/" + name} }
+func stringSchema() schemaMap         { return schemaMap{"type": "string"} }
+func objectSchema(properties schemaMap, required ...string) schemaMap {
+	return schemaMap{"type": "object", "additionalProperties": false, "properties": properties, "required": required}
 }
-
-func standardResponses() map[string]any {
-	return map[string]any{
-		"200": map[string]any{"description": "Successful response", "content": map[string]any{"application/json": map[string]any{"schema": map[string]string{"$ref": "#/components/schemas/CatalogResponse"}}}},
-		"400": map[string]string{"description": "Invalid request"},
-		"401": map[string]string{"description": "Authentication required"},
-		"403": map[string]string{"description": "Insufficient permissions"},
-		"404": map[string]string{"description": "Resource not found"},
-		"500": map[string]string{"description": "Server error"},
+func arraySchema(items schemaMap) schemaMap { return schemaMap{"type": "array", "items": items} }
+func dtoSchema(t reflect.Type) schemaMap {
+	if t.Kind() == reflect.Pointer {
+		s := dtoSchema(t.Elem())
+		s["nullable"] = true
+		return s
 	}
+	switch t.Kind() {
+	case reflect.String:
+		return stringSchema()
+	case reflect.Bool:
+		return schemaMap{"type": "boolean"}
+	case reflect.Int, reflect.Int32, reflect.Int64:
+		return schemaMap{"type": "integer"}
+	case reflect.Slice:
+		s := arraySchema(dtoSchema(t.Elem()))
+		s["nullable"] = true
+		return s
+	case reflect.Map:
+		return schemaMap{"type": "object", "additionalProperties": dtoSchema(t.Elem()), "nullable": true}
+	case reflect.Struct:
+		props := schemaMap{}
+		required := []string{}
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+			tag := f.Tag.Get("json")
+			if tag == "-" || tag == "" {
+				continue
+			}
+			name := strings.Split(tag, ",")[0]
+			props[name] = dtoSchema(f.Type)
+			if !strings.Contains(tag, "omitempty") {
+				required = append(required, name)
+			}
+		}
+		return objectSchema(props, required...)
+	}
+	panic("unsupported public schema type: " + t.String())
+}
+func queryParameter(name string, required bool, schema schemaMap) schemaMap {
+	return schemaMap{"name": name, "in": "query", "required": required, "schema": schema}
+}
+func publicSpecResponses(code, schema string) schemaMap {
+	responses := schemaMap{}
+	if code == "204" {
+		responses[code] = schemaMap{"description": "Deregistered or already absent"}
+	} else {
+		responses[code] = schemaMap{"description": "Successful response", "content": schemaMap{"application/json": schemaMap{"schema": schemaRef(schema)}}}
+	}
+	for _, status := range []string{"400", "401", "403", "404", "409", "413", "415", "429", "500", "503"} {
+		responses[status] = schemaMap{"description": "Problem Details with stable code", "content": schemaMap{"application/problem+json": schemaMap{"schema": schemaRef("ProblemDetails")}}}
+	}
+	return responses
+}
+func buildPublicOpenAPI() schemaMap {
+	key := schemaMap{"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._-]+$"}
+	stringMap := schemaMap{"type": "object", "additionalProperties": stringSchema(), "nullable": true}
+	schemas := schemaMap{}
+	for name, value := range map[string]any{"Registration": contract.Registration{}, "RegistrationResponse": publicRegistrationResponse{}, "Instance": publicInstance{}, "Endpoint": publicEndpoint{}, "Discovery": publicDiscoveryResponse{}, "HealthCheck": publicHealthCheck{}, "HealthResult": publicHealthResult{}, "ProblemDetails": problem.Details{}} {
+		schemas[name] = dtoSchema(reflect.TypeOf(value))
+	}
+	registration := schemas["Registration"].(schemaMap)
+	checkProps := schemas["HealthCheck"].(schemaMap)["properties"].(schemaMap)
+	checkProps["type"] = schemaMap{"type": "string", "enum": []string{"http", "tcp", "dns"}}
+	checkProps["intervalSeconds"] = schemaMap{"type": "integer", "minimum": 1, "maximum": 86400, "default": 30}
+	checkProps["timeoutSeconds"] = schemaMap{"type": "integer", "minimum": 1, "maximum": 300, "default": 5}
+	checkProps["failuresBeforeUnhealthy"] = schemaMap{"type": "integer", "minimum": 1, "default": 3}
+	checkProps["successesBeforeHealthy"] = schemaMap{"type": "integer", "minimum": 1, "default": 2}
+	schemas["HealthCheckCreate"] = objectSchema(checkProps, "name", "endpoint", "type")
+	schemas["Instance"].(schemaMap)["properties"].(schemaMap)["healthState"] = schemaMap{"type": "string", "enum": []string{"Healthy", "Unknown", "Degraded", "Unhealthy", "Disabled"}}
+	registration["required"] = []string{"environment", "instance"}
+	rp := registration["properties"].(schemaMap)
+	rp["environment"] = key
+	rp["mode"] = schemaMap{"type": "string", "enum": []string{"upsert"}, "default": "upsert"}
+	rp["replaceEndpoints"] = schemaMap{"type": "boolean", "default": false}
+	ep := rp["endpoints"].(schemaMap)["items"].(schemaMap)["properties"].(schemaMap)
+	ep["port"] = schemaMap{"type": "integer", "minimum": 1, "maximum": 65535, "nullable": true}
+	ep["protocol"] = schemaMap{"type": "string", "enum": []string{"http", "https", "tcp", "udp", "grpc"}, "nullable": true}
+	ep["name"] = key
+	ip := rp["instance"].(schemaMap)["properties"].(schemaMap)
+	ip["name"] = key
+	ip["address"] = schemaMap{"type": "string", "description": "Bare DNS hostname, IPv4 or IPv6; scheme and embedded port are rejected.", "nullable": true}
+	registration["example"] = schemaMap{"environment": "stg", "instance": schemaMap{"name": "lynx-authentication.lynx", "address": "lynx-authentication.lynx"}, "endpoints": []any{schemaMap{"name": "default", "protocol": "http", "port": 81, "path": "/"}}}
+	schemas["Resolve"] = objectSchema(schemaMap{"service": stringSchema(), "environment": stringSchema(), "instance": stringSchema(), "endpoint": stringSchema(), "address": schemaMap{"type": "string", "format": "uri"}}, "service", "environment", "instance", "endpoint", "address")
+	schemas["Service"] = objectSchema(schemaMap{"id": stringSchema(), "name": key, "displayName": stringSchema(), "description": stringSchema(), "tags": stringMap, "metadata": stringMap}, "id", "name", "displayName", "description", "tags", "metadata")
+	schemas["ServiceCreate"] = objectSchema(schemaMap{"name": key, "displayName": stringSchema(), "description": stringSchema(), "tags": stringMap, "metadata": stringMap}, "name")
+	schemas["EnvironmentCreate"] = objectSchema(schemaMap{"key": key, "name": stringSchema(), "description": stringSchema(), "tags": stringMap}, "key")
+	schemas["Environment"] = objectSchema(schemaMap{"id": stringSchema(), "key": key, "name": stringSchema(), "description": stringSchema(), "enabled": schemaMap{"type": "boolean"}, "tier": stringSchema(), "tags": stringMap, "createdAt": schemaMap{"type": "string", "format": "date-time"}, "updatedAt": schemaMap{"type": "string", "format": "date-time"}}, "id", "key", "name", "enabled")
+	schemas["Pagination"] = objectSchema(schemaMap{"nextPageToken": stringSchema(), "totalSize": schemaMap{"type": "integer"}})
+	for name, item := range map[string]string{"Services": "Service", "Environments": "Environment", "Instances": "Instance", "Endpoints": "Endpoint", "Checks": "HealthCheck", "Results": "HealthResult"} {
+		field := strings.ToLower(name)
+		props := schemaMap{field: arraySchema(schemaRef(item)), "nextPageToken": stringSchema()}
+		if name == "Instances" || name == "Endpoints" {
+			props["service"] = stringSchema()
+			props["environment"] = stringSchema()
+		}
+		if name == "Endpoints" {
+			props["instance"] = stringSchema()
+		}
+		if name == "Environments" {
+			props["pagination"] = schemaRef("Pagination")
+		}
+		if name == "Services" {
+			props["pagination"] = schemaRef("Pagination")
+		}
+		schemas[name] = objectSchema(props, field)
+	}
+	schemas["HealthRun"] = objectSchema(schemaMap{"check": stringSchema(), "instance": stringSchema(), "success": schemaMap{"type": "boolean"}, "timestamp": schemaMap{"type": "string", "format": "date-time"}, "healthState": stringSchema()}, "check", "instance", "success", "timestamp", "healthState")
+	paths := schemaMap{}
+	add := func(path, method, summary, capability, response, code, body string, environment, pagination bool) {
+		params := []any{}
+		for _, part := range strings.Split(path, "/") {
+			if strings.HasPrefix(part, "{") {
+				params = append(params, schemaMap{"name": strings.Trim(part, "{}"), "in": "path", "required": true, "schema": key})
+			}
+		}
+		if environment {
+			params = append(params, queryParameter("environment", true, key))
+		}
+		if pagination {
+			params = append(params, queryParameter("pageSize", false, schemaMap{"type": "integer", "minimum": 1, "maximum": 200, "default": 50}), queryParameter("pageToken", false, stringSchema()))
+		}
+		op := schemaMap{"summary": summary, "description": "Requires " + capability + ". Environment restrictions are enforced by the backend before pagination.", "x-capability": capability, "tags": []string{"PUBLIC"}, "parameters": params, "responses": publicSpecResponses(code, response)}
+		if body != "" {
+			op["requestBody"] = schemaMap{"required": true, "content": schemaMap{"application/json": schemaMap{"schema": schemaRef(body)}}}
+		}
+		if paths[path] == nil {
+			paths[path] = schemaMap{}
+		}
+		paths[path].(schemaMap)[method] = op
+	}
+	add("/api/v1/services", "get", "List Services", "registry.read", "Services", "200", "", false, true)
+	paths["/api/v1/services"].(schemaMap)["get"].(schemaMap)["parameters"] = append(paths["/api/v1/services"].(schemaMap)["get"].(schemaMap)["parameters"].([]any), queryParameter("environment", false, key))
+	add("/api/v1/services", "post", "Explicit Service bootstrap", "registry.write", "Service", "201", "ServiceCreate", false, false)
+	add("/api/v1/environments", "get", "List Environments, including disabled", "registry.read", "Environments", "200", "", false, true)
+	add("/api/v1/environments", "post", "Explicit Environment bootstrap", "registry.write", "Environment", "201", "EnvironmentCreate", false, false)
+	add("/api/v1/environments/{environmentKey}", "get", "Get Environment by key", "registry.read", "Environment", "200", "", false, false)
+	add("/api/v1/environments/{environmentKey}/services", "get", "List Environment Services", "registry.read", "Services", "200", "", false, true)
+	add("/api/v1/environments/{environmentKey}/services/{serviceName}", "get", "Get Environment Service", "registry.read", "Service", "200", "", false, false)
+	base := "/api/v1/services/{serviceKey}"
+	add(base, "get", "Get Service", "registry.read", "Service", "200", "", true, false)
+	add(base+"/instances", "get", "List Instances regardless of discovery eligibility", "registry.read", "Instances", "200", "", true, true)
+	add(base+"/instances", "post", "Atomic idempotent registration UPSERT", "registry.write", "RegistrationResponse", "200", "Registration", false, false)
+	op := paths[base+"/instances"].(schemaMap)["post"].(schemaMap)
+	op["description"] = "Identity: Service + Environment + Instance name. Omitted fields preserve values; explicit empty tags/metadata clear them. Matching Endpoint names are updated, new names created, omitted names preserved unless replaceEndpoints=true. Primary promotion atomically demotes the old Primary. A new singleton with Primary omitted defaults to Primary; existing incremental singletons do not. Only mode=upsert is supported. Service and Environment must exist and Environment must be enabled. Requires registry.write."
+	add(base+"/instances/{instanceName}", "get", "Get Instance", "registry.read", "Instance", "200", "", true, false)
+	add(base+"/instances/{instanceName}", "delete", "Idempotent deregistration preserving history and retained endpoints/checks", "registry.write", "", "204", "", true, false)
+	add(base+"/instances/{instanceName}/endpoints", "get", "List registered Endpoints including disabled", "registry.read", "Endpoints", "200", "", true, true)
+	hb := base + "/instances/{instanceName}/health-checks"
+	add(hb, "get", "List Health Checks", "health.read", "Checks", "200", "", true, true)
+	add(hb, "post", "Create named Health Check bound to Endpoint", "health.write", "HealthCheck", "201", "HealthCheckCreate", true, false)
+	add(hb+"/{checkName}/run", "post", "Execute active Health Check", "health.execute", "HealthRun", "200", "", true, false)
+	add(base+"/health-results", "get", "List Health history using public names", "health.read", "Results", "200", "", true, true)
+	resultsOp := paths[base+"/health-results"].(schemaMap)["get"].(schemaMap)
+	for _, name := range []string{"instance", "endpoint", "check", "from", "to"} {
+		schema := stringSchema()
+		if name == "from" || name == "to" {
+			schema["format"] = "date-time"
+		}
+		resultsOp["parameters"] = append(resultsOp["parameters"].([]any), queryParameter(name, false, schema))
+	}
+	for _, resolve := range []bool{false, true} {
+		path := "/api/v1/discovery/{serviceKey}"
+		model := "Discovery"
+		if resolve {
+			path += "/resolve"
+			model = "Resolve"
+		}
+		add(path, "get", "Discover usable endpoints without ID lookup", "discovery.read", model, "200", "", true, false)
+		op := paths[path].(schemaMap)["get"].(schemaMap)
+		op["parameters"] = append(op["parameters"].([]any), queryParameter("endpoint", false, key), queryParameter("health", false, schemaMap{"type": "string", "enum": []string{"usable", "healthy", "all"}, "default": "usable"}))
+		op["description"] = "Enabled Environment/Instances/Endpoints only. usable excludes known Unhealthy/Disabled and allows Unknown/Degraded; healthy requires fresh Healthy; all includes health states but not disabled lifecycle resources. Missing checks, disabled monitoring and stale health become Unknown. Healthy candidates rank first, then name order. Resolve selects named Endpoint, otherwise Primary, then lexicographic Endpoint name. No load balancing. Cache-Control: no-store."
+	}
+
+	schemas["LegacyResponse"] = schemaMap{"type": "object", "description": "Compatibility DTO; protobuf-specific IDs remain. Not a stable public integration model.", "additionalProperties": true}
+	schemas["Resolve"].(schemaMap)["example"] = schemaMap{"service": "Authentication.Grpc", "environment": "stg", "instance": "lynx-authentication.lynx", "endpoint": "default", "address": "http://lynx-authentication.lynx:81/"}
+	exampleInstance := publicInstance{Name: "lynx-authentication.lynx", Address: "lynx-authentication.lynx", Enabled: true, HealthState: "Unknown"}
+	exampleEndpoint := publicEndpoint{Name: "default", Protocol: "http", Port: 81, Path: "/", Primary: true, Enabled: true, Address: "http://lynx-authentication.lynx:81/"}
+	exampleInstance.Endpoints = []publicEndpoint{exampleEndpoint}
+	schemas["RegistrationResponse"].(schemaMap)["example"] = publicRegistrationResponse{Service: "Authentication.Grpc", Environment: "stg", Instance: exampleInstance, Endpoints: []publicEndpoint{exampleEndpoint}}
+	schemas["Discovery"].(schemaMap)["example"] = publicDiscoveryResponse{Service: "Authentication.Grpc", Environment: "stg", Instances: []publicInstance{exampleInstance}}
+	schemas["ProblemDetails"].(schemaMap)["example"] = problem.Details{Type: "https://alauda.dev/problems/service-not-found", Title: "Not Found", Status: 404, Code: "service_not_found", Detail: "Service does not exist."}
+	schemas["ServiceCreate"].(schemaMap)["example"] = schemaMap{"name": "Authentication.Grpc"}
+	schemas["EnvironmentCreate"].(schemaMap)["example"] = schemaMap{"key": "stg", "name": "Staging"}
+	for _, path := range []string{"/api/v1/catalog/environments", "/api/v1/catalog/services", "/api/v1/catalog/deployments", "/api/v1/catalog/instances", "/api/v1/catalog/endpoints", "/api/v1/discovery/services/{serviceName}"} {
+		params := []any{}
+		if strings.Contains(path, "{") {
+			params = append(params, schemaMap{"name": "serviceName", "in": "path", "required": true, "schema": key}, queryParameter("environment", true, key), queryParameter("healthyOnly", false, schemaMap{"type": "boolean", "default": false}))
+		} else {
+			params = append(params, queryParameter("pageSize", false, schemaMap{"type": "integer", "maximum": 200, "default": 50}), queryParameter("pageToken", false, stringSchema()))
+			for _, name := range []string{"environment", "environmentId", "serviceId", "deploymentId", "instanceId", "includeDisabled"} {
+				params = append(params, queryParameter(name, false, stringSchema()))
+			}
+		}
+		paths[path] = schemaMap{"get": schemaMap{"summary": "Legacy compatibility operation", "deprecated": true, "tags": []string{"LEGACY"}, "parameters": params, "responses": publicSpecResponses("200", "LegacyResponse"), "description": "Use the key-addressed PUBLIC operations. Environment restrictions and safe health filtering also apply to legacy discovery."}}
+	}
+	return schemaMap{"openapi": "3.0.3", "info": schemaMap{"title": "Alauda Public API", "version": "1.0.0", "description": "Stable Service / Environment / Instance / Endpoint / Health Check contract. Bearer API tokens and Application Keys supported. Legacy read/write scopes map to documented capabilities; admin grants all. Scoped credentials cannot bootstrap global resources. Connect RPC and legacy catalog/discovery remain compatibility surfaces, not this stable public contract; see docs/API.md."}, "servers": []any{schemaMap{"url": "/"}}, "security": []any{schemaMap{"bearerAuth": []string{}}}, "components": schemaMap{"securitySchemes": schemaMap{"bearerAuth": schemaMap{"type": "http", "scheme": "bearer"}}, "schemas": schemas}, "paths": paths}
 }
 
 const swaggerHTML = `<!doctype html>

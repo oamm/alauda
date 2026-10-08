@@ -15,7 +15,7 @@ func (h *environmentHandler) CreateEnvironment(ctx context.Context, req *connect
 	}
 	env, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.CreateEnvironmentResponse{Environment: env}), nil
 }
@@ -24,9 +24,9 @@ func (h *environmentHandler) GetEnvironment(ctx context.Context, req *connect.Re
 	env, err := h.repo.Get(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetEnvironmentResponse{Environment: env}), nil
 }
@@ -43,7 +43,7 @@ func (h *environmentHandler) ListEnvironments(ctx context.Context, req *connect.
 
 	items, nextToken, err := h.repo.List(ctx, req.Msg.GetIncludeDisabled(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&registryv1.ListEnvironmentsResponse{
@@ -62,9 +62,9 @@ func (h *environmentHandler) UpdateEnvironment(ctx context.Context, req *connect
 	env, err := h.repo.Update(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.UpdateEnvironmentResponse{Environment: env}), nil
 }
@@ -74,7 +74,7 @@ func (h *environmentHandler) DeleteEnvironment(ctx context.Context, req *connect
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.Delete(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteEnvironmentResponse{}), nil
 }

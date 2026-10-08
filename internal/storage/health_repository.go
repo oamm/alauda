@@ -158,6 +158,7 @@ func (r *HealthRepository) ListHealthChecks(ctx context.Context, instanceID stri
 	if !includeDisabled {
 		query += ` AND enabled = 1`
 	}
+	query, args = appendEnvironmentAccess(ctx, query, "(SELECT d.environment_id FROM service_instances i JOIN service_deployments d ON d.id=i.deployment_id WHERE i.id=health_checks.instance_id)", args)
 	query += ` ORDER BY name ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
@@ -299,6 +300,7 @@ func (r *HealthRepository) ListHealthResults(ctx context.Context, healthCheckID,
 		query += ` AND instance_id = ?`
 		args = append(args, instanceID)
 	}
+	query, args = appendEnvironmentAccess(ctx, query, "(SELECT d.environment_id FROM service_instances i JOIN service_deployments d ON d.id=i.deployment_id WHERE i.id=health_results.instance_id)", args)
 	query += ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
@@ -380,6 +382,8 @@ func (r *HealthRepository) ListDueHealthCheckTargets(ctx context.Context, limit 
 		       si.address, COALESCE(e.port, si.port), COALESCE(e.path, '')
 		FROM health_checks hc
 		JOIN service_instances si ON si.id = hc.instance_id AND si.deleted_at IS NULL AND si.enabled = 1
+		JOIN service_deployments d ON d.id=si.deployment_id AND d.deleted_at IS NULL AND d.health_enabled=1
+		JOIN environments env ON env.id=d.environment_id AND env.deleted_at IS NULL AND env.enabled=1
 		LEFT JOIN endpoints e ON e.id = hc.endpoint_id AND e.deleted_at IS NULL AND e.enabled = 1
 		LEFT JOIN (
 			SELECT health_check_id, MAX(timestamp) AS last_timestamp
@@ -388,6 +392,7 @@ func (r *HealthRepository) ListDueHealthCheckTargets(ctx context.Context, limit 
 		) latest ON latest.health_check_id = hc.id
 		WHERE hc.deleted_at IS NULL
 		  AND hc.enabled = 1
+		  AND (hc.endpoint_id IS NULL OR hc.endpoint_id='' OR e.id IS NOT NULL)
 		  AND (
 			latest.last_timestamp IS NULL
 			OR julianday(latest.last_timestamp) <= julianday('now') - (CAST(hc.interval_seconds AS REAL) / 86400.0)
@@ -422,8 +427,11 @@ func (r *HealthRepository) GetHealthCheckTarget(ctx context.Context, id string) 
 		       si.address, COALESCE(e.port, si.port), COALESCE(e.path, '')
 		FROM health_checks hc
 		JOIN service_instances si ON si.id = hc.instance_id AND si.deleted_at IS NULL AND si.enabled = 1
+		JOIN service_deployments d ON d.id=si.deployment_id AND d.deleted_at IS NULL
+		JOIN environments env ON env.id=d.environment_id AND env.deleted_at IS NULL AND env.enabled=1
 		LEFT JOIN endpoints e ON e.id = hc.endpoint_id AND e.deleted_at IS NULL AND e.enabled = 1
 		WHERE hc.id = ? AND hc.deleted_at IS NULL AND hc.enabled = 1
+		  AND (hc.endpoint_id IS NULL OR hc.endpoint_id='' OR e.id IS NOT NULL)
 	`, id)
 
 	target, err := scanHealthCheckTarget(row)

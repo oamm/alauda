@@ -29,10 +29,13 @@ COPY internal ./internal
 COPY api ./api
 COPY gen ./gen
 
-# Build the binary
+# Build the server and public CLI binaries
 RUN CGO_ENABLED=1 GOOS=linux go build \
     -ldflags="-w -s" \
     -o registry ./cmd/registry
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-w -s" \
+    -o alauda ./cmd/registryctl
 
 # Stage 3: Runtime
 FROM alpine:3.18
@@ -46,8 +49,10 @@ RUN apk add --no-cache ca-certificates sqlite
 RUN addgroup -g 1000 registry && \
     adduser -D -u 1000 -G registry registry
 
-# Copy binary from builder
-COPY --from=backend-builder /app/registry /usr/local/bin/
+# Copy server and canonical CLI binaries from builder
+COPY --from=backend-builder /app/registry /usr/local/bin/registry
+COPY --from=backend-builder /app/alauda /usr/local/bin/alauda
+RUN ln -s /usr/local/bin/alauda /usr/local/bin/registryctl
 
 # Copy static files (embedded in binary, but also available)
 COPY --from=frontend-builder /app/web/dist ./web/dist

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -246,8 +245,7 @@ func TestCatalogLifecycleOverConnect(t *testing.T) {
 func setupIntegrationServer(t *testing.T) (*storage.Database, *httptest.Server, func()) {
 	t.Helper()
 
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "registry-test.db")
+	dbPath := integrationDatabasePath(t)
 	db, err := storage.NewDatabase(context.Background(), dbPath)
 	if err != nil {
 		if isSQLiteCGODisabled(err) {

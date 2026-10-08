@@ -4,12 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
 	"github.com/company/service-registry/internal/storage"
+	"github.com/company/service-registry/internal/testutil"
 )
 
 func TestEngineRetriesWebhookAndLogsAttempts(t *testing.T) {
@@ -101,7 +101,7 @@ type testScope struct {
 
 func newTestDatabase(t *testing.T) *storage.Database {
 	t.Helper()
-	db, err := storage.NewDatabase(context.Background(), filepath.Join(t.TempDir(), "registry-test.db"))
+	db, err := storage.NewDatabase(context.Background(), testutil.DatabasePath(t))
 	if err != nil {
 		t.Fatalf("new database: %v", err)
 	}

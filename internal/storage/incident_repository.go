@@ -78,6 +78,7 @@ func (r *IncidentRepository) List(ctx context.Context, environmentID, serviceID,
 		query += ` AND state = ?`
 		args = append(args, state.String())
 	}
+	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
 	query += ` ORDER BY opened_at DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 

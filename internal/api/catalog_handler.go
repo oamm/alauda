@@ -15,7 +15,7 @@ func (h *catalogHandler) CreateService(ctx context.Context, req *connect.Request
 	}
 	svc, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.CreateServiceResponse{Service: svc}), nil
 }
@@ -24,9 +24,9 @@ func (h *catalogHandler) GetService(ctx context.Context, req *connect.Request[re
 	svc, err := h.repo.Get(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetServiceResponse{Service: svc}), nil
 }
@@ -43,7 +43,7 @@ func (h *catalogHandler) ListServices(ctx context.Context, req *connect.Request[
 
 	items, nextToken, err := h.repo.List(ctx, req.Msg.GetEnvironmentId(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&registryv1.ListServicesResponse{
@@ -62,9 +62,9 @@ func (h *catalogHandler) UpdateService(ctx context.Context, req *connect.Request
 	svc, err := h.repo.Update(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.UpdateServiceResponse{Service: svc}), nil
 }
@@ -74,7 +74,7 @@ func (h *catalogHandler) DeleteService(ctx context.Context, req *connect.Request
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.Delete(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteServiceResponse{}), nil
 }

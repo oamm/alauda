@@ -115,6 +115,7 @@ func (r *EndpointRepository) List(ctx context.Context, instanceID string, pageSi
 		args = append(args, instanceID)
 	}
 
+	query, args = appendEnvironmentAccess(ctx, query, "(SELECT d.environment_id FROM service_instances i JOIN service_deployments d ON d.id=i.deployment_id WHERE i.id=endpoints.instance_id)", args)
 	query += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize+1, offset)
 

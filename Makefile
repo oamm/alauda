@@ -1,6 +1,8 @@
 # Service Registry - Build Automation
 
-.PHONY: help setup dev test build docker clean lint fmt proto gen-api
+IMAGE ?= alauda/service-registry:latest
+
+.PHONY: help setup dev test build build-alauda docker clean lint fmt proto gen-api docker-push
 
 help:
 	@echo "Service Registry - Available Commands"
@@ -77,6 +79,11 @@ build-cli: proto
 	go build -o bin/registryctl ./cmd/registryctl
 	@echo "Binary: bin/registryctl"
 
+build-alauda: proto
+	@echo "Building Alauda CLI..."
+	go build -o bin/alauda ./cmd/registryctl
+	@echo "Binary: bin/alauda"
+
 # Testing
 
 test: proto
@@ -117,8 +124,12 @@ vet:
 
 docker-build: proto
 	@echo "Building Docker image..."
-	docker build -t service-registry:latest .
-	@echo "Image: service-registry:latest"
+	docker build -t $(IMAGE) .
+	@echo "Image: $(IMAGE)"
+
+docker-push: docker-build
+	@echo "Pushing Docker image..."
+	docker push $(IMAGE)
 
 docker-run:
 	@echo "Running Docker container..."

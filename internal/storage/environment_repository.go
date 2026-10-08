@@ -80,6 +80,7 @@ func (r *EnvironmentRepository) List(ctx context.Context, includeDisabled bool, 
 	if !includeDisabled {
 		query += ` AND enabled = 1`
 	}
+	query, args = appendEnvironmentAccess(ctx, query, "id", args)
 	query += ` ORDER BY created_at ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 

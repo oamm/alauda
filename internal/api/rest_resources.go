@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"net/url"
 	"strings"
 
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
@@ -28,20 +27,29 @@ type restResources struct {
 }
 
 func (a *restResources) listEnvironments(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		createPublicEnvironment(w, r, a.environmentRepo)
+		return
+	}
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
 		return
 	}
-	items, next, err := a.environmentRepo.List(r.Context(), false, pageSize(r), r.URL.Query().Get("pageToken"))
+	size, _, ok := publicPage(w, r)
+	if !ok {
+		return
+	}
+	items, next, err := a.environmentRepo.List(r.Context(), true, size, r.URL.Query().Get("pageToken"))
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "failed to list environments")
 		return
 	}
 	items = filterEnvironments(r, items)
-	writeProtoJSON(w, &registryv1.ListEnvironmentsResponse{
-		Environments: items,
-		Pagination:   &registryv1.PaginationResponse{NextPageToken: next, TotalSize: int32(len(items))},
-	})
+	result := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		result = append(result, publicEnvironmentData(item))
+	}
+	writeJSON(w, 200, map[string]any{"environments": result, "nextPageToken": next, "pagination": map[string]any{"nextPageToken": next, "totalSize": len(items)}})
 }
 
 func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Request) {
@@ -51,8 +59,8 @@ func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	environmentKey, err := url.PathUnescape(parts[0])
-	if err != nil || environmentKey == "" {
+	environmentKey := parts[0]
+	if !validPublicKey(environmentKey) {
 		writeAPIError(w, http.StatusBadRequest, "invalid environment key")
 		return
 	}
@@ -71,7 +79,7 @@ func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Reque
 			methodNotAllowed(w)
 			return
 		}
-		writeProtoJSON(w, environment)
+		writeJSON(w, 200, publicEnvironmentData(environment))
 		return
 	}
 	if parts[1] != "services" {
@@ -84,15 +92,20 @@ func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Reque
 			methodNotAllowed(w)
 			return
 		}
-		items, next, err := a.services.List(r.Context(), environment.GetId(), pageSize(r), r.URL.Query().Get("pageToken"))
+		size, _, ok := publicPage(w, r)
+		if !ok {
+			return
+		}
+		items, next, err := a.services.List(r.Context(), environment.GetId(), size, r.URL.Query().Get("pageToken"))
 		if err != nil {
 			writeAPIError(w, http.StatusInternalServerError, "failed to list services")
 			return
 		}
-		writeProtoJSON(w, &registryv1.ListServicesResponse{
-			Services:   items,
-			Pagination: &registryv1.PaginationResponse{NextPageToken: next, TotalSize: int32(len(items))},
-		})
+		result := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			result = append(result, publicServiceData(item))
+		}
+		writeJSON(w, 200, map[string]any{"services": result, "nextPageToken": next, "pagination": map[string]any{"nextPageToken": next, "totalSize": len(items)}})
 		return
 	}
 
@@ -100,8 +113,8 @@ func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Reque
 		methodNotAllowed(w)
 		return
 	}
-	serviceName, err := url.PathUnescape(parts[2])
-	if err != nil || serviceName == "" {
+	serviceName := parts[2]
+	if !validPublicKey(serviceName) {
 		writeAPIError(w, http.StatusBadRequest, "invalid service name")
 		return
 	}
@@ -110,16 +123,14 @@ func (a *restResources) environmentResource(w http.ResponseWriter, r *http.Reque
 		writeResourceError(w, err, "service not found")
 		return
 	}
-	services, _, err := a.services.List(r.Context(), environment.GetId(), 200, "")
+	member, err := a.services.BelongsToEnvironment(r.Context(), service.GetId(), environment.GetId())
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "failed to find service in environment")
 		return
 	}
-	for _, candidate := range services {
-		if candidate.GetId() == service.GetId() {
-			writeProtoJSON(w, service)
-			return
-		}
+	if member {
+		writeJSON(w, 200, publicServiceData(service))
+		return
 	}
 	writeAPIError(w, http.StatusNotFound, "service not found in environment")
 }

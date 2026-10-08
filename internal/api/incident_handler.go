@@ -17,9 +17,9 @@ func (h *incidentHandler) GetIncident(ctx context.Context, req *connect.Request[
 	item, err := h.repo.Get(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetIncidentResponse{Incident: item}), nil
 }
@@ -36,7 +36,7 @@ func (h *incidentHandler) ListIncidents(ctx context.Context, req *connect.Reques
 
 	items, nextToken, err := h.repo.List(ctx, req.Msg.GetEnvironmentId(), req.Msg.GetServiceId(), req.Msg.GetDeploymentId(), req.Msg.GetInstanceId(), req.Msg.GetState(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ListIncidentsResponse{
 		Incidents: items,
@@ -54,9 +54,9 @@ func (h *incidentHandler) VerifyIncidentRecovery(ctx context.Context, req *conne
 	incident, err := h.repo.Get(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	if incident.GetState() != registryv1.IncidentState_INCIDENT_STATE_OPEN {
 		return connect.NewResponse(&registryv1.VerifyIncidentRecoveryResponse{
@@ -72,15 +72,15 @@ func (h *incidentHandler) VerifyIncidentRecovery(ctx context.Context, req *conne
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("originating health check is unavailable for verification"))
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	result := h.executor.Execute(ctx, healthsvc.Target{Check: target.Check, Address: target.Address, Port: target.Port, Path: target.Path})
 	if _, err := h.healthRepo.RecordHealthResultForIncident(ctx, target.Check, result, incident.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	updated, err := h.repo.Get(ctx, incident.GetId())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	reason := result.GetErrorMessage()
 	if reason == "" {
@@ -102,9 +102,9 @@ func (h *incidentHandler) ResolveIncidentManually(ctx context.Context, req *conn
 	item, err := h.repo.ResolveManually(ctx, req.Msg.GetId(), req.Msg.GetNote())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ResolveIncidentManuallyResponse{Incident: item}), nil
 }

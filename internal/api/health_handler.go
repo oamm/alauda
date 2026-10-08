@@ -16,7 +16,7 @@ func (h *healthHandler) CreateHealthCheck(ctx context.Context, req *connect.Requ
 	}
 	item, err := h.repo.CreateHealthCheck(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(codeForStorageError(err), err)
+		return nil, safeConnectError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateHealthCheckResponse{HealthCheck: item}), nil
 }
@@ -25,9 +25,9 @@ func (h *healthHandler) GetHealthCheck(ctx context.Context, req *connect.Request
 	item, err := h.repo.GetHealthCheck(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetHealthCheckResponse{HealthCheck: item}), nil
 }
@@ -44,7 +44,7 @@ func (h *healthHandler) ListHealthChecks(ctx context.Context, req *connect.Reque
 
 	items, nextToken, err := h.repo.ListHealthChecks(ctx, req.Msg.GetInstanceId(), req.Msg.GetIncludeDisabled(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&registryv1.ListHealthChecksResponse{
@@ -63,9 +63,9 @@ func (h *healthHandler) UpdateHealthCheck(ctx context.Context, req *connect.Requ
 	item, err := h.repo.UpdateHealthCheck(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.UpdateHealthCheckResponse{HealthCheck: item}), nil
 }
@@ -75,7 +75,7 @@ func (h *healthHandler) DeleteHealthCheck(ctx context.Context, req *connect.Requ
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.DeleteHealthCheck(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteHealthCheckResponse{}), nil
 }
@@ -87,9 +87,9 @@ func (h *healthHandler) RunHealthCheck(ctx context.Context, req *connect.Request
 	target, err := h.repo.GetHealthCheckTarget(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 
 	result := h.executor.Execute(ctx, healthsvc.Target{
@@ -100,7 +100,7 @@ func (h *healthHandler) RunHealthCheck(ctx context.Context, req *connect.Request
 	})
 	state, err := h.repo.RecordHealthResult(ctx, target.Check, result)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.RunHealthCheckResponse{
 		Result: result,
@@ -115,9 +115,9 @@ func (h *healthHandler) GetInstanceHealthState(ctx context.Context, req *connect
 	state, err := h.repo.GetInstanceHealthState(ctx, req.Msg.GetInstanceId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetInstanceHealthStateResponse{State: state}), nil
 }
@@ -134,7 +134,7 @@ func (h *healthHandler) ListHealthResults(ctx context.Context, req *connect.Requ
 
 	items, nextToken, err := h.repo.ListHealthResults(ctx, req.Msg.GetHealthCheckId(), req.Msg.GetInstanceId(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ListHealthResultsResponse{
 		Results: items,
@@ -148,7 +148,7 @@ func (h *healthHandler) ListHealthResults(ctx context.Context, req *connect.Requ
 func (h *healthHandler) GetAvailability(ctx context.Context, req *connect.Request[registryv1.GetAvailabilityRequest]) (*connect.Response[registryv1.GetAvailabilityResponse], error) {
 	response, err := h.availabilityRepo.GetAvailability(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(response), nil
 }

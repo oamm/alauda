@@ -10,9 +10,9 @@ import (
 
 type HealthResultsQuery struct {
 	From, To, Search, ServiceID, EnvironmentID, InstanceID, EndpointID, CheckID, Type, Status string
-	Port, PageSize, Offset                                                            int
-	Oldest                                                                            bool
-	AllowedEnvironmentIDs                                                             []string
+	Port, PageSize, Offset                                                                    int
+	Oldest                                                                                    bool
+	AllowedEnvironmentIDs                                                                     []string
 }
 
 type HealthResultRecord struct {

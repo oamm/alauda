@@ -87,6 +87,11 @@ func (r *ServiceRepository) List(ctx context.Context, environmentID string, page
 	} else {
 		query += ` WHERE s.deleted_at IS NULL`
 	}
+	if len(environmentAccess(ctx)) > 0 {
+		sub, subargs := appendEnvironmentAccess(ctx, "SELECT 1 FROM service_deployments scoped WHERE scoped.service_id=s.id AND scoped.deleted_at IS NULL", "scoped.environment_id", nil)
+		query += " AND EXISTS (" + sub + ")"
+		args = append(args, subargs...)
+	}
 	query += ` ORDER BY s.created_at ASC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
@@ -136,6 +141,12 @@ func (r *ServiceRepository) Update(ctx context.Context, req *registryv1.UpdateSe
 	}
 
 	return r.Get(ctx, req.GetId())
+}
+
+func (r *ServiceRepository) BelongsToEnvironment(ctx context.Context, serviceID, environmentID string) (bool, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM service_deployments WHERE service_id=? AND environment_id=? AND deleted_at IS NULL`, serviceID, environmentID).Scan(&count)
+	return count > 0, err
 }
 
 func (r *ServiceRepository) Delete(ctx context.Context, id string) error {

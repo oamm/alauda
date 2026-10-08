@@ -17,7 +17,7 @@ func (h *instanceHandler) RegisterRuntime(ctx context.Context, req *connect.Requ
 		if errors.Is(err, storage.ErrInvalidRuntimeRegistration) {
 			code = connect.CodeInvalidArgument
 		}
-		return nil, connect.NewError(code, err)
+		return nil, safeConnectError(code, err)
 	}
 	return connect.NewResponse(item), nil
 }
@@ -28,7 +28,7 @@ func (h *instanceHandler) CreateInstance(ctx context.Context, req *connect.Reque
 	}
 	item, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(codeForStorageError(err), err)
+		return nil, safeConnectError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateInstanceResponse{Instance: item}), nil
 }
@@ -37,9 +37,9 @@ func (h *instanceHandler) GetInstance(ctx context.Context, req *connect.Request[
 	item, err := h.repo.Get(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetInstanceResponse{Instance: item}), nil
 }
@@ -56,7 +56,7 @@ func (h *instanceHandler) ListInstances(ctx context.Context, req *connect.Reques
 
 	items, nextToken, err := h.repo.List(ctx, req.Msg.GetDeploymentId(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&registryv1.ListInstancesResponse{
@@ -75,9 +75,9 @@ func (h *instanceHandler) UpdateInstance(ctx context.Context, req *connect.Reque
 	item, err := h.repo.Update(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.UpdateInstanceResponse{Instance: item}), nil
 }
@@ -87,7 +87,7 @@ func (h *instanceHandler) DeleteInstance(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.Delete(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteInstanceResponse{}), nil
 }

@@ -16,9 +16,9 @@ func (h *registryHandler) ResolveService(ctx context.Context, req *connect.Reque
 	serviceID, deploymentID, endpoints, err := h.repo.ResolveService(ctx, req.Msg.GetServiceName(), req.Msg.GetEnvironmentKey(), req.Msg.GetHealthyOnly())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ResolveServiceResponse{
 		ServiceId:    serviceID,
@@ -34,9 +34,9 @@ func (h *registryHandler) ResolveEndpoint(ctx context.Context, req *connect.Requ
 	serviceID, deploymentID, endpoints, err := h.repo.ResolveEndpoint(ctx, req.Msg.GetServiceName(), req.Msg.GetEndpointName(), req.Msg.GetEnvironmentKey(), req.Msg.GetHealthyOnly())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ResolveEndpointResponse{
 		ServiceId:    serviceID,

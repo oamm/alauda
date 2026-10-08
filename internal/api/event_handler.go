@@ -21,7 +21,7 @@ func (h *eventHandler) ListEvents(ctx context.Context, req *connect.Request[regi
 
 	items, nextToken, err := h.repo.List(ctx, eventFiltersFromListRequest(req.Msg), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ListEventsResponse{
 		Events: items,
@@ -46,7 +46,7 @@ func (h *eventHandler) WatchEvents(ctx context.Context, req *connect.Request[reg
 	for {
 		events, err := h.repo.ListSince(ctx, filters, cursor, 50)
 		if err != nil {
-			return connect.NewError(connect.CodeInternal, err)
+			return safeConnectError(connect.CodeInternal, err)
 		}
 		for _, event := range events {
 			if event.GetTimestamp() != nil {

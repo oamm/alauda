@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -69,7 +68,7 @@ func TestRegistryResolveEndpointFiltersByEndpointName(t *testing.T) {
 
 func setupRegistryTestServer(t *testing.T, ctx context.Context) (*storage.Database, *httptest.Server) {
 	t.Helper()
-	db, err := storage.NewDatabase(ctx, filepath.Join(t.TempDir(), "registry-test.db"))
+	db, err := storage.NewDatabase(ctx, fixtureDatabasePath(t))
 	if err != nil {
 		t.Fatalf("new database: %v", err)
 	}

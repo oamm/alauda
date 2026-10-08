@@ -10,11 +10,12 @@ import (
 	"testing"
 
 	"github.com/company/service-registry/internal/storage"
+	"github.com/company/service-registry/internal/testutil"
 )
 
 func TestBootstrapCreatesRootOnceWithRestrictedCredentialFile(t *testing.T) {
 	ctx := context.Background()
-	db, err := storage.NewDatabase(ctx, filepath.Join(t.TempDir(), "registry.db"))
+	db, err := storage.NewDatabase(ctx, testutil.DatabasePath(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestBootstrapCreatesRootOnceWithRestrictedCredentialFile(t *testing.T) {
 
 func TestBootstrapConcurrentStartsCreateOneRoot(t *testing.T) {
 	ctx := context.Background()
-	databasePath := filepath.Join(t.TempDir(), "registry.db")
+	databasePath := testutil.DatabasePath(t)
 	first, err := storage.NewDatabase(ctx, databasePath)
 	if err != nil {
 		t.Fatal(err)

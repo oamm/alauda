@@ -11,6 +11,10 @@ import (
 
 func registerEventSSE(mux *http.ServeMux, eventRepo *storage.EventRepository) {
 	mux.HandleFunc("/api/v1/events/watch", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w)
+			return
+		}
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
@@ -37,7 +41,7 @@ func registerEventSSE(mux *http.ServeMux, eventRepo *storage.EventRepository) {
 		for {
 			events, err := eventRepo.ListSince(r.Context(), filters, cursor, 50)
 			if err != nil {
-				fmt.Fprintf(w, "event: error\ndata: %q\n\n", err.Error())
+				fmt.Fprintf(w, "event: error\ndata: %q\n\n", "Unable to read events")
 				flusher.Flush()
 				return
 			}

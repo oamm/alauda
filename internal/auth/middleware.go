@@ -2,6 +2,9 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"github.com/company/service-registry/internal/problem"
 	"net/http"
 	"strings"
 )
@@ -53,11 +56,15 @@ func MiddlewareWithCookieName(enabled bool, service *Service, cookieName string,
 		}
 		if credentialType == "session" {
 			principal, err = service.AuthenticateSession(r.Context(), secret)
-		} else if err != nil {
+		} else if errors.Is(err, sql.ErrNoRows) {
 			// CLI clients may use the compatibility token returned by login; it is a hashed session secret.
 			principal, err = service.AuthenticateSession(r.Context(), secret)
 		}
 		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) && !errors.Is(err, ErrInvalidCredentials) {
+				problem.Write(w, 503, "temporarily_unavailable", "Authentication is temporarily unavailable.", nil)
+				return
+			}
 			writeAuthError(w, http.StatusUnauthorized, "invalid authentication")
 			return
 		}
@@ -66,7 +73,13 @@ func MiddlewareWithCookieName(enabled bool, service *Service, cookieName string,
 			return
 		}
 		required := RequiredScope(r.Method, r.URL.Path)
-		if !HasScope(principal.Scopes, required) {
+		documentation := false
+		if r.Method == http.MethodGet && (r.URL.Path == "/openapi.json" || r.URL.Path == "/swagger") {
+			for _, capability := range []Scope{ScopeRead, ScopeDiscoveryRead, ScopeRegistryRead, ScopeHealthRead, ScopeIncidentRead, ScopeEventsRead} {
+				documentation = documentation || HasScope(principal.Scopes, capability)
+			}
+		}
+		if !documentation && !HasScope(principal.Scopes, required) {
 			writeAuthError(w, http.StatusForbidden, "insufficient scope")
 			return
 		}
@@ -77,6 +90,37 @@ func MiddlewareWithCookieName(enabled bool, service *Service, cookieName string,
 func RequiredScope(method, path string) Scope {
 	if strings.HasPrefix(path, "/api/v1/auth/users") || strings.HasPrefix(path, "/api/v1/auth/tokens") || strings.HasPrefix(path, "/api/v1/auth/application-keys") || strings.HasPrefix(path, "/api/v1/auth/sessions") {
 		return ScopeAdmin
+	}
+	if strings.HasPrefix(path, "/api/v1/audit-logs") || strings.HasPrefix(path, "/api/v1/alerts/") || strings.Contains(path, "AlertService/") {
+		return ScopeAdmin
+	}
+	if strings.HasPrefix(path, "/api/v1/discovery/") || strings.Contains(path, "RegistryService/Resolve") {
+		return ScopeDiscoveryRead
+	}
+	read := method == http.MethodGet || strings.Contains(path, "/Get") || strings.Contains(path, "/List") || strings.Contains(path, "/Watch")
+	if strings.Contains(path, "HealthService/") || strings.HasPrefix(path, "/api/v1/health/") || strings.Contains(path, "/health-checks") || strings.Contains(path, "/health-results") {
+		if strings.Contains(path, "/Run") || strings.HasSuffix(path, "/run") {
+			return ScopeHealthExecute
+		}
+		if read {
+			return ScopeHealthRead
+		}
+		return ScopeHealthWrite
+	}
+	if strings.Contains(path, "IncidentService/") || strings.HasPrefix(path, "/api/v1/incidents") {
+		if read {
+			return ScopeIncidentRead
+		}
+		return ScopeIncidentResolve
+	}
+	if strings.Contains(path, "EventService/") || strings.HasPrefix(path, "/api/v1/events/") {
+		return ScopeEventsRead
+	}
+	if strings.HasPrefix(path, "/api/v1/services") || strings.HasPrefix(path, "/api/v1/environments") || strings.HasPrefix(path, "/api/v1/catalog/") || strings.Contains(path, "Service/") {
+		if read {
+			return ScopeRegistryRead
+		}
+		return ScopeRegistryWrite
 	}
 	if strings.Contains(path, "/List") || strings.Contains(path, "/Get") || strings.Contains(path, "/Watch") || method == http.MethodGet {
 		return ScopeRead
@@ -96,9 +140,17 @@ func passwordChangeAllowed(path string) bool {
 }
 
 func writeAuthError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write([]byte(`{"error":"` + message + `"}`))
+	if status == http.StatusUnauthorized {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="alauda"`)
+	}
+	code := "authentication_required"
+	if status == http.StatusForbidden {
+		code = "permission_denied"
+	}
+	if message == "password_change_required" {
+		code = message
+	}
+	problem.Write(w, status, code, message, nil)
 }
 
 func bearerToken(header string) string {

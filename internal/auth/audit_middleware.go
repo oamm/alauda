@@ -24,14 +24,19 @@ func AuditMiddleware(logger AuditLogger, next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		required := RequiredScope(r.Method, r.URL.Path)
-		if required == ScopeRead || isPublicPath(r.URL.Path) {
+		if HasScope([]Scope{ScopeRead}, required) || isPublicPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		var body []byte
 		if r.Body != nil {
-			body, _ = io.ReadAll(io.LimitReader(r.Body, 64*1024))
+			var err error
+			body, err = io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "request body exceeds limit", http.StatusRequestEntityTooLarge)
+				return
+			}
 			r.Body.Close()
 			r.Body = io.NopCloser(bytes.NewReader(body))
 		}
@@ -137,12 +142,15 @@ func auditChanges(body []byte) string {
 	}
 	var payload any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return string(body)
+		return "[unparseable request body]"
 	}
 	redactValue(payload)
 	sanitized, err := json.Marshal(payload)
 	if err != nil {
 		return ""
+	}
+	if len(sanitized) > 64*1024 {
+		return string(sanitized[:64*1024]) + " [truncated]"
 	}
 	return string(sanitized)
 }

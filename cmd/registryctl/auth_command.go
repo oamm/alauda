@@ -176,7 +176,9 @@ func newAuthTokenRevokeCommand() *cobra.Command {
 			if err := doJSON(http.MethodDelete, "/api/v1/auth/tokens/"+args[0], nil, nil); err != nil {
 				return err
 			}
-			fmt.Println("revoked")
+			if !cliConfig.Quiet {
+				printAny(map[string]string{"status": "revoked"})
+			}
 			return nil
 		},
 	}

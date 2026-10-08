@@ -1,5 +1,17 @@
 # Protobuf API Contracts
 
+## Surface classification
+
+PUBLIC: the key-addressed Service/Environment/Instance/Endpoint/Health Check facade in [PUBLIC_API.md](PUBLIC_API.md), with validated OpenAPI at /openapi.json.
+
+LEGACY: /api/v1/catalog/*, /api/v1/discovery/services/* and singular ID-addressed CLI commands. OpenAPI marks retained legacy REST operations deprecated. Legacy discovery now excludes disabled, invalid-address and known-unhealthy candidates; healthyOnly requires fresh Healthy state. This is an intentional safety tightening, not a DTO removal.
+
+INTERNAL: Connect/RPC protobuf contracts below and browser-specific /api/v1/health/checks and /api/v1/health/results projections remain used by the frontend and legacy CLI. They are not the stable public integration contract; Deployment IDs remain in compatibility DTOs and browser projections retain their existing pagination. No RPC is removed in this release.
+
+ADMIN: user/token/Application Key/session administration, audit logs, notification channels, alert policies and notification testing. Notification testing is POST-only and requires admin. The previous GET side effect is intentionally removed.
+
+All reachable authenticated surfaces enforce Environment restrictions at the backend boundary. Granular capabilities replace blanket permissions for new credentials; legacy read/write/admin map as documented in PUBLIC_API.md. Scoped credentials cannot access global administration or audit logs. REST errors use Problem Details; Connect preserves its transport error envelope with safe classified messages.
+
 This service exposes ConnectRPC APIs generated from Protobuf plus a small set of operational REST endpoints:
 
 - `POST /api/v1/auth/login`
@@ -16,9 +28,21 @@ This service exposes ConnectRPC APIs generated from Protobuf plus a small set of
 - `POST /api/v1/alerts/test/{channelId}`
 - `GET /api/v1/ping`
 
-Configured servers require authentication for API requests by default. The explicit public API allowlist is `POST /api/v1/auth/login` and `GET /api/v1/ping`; liveness and readiness are exposed separately at `/healthz` and `/readyz`. Browser sessions use the HttpOnly `alauda_session` cookie, while Bearer tokens remain supported for CLI and automation. Missing or invalid authentication returns `401`; an authenticated principal without the required scope returns `403`. Read requests require `read`, mutations require `write`, and user/token/session administration requires `admin`.
+Configured servers require authentication for API requests by default. The explicit public API allowlist is `POST /api/v1/auth/login` and `GET /api/v1/ping`; liveness and readiness are exposed separately at `/healthz` and `/readyz`. Browser sessions use the HttpOnly `alauda_session` cookie, while Bearer tokens remain supported for CLI and automation. Missing or invalid authentication returns `401`; an authenticated principal without the required capability returns `403`. Authentication storage failures return `503`. Operation-specific capabilities and legacy read/write mapping are documented in PUBLIC_API.md; user/token/session administration requires admin. REST error consumers must read Problem Details code/detail/errors rather than the old unstructured error string. Connect keeps its existing transport error envelope.
 
 This document defines all Protocol Buffer service definitions and messages for the Service Registry.
+
+## Stable public REST contract
+
+New integrations should use the human-readable REST facade documented in [PUBLIC_API.md](PUBLIC_API.md):
+
+- `GET /api/v1/services?environment={environmentKey}`
+- `POST /api/v1/services/{serviceKey}/instances`
+- `DELETE /api/v1/services/{serviceKey}/instances/{instanceName}?environment={environmentKey}`
+- `GET /api/v1/discovery/{serviceKey}?environment={environmentKey}`
+- `GET /api/v1/discovery/{serviceKey}/resolve?environment={environmentKey}&endpoint={endpointName}`
+
+The existing Connect services and ID-based catalog/discovery routes remain for backward compatibility and are deprecated for new consumers.
 
 The API is organized into logical services around domain boundaries:
 

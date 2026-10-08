@@ -12,9 +12,9 @@ import (
 
 func newHealthCheckCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "health-check",
-		Aliases: []string{"health"},
-		Short:   "Manage health checks",
+		Use:        "health-check",
+		Deprecated: "use health checks commands with public resource names",
+		Short:      "Manage health checks",
 	}
 	cmd.AddCommand(newHealthCheckCreateCommand())
 	cmd.AddCommand(newHealthCheckListCommand())

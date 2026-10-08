@@ -18,7 +18,7 @@ func (h *endpointHandler) CreateEndpoint(ctx context.Context, req *connect.Reque
 	}
 	item, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(codeForStorageError(err), err)
+		return nil, safeConnectError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateEndpointResponse{Endpoint: item}), nil
 }
@@ -27,9 +27,9 @@ func (h *endpointHandler) GetEndpoint(ctx context.Context, req *connect.Request[
 	item, err := h.repo.Get(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetEndpointResponse{Endpoint: item}), nil
 }
@@ -46,7 +46,7 @@ func (h *endpointHandler) ListEndpoints(ctx context.Context, req *connect.Reques
 
 	items, nextToken, err := h.repo.List(ctx, req.Msg.GetInstanceId(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&registryv1.ListEndpointsResponse{
@@ -65,9 +65,9 @@ func (h *endpointHandler) UpdateEndpoint(ctx context.Context, req *connect.Reque
 	item, err := h.repo.Update(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(codeForStorageError(err), err)
+		return nil, safeConnectError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.UpdateEndpointResponse{Endpoint: item}), nil
 }
@@ -77,7 +77,7 @@ func (h *endpointHandler) DeleteEndpoint(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.Delete(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteEndpointResponse{}), nil
 }

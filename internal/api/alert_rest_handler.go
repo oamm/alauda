@@ -13,7 +13,8 @@ import (
 
 func registerAlertREST(mux *http.ServeMux, repo *storage.AlertRepository, engine *alerts.Engine) {
 	mux.HandleFunc("/api/v1/alerts/test/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost && r.Method != http.MethodGet {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", http.MethodPost)
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}

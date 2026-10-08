@@ -43,3 +43,21 @@ func TestHasScopeAllowsAdminAndExactScope(t *testing.T) {
 		t.Fatalf("read scope should not satisfy write requirement")
 	}
 }
+
+func TestGranularCapabilitiesAndLegacyMapping(t *testing.T) {
+	for _, scope := range []Scope{ScopeDiscoveryRead, ScopeRegistryRead, ScopeHealthRead, ScopeIncidentRead, ScopeEventsRead} {
+		if !HasScope([]Scope{ScopeRead}, scope) {
+			t.Fatal(scope)
+		}
+	}
+	for _, scope := range []Scope{ScopeRegistryWrite, ScopeHealthWrite, ScopeHealthExecute, ScopeIncidentResolve} {
+		if !HasScope([]Scope{ScopeWrite}, scope) || HasScope([]Scope{ScopeRead}, scope) {
+			t.Fatal(scope)
+		}
+	}
+	for _, scope := range []Scope{ScopeRegistryRead, ScopeRegistryWrite, ScopeHealthExecute, ScopeHealthWrite, ScopeAdmin} {
+		if HasScope([]Scope{ScopeDiscoveryRead}, scope) {
+			t.Fatalf("discovery grants %s", scope)
+		}
+	}
+}

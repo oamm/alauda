@@ -85,11 +85,11 @@ func newDeploymentCreateCommand() *cobra.Command {
 
 			client := registryv1connect.NewDeploymentServiceClient(newHTTPClient(), cliConfig.ServerURL)
 			resp, err := client.CreateDeployment(ctx, connect.NewRequest(&registryv1.CreateDeploymentRequest{
-				ServiceId:             serviceID,
-				EnvironmentId:         environmentID,
-				HealthEnabled:         healthEnabled,
-				AlertsEnabled:         alertsEnabled,
-				AlertCooldownMinutes:  alertCooldownMinutes,
+				ServiceId:            serviceID,
+				EnvironmentId:        environmentID,
+				HealthEnabled:        healthEnabled,
+				AlertsEnabled:        alertsEnabled,
+				AlertCooldownMinutes: alertCooldownMinutes,
 			}))
 			if err != nil {
 				return err

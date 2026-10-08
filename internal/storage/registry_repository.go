@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"github.com/company/service-registry/internal/address"
+	"strings"
 
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
 )
@@ -26,14 +28,14 @@ func (r *RegistryRepository) ResolveEndpoint(ctx context.Context, serviceName, e
 func (r *RegistryRepository) resolve(ctx context.Context, serviceName, endpointName, environmentKey string, healthyOnly bool) (string, string, []*registryv1.ResolvedEndpoint, error) {
 	query := `
 		SELECT s.id, d.id, si.id, COALESCE(e.id, ''), si.address, COALESCE(e.port, si.port, 0),
-		       COALESCE(e.path, ''), COALESCE(e.protocol, 0), COALESCE(hs.current_state, 'HEALTH_STATE_UNKNOWN')
+		       COALESCE(e.path, ''), COALESCE(e.protocol, 0), ` + EffectiveHealthSQL + `
 		FROM services s
 		JOIN service_deployments d ON d.service_id = s.id AND d.deleted_at IS NULL
 		JOIN environments env ON env.id = d.environment_id AND env.deleted_at IS NULL
 		JOIN service_instances si ON si.deployment_id = d.id AND si.deleted_at IS NULL AND si.enabled = 1
-		LEFT JOIN endpoints e ON e.instance_id = si.id AND e.deleted_at IS NULL AND e.enabled = 1
+		JOIN endpoints e ON e.instance_id = si.id AND e.deleted_at IS NULL AND e.enabled = 1
 		LEFT JOIN health_states hs ON hs.instance_id = si.id
-		WHERE s.deleted_at IS NULL AND s.name = ? AND env.key = ?
+		WHERE s.deleted_at IS NULL AND s.name = ? AND env.key = ? AND env.enabled=1
 	`
 	args := []any{serviceName, environmentKey}
 	if endpointName != "" {
@@ -41,10 +43,12 @@ func (r *RegistryRepository) resolve(ctx context.Context, serviceName, endpointN
 		args = append(args, endpointName)
 	}
 	if healthyOnly {
-		query += ` AND hs.current_state = ?`
-		args = append(args, registryv1.HealthState_HEALTH_STATE_HEALTHY.String())
+		query += " AND (" + EffectiveHealthSQL + ")='Healthy'"
+	} else {
+		query += " AND (" + EffectiveHealthSQL + ") NOT IN ('Unhealthy','Disabled')"
 	}
-	query += ` ORDER BY si.name ASC, e.name ASC`
+	query, args = appendEnvironmentAccess(ctx, query, "d.environment_id", args)
+	query += " ORDER BY CASE WHEN (" + EffectiveHealthSQL + ")='Healthy' THEN 0 ELSE 1 END,si.name,e.name"
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -73,6 +77,9 @@ func (r *RegistryRepository) resolve(ctx context.Context, serviceName, endpointN
 			serviceID = rowServiceID
 			deploymentID = rowDeploymentID
 		}
+		if _, err := address.Build(strings.ToLower(strings.TrimPrefix(registryv1.Protocol(protocol).String(), "PROTOCOL_")), host, port, path); err != nil {
+			continue
+		}
 		endpoints = append(endpoints, &registryv1.ResolvedEndpoint{
 			InstanceId:  instanceID,
 			EndpointId:  endpointID,
@@ -80,13 +87,13 @@ func (r *RegistryRepository) resolve(ctx context.Context, serviceName, endpointN
 			Port:        port,
 			Path:        path,
 			Protocol:    registryv1.Protocol(protocol),
-			HealthState: parseHealthState(healthStateRaw),
+			HealthState: parseHealthState("HEALTH_STATE_" + strings.ToUpper(healthStateRaw)),
 		})
 	}
 	if err := rows.Err(); err != nil {
 		return "", "", nil, err
 	}
-	if serviceID == "" {
+	if serviceID == "" || len(endpoints) == 0 {
 		return "", "", nil, sql.ErrNoRows
 	}
 	if endpointName != "" && len(endpoints) == 0 {

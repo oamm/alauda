@@ -71,6 +71,7 @@ func (r *EventRepository) List(ctx context.Context, filters EventFilters, pageSi
 	}
 
 	query, args := eventListQuery(filters)
+	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
 	query += ` ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?`
 	args = append(args, pageSize, offset)
 
@@ -104,6 +105,7 @@ func (r *EventRepository) ListSince(ctx context.Context, filters EventFilters, a
 		limit = 50
 	}
 	query, args := eventListQuery(filters)
+	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
 	query += ` AND timestamp > ? ORDER BY timestamp ASC, id ASC LIMIT ?`
 	args = append(args, after.Format(time.RFC3339Nano), limit)
 

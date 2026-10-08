@@ -15,7 +15,7 @@ func (h *deploymentHandler) CreateDeployment(ctx context.Context, req *connect.R
 	}
 	item, err := h.repo.Create(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(codeForStorageError(err), err)
+		return nil, safeConnectError(codeForStorageError(err), err)
 	}
 	return connect.NewResponse(&registryv1.CreateDeploymentResponse{Deployment: item}), nil
 }
@@ -24,9 +24,9 @@ func (h *deploymentHandler) GetDeployment(ctx context.Context, req *connect.Requ
 	item, err := h.repo.Get(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetDeploymentResponse{Deployment: item}), nil
 }
@@ -43,7 +43,7 @@ func (h *deploymentHandler) ListDeployments(ctx context.Context, req *connect.Re
 
 	items, nextToken, err := h.repo.List(ctx, req.Msg.GetServiceId(), req.Msg.GetEnvironmentId(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&registryv1.ListDeploymentsResponse{
@@ -62,9 +62,9 @@ func (h *deploymentHandler) UpdateDeployment(ctx context.Context, req *connect.R
 	item, err := h.repo.Update(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.UpdateDeploymentResponse{Deployment: item}), nil
 }
@@ -74,7 +74,7 @@ func (h *deploymentHandler) DeleteDeployment(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.Delete(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteDeploymentResponse{}), nil
 }

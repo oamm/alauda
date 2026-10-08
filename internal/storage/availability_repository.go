@@ -78,6 +78,7 @@ func (r *AvailabilityRepository) Calculate(ctx context.Context, req *registryv1.
 		query += ` AND instance_id = ?`
 		args = append(args, req.GetInstanceId())
 	}
+	query, args = appendEnvironmentAccess(ctx, query, "environment_id", args)
 	query += ` ORDER BY opened_at ASC`
 
 	rows, err := r.db.Query(ctx, query, args...)

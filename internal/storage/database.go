@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -16,7 +17,8 @@ var migrations embed.FS
 
 // Database wraps the SQL database connection
 type Database struct {
-	db *sql.DB
+	db        *sql.DB
+	runtimeMu sync.Mutex
 }
 
 // NewDatabase creates a new database connection

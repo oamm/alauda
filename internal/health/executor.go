@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
+	"github.com/company/service-registry/internal/address"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -171,11 +171,7 @@ func buildHTTPURL(target Target) (string, error) {
 		path = "/" + path
 	}
 
-	return (&url.URL{
-		Scheme: scheme,
-		Host:   net.JoinHostPort(target.Address, strconv.Itoa(int(target.Port))),
-		Path:   path,
-	}).String(), nil
+	return address.Build(scheme, target.Address, target.Port, path)
 }
 
 func expectedStatus(check *registryv1.HealthCheck, statusCode int) bool {

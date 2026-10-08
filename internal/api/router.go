@@ -37,7 +37,7 @@ func RegisterRoutesWithConfig(mux *http.ServeMux, db *storage.Database, cfg *con
 		cookieName = cfg.Auth.SessionCookieName
 	}
 	secure := func(handler http.Handler) http.Handler {
-		return hardeningMiddleware(rateLimit(auth.MiddlewareWithCookieName(authEnabled, authService, cookieName, auth.AuditMiddleware(auditRepo, handler))))
+		return publicErrors(hardeningMiddleware(rateLimit(auth.MiddlewareWithCookieName(authEnabled, authService, cookieName, environmentAuthorization(db, auth.AuditMiddleware(auditRepo, handler))))))
 	}
 	RegisterConnectHandlersWithMiddleware(mux, db, secure)
 	registerEventSSE(apiMux, storage.NewEventRepository(db))
@@ -48,6 +48,7 @@ func RegisterRoutesWithConfig(mux *http.ServeMux, db *storage.Database, cfg *con
 	registerAuditREST(apiMux, auditRepo)
 	RegisterExternalCatalogREST(apiMux, db)
 	RegisterRESTResources(apiMux, db)
+	RegisterPublicContractREST(apiMux, db)
 
 	apiMux.HandleFunc("/api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

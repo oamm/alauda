@@ -16,7 +16,7 @@ func (h *alertHandler) CreateNotificationChannel(ctx context.Context, req *conne
 	}
 	item, err := h.repo.CreateNotificationChannel(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.CreateNotificationChannelResponse{Channel: item}), nil
 }
@@ -28,9 +28,9 @@ func (h *alertHandler) GetNotificationChannel(ctx context.Context, req *connect.
 	item, err := h.repo.GetNotificationChannel(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetNotificationChannelResponse{Channel: item}), nil
 }
@@ -39,7 +39,7 @@ func (h *alertHandler) ListNotificationChannels(ctx context.Context, req *connec
 	pageSize, pageToken := pagination(req.Msg.GetPagination())
 	items, nextToken, err := h.repo.ListNotificationChannels(ctx, int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ListNotificationChannelsResponse{
 		Channels: items,
@@ -57,9 +57,9 @@ func (h *alertHandler) UpdateNotificationChannel(ctx context.Context, req *conne
 	item, err := h.repo.UpdateNotificationChannel(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.UpdateNotificationChannelResponse{Channel: item}), nil
 }
@@ -69,7 +69,7 @@ func (h *alertHandler) DeleteNotificationChannel(ctx context.Context, req *conne
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.DeleteNotificationChannel(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteNotificationChannelResponse{}), nil
 }
@@ -81,16 +81,16 @@ func (h *alertHandler) TestNotificationChannel(ctx context.Context, req *connect
 	channel, err := h.repo.GetNotificationChannel(ctx, req.Msg.GetChannelId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	engine := h.engine
 	if engine == nil {
 		engine = alerts.NewEngine(h.repo, nil)
 	}
 	if err := engine.TestChannel(ctx, channel); err != nil {
-		return nil, connect.NewError(connect.CodeUnavailable, err)
+		return nil, safeConnectError(connect.CodeUnavailable, err)
 	}
 	return connect.NewResponse(&registryv1.TestNotificationChannelResponse{
 		Success: true,
@@ -104,7 +104,7 @@ func (h *alertHandler) CreateAlertPolicy(ctx context.Context, req *connect.Reque
 	}
 	item, err := h.repo.CreateAlertPolicy(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.CreateAlertPolicyResponse{Policy: item}), nil
 }
@@ -116,9 +116,9 @@ func (h *alertHandler) GetAlertPolicy(ctx context.Context, req *connect.Request[
 	item, err := h.repo.GetAlertPolicy(ctx, req.Msg.GetId())
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.GetAlertPolicyResponse{Policy: item}), nil
 }
@@ -127,7 +127,7 @@ func (h *alertHandler) ListAlertPolicies(ctx context.Context, req *connect.Reque
 	pageSize, pageToken := pagination(req.Msg.GetPagination())
 	items, nextToken, err := h.repo.ListAlertPolicies(ctx, req.Msg.GetDeploymentId(), req.Msg.GetEnvironmentId(), int(pageSize), pageToken)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.ListAlertPoliciesResponse{
 		Policies: items,
@@ -145,9 +145,9 @@ func (h *alertHandler) UpdateAlertPolicy(ctx context.Context, req *connect.Reque
 	item, err := h.repo.UpdateAlertPolicy(ctx, req.Msg)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, connect.NewError(connect.CodeNotFound, err)
+			return nil, safeConnectError(connect.CodeNotFound, err)
 		}
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.UpdateAlertPolicyResponse{Policy: item}), nil
 }
@@ -157,7 +157,7 @@ func (h *alertHandler) DeleteAlertPolicy(ctx context.Context, req *connect.Reque
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("id is required"))
 	}
 	if err := h.repo.DeleteAlertPolicy(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, safeConnectError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&registryv1.DeleteAlertPolicyResponse{}), nil
 }

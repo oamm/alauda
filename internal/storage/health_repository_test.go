@@ -2,11 +2,11 @@ package storage
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
+	"github.com/company/service-registry/internal/testutil"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -167,6 +167,12 @@ func TestListDueHealthCheckTargets(t *testing.T) {
 
 	repo := NewHealthRepository(db)
 	check := createTestHealthCheck(t, ctx, db)
+	if targets, err := repo.ListDueHealthCheckTargets(ctx, 10); err != nil || len(targets) != 0 {
+		t.Fatalf("monitoring disabled scheduled targets: %d %v", len(targets), err)
+	}
+	if _, err := db.Exec(ctx, "UPDATE service_deployments SET health_enabled=1"); err != nil {
+		t.Fatal(err)
+	}
 
 	targets, err := repo.ListDueHealthCheckTargets(ctx, 10)
 	if err != nil {
@@ -388,7 +394,7 @@ func TestRecordHealthResultForIncidentVerifiesOnlyTheRequestedIncident(t *testin
 func newTestDatabase(t *testing.T) *Database {
 	t.Helper()
 
-	db, err := NewDatabase(context.Background(), filepath.Join(t.TempDir(), "registry-test.db"))
+	db, err := NewDatabase(context.Background(), testutil.DatabasePath(t))
 	if err != nil {
 		t.Fatalf("new database: %v", err)
 	}
