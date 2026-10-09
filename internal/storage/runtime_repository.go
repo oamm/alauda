@@ -154,7 +154,7 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 		if old == nil {
 			old = &registryv1.Endpoint{Name: ep.Name, Enabled: true}
 		}
-		item := &registryv1.RuntimeEndpointRegistration{Name: ep.Name, Protocol: old.Protocol, Port: old.Port, Path: old.Path, Enabled: old.Enabled, Primary: old.Primary, Tags: old.Tags, Metadata: old.Metadata}
+		item := &registryv1.RuntimeEndpointRegistration{Name: ep.Name, Protocol: old.Protocol, Port: old.Port, Path: address.PublicPath(old.Protocol.String(), old.Path), Enabled: old.Enabled, Primary: old.Primary, Tags: old.Tags, Metadata: old.Metadata}
 		if ep.Protocol != nil {
 			value, ok := registryv1.Protocol_value["PROTOCOL_"+strings.ToUpper(*ep.Protocol)]
 			if !ok {
@@ -167,6 +167,8 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 		}
 		if ep.Path != nil {
 			item.Path = *ep.Path
+		} else {
+			item.Path = address.PublicPath(item.Protocol.String(), item.Path)
 		}
 		if ep.Enabled != nil {
 			item.Enabled = *ep.Enabled
@@ -207,6 +209,9 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 	}
 	for i, ep := range merged.Endpoints {
 		prefix := fmt.Sprintf("endpoints[%d]", i)
+		if err := address.ValidateEndpointPath(ep.Protocol.String(), ep.Path); err != nil {
+			fields[prefix+".path"] = []string{err.Error()}
+		}
 		if ep.Protocol == registryv1.Protocol_PROTOCOL_UNSPECIFIED {
 			fields[prefix+".protocol"] = []string{"Protocol is required for a new Endpoint."}
 		}
@@ -326,6 +331,9 @@ func validateRuntimeRegistration(req *registryv1.RegisterRuntimeRequest) error {
 
 	primaryCount := 0
 	for _, endpoint := range req.GetEndpoints() {
+		if err := address.ValidateEndpoint(endpoint.GetProtocol().String(), endpoint.GetPort(), endpoint.GetPath()); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidRuntimeRegistration, err)
+		}
 		if strings.TrimSpace(endpoint.GetName()) == "" {
 			return fmt.Errorf("%w: endpoint name is required", ErrInvalidRuntimeRegistration)
 		}

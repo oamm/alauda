@@ -8,6 +8,23 @@ export const endpointProtocols = [
   ["PROTOCOL_UDP", "UDP"],
 ] as const;
 
+export const endpointCapabilities: Record<string, { supportsPath: boolean }> =
+  Object.fromEntries(
+    endpointProtocols.map(([protocol]) => [
+      protocol,
+      {
+        supportsPath:
+          protocol === "PROTOCOL_HTTP" || protocol === "PROTOCOL_HTTPS",
+      },
+    ]),
+  );
+export function supportsEndpointPath(protocol: string) {
+  return endpointCapabilities[protocol]?.supportsPath === true;
+}
+export function endpointPath(protocol: string, path = "") {
+  return supportsEndpointPath(protocol) ? path : "";
+}
+
 export const endpointSchema = object({
   name: string().trim().min(1, "Endpoint name is required."),
   protocol: string().refine(
@@ -21,6 +38,22 @@ export const endpointSchema = object({
   path: string(),
   primary: boolean(),
   enabled: boolean(),
+}).superRefine((value, context) => {
+  if (!supportsEndpointPath(value.protocol) && value.path)
+    context.addIssue({
+      code: "custom",
+      path: ["path"],
+      message: "Path is only supported for HTTP and HTTPS endpoints.",
+    });
+  else if (
+    /[?#\\\x00-\x1f\x7f]/.test(value.path) ||
+    value.path.startsWith("//")
+  )
+    context.addIssue({
+      code: "custom",
+      path: ["path"],
+      message: "Use a path without query, fragment or authority.",
+    });
 });
 export type EndpointFormValue = Infer<typeof endpointSchema>;
 export type EndpointErrors = Partial<Record<keyof EndpointFormValue, string>>;
@@ -48,7 +81,7 @@ export function newEndpoint(
   let name = "default";
   for (let suffix = 2; existingNames.includes(name); suffix++)
     name = `default-${suffix}`;
-  return {
+  const value = {
     name,
     protocol: "PROTOCOL_HTTP",
     port: 8080,
@@ -57,6 +90,7 @@ export function newEndpoint(
     enabled: true,
     ...overrides,
   };
+  return { ...value, path: endpointPath(value.protocol, value.path) };
 }
 
 export function validateEndpointCollection(values: EndpointFormValue[]) {

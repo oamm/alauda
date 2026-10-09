@@ -2,6 +2,8 @@ import { Trash2 } from "lucide-react";
 import { FormField, IconButton, Input, Select, Switch } from "./ui";
 import {
   endpointProtocols,
+  supportsEndpointPath,
+  endpointPath,
   validateEndpoint,
   type EndpointFormValue,
   type EndpointErrors,
@@ -54,7 +56,12 @@ export function EndpointEditor({
           disabled={disabled}
           aria-label={label("Protocol")}
           value={value.protocol}
-          onChange={(event) => change({ protocol: event.target.value })}
+          onChange={(event) =>
+            change({
+              protocol: event.target.value,
+              path: endpointPath(event.target.value, value.path),
+            })
+          }
         >
           {endpointProtocols.map(([protocol, text]) => (
             <option key={protocol} value={protocol}>
@@ -63,7 +70,13 @@ export function EndpointEditor({
           ))}
         </Select>
       </FormField>
-      <FormField label="Port" error={validation.port}>
+      <FormField
+        label="Port"
+        error={validation.port}
+        className={
+          supportsEndpointPath(value.protocol) ? undefined : "sm:col-span-2"
+        }
+      >
         <Input
           required
           disabled={disabled}
@@ -76,14 +89,16 @@ export function EndpointEditor({
           onChange={(event) => change({ port: Number(event.target.value) })}
         />
       </FormField>
-      <FormField label="Path" error={validation.path}>
-        <Input
-          disabled={disabled}
-          aria-label={label("Path")}
-          value={value.path}
-          onChange={(event) => change({ path: event.target.value })}
-        />
-      </FormField>
+      {supportsEndpointPath(value.protocol) ? (
+        <FormField label="Path" error={validation.path}>
+          <Input
+            disabled={disabled}
+            aria-label={label("Path")}
+            value={value.path}
+            onChange={(event) => change({ path: event.target.value })}
+          />
+        </FormField>
+      ) : null}
       <FormField
         label="Primary"
         error={validation.primary}

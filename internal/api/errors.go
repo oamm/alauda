@@ -9,6 +9,9 @@ import (
 )
 
 func codeForStorageError(err error) connect.Code {
+	if errors.Is(err, storage.ErrInvalidEndpoint) {
+		return connect.CodeInvalidArgument
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return connect.CodeNotFound
 	}

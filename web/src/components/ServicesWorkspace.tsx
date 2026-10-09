@@ -4,6 +4,7 @@ import { HealthCheckForm } from "./HealthCheckForm";
 import { EndpointEditor } from "./EndpointEditor";
 import {
   validateEndpointCollection,
+  endpointPath,
   type EndpointFormValue,
 } from "../lib/endpoint-form";
 import { Copy, MoreHorizontal, Plus, Trash2, Pencil } from "lucide-react";
@@ -31,6 +32,8 @@ import {
   Button,
   Card,
   Checkbox,
+  CatalogRow,
+  ResourceList,
   Dialog,
   DialogBody,
   DialogContent,
@@ -221,9 +224,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
   const selectedEvents = props.events.filter(
     (event) => event.serviceId === props.selectedServiceId,
   );
-  const status = selectedService
-    ? serviceStatus(selectedService)
-    : "unknown";
+  const status = selectedService ? serviceStatus(selectedService) : "unknown";
 
   return (
     <section className="services-workspace-new">
@@ -346,7 +347,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
               description="No catalog services match the current search, health, and tag filters."
             />
           ) : (
-            <div className="service-resource-list">
+            <ResourceList label="Services catalog">
               {props.visibleServices.map((service) => (
                 <ServiceListItem
                   key={service.id}
@@ -371,7 +372,7 @@ export function ServicesWorkspace(props: ServicesWorkspaceProps) {
                   onToggle={() => props.toggleBulkService(service.id)}
                 />
               ))}
-            </div>
+            </ResourceList>
           )}
           <Pagination
             page={props.servicePage}
@@ -548,31 +549,20 @@ function ServiceListItem({
   onToggle: () => void;
 }) {
   return (
-    <div
-      className={
-        selected ? "service-resource-item selected" : "service-resource-item"
+    <CatalogRow
+      name={service.displayName || service.name}
+      selected={selected}
+      onSelect={onSelect}
+      metadata={pluralize(instanceCount, "instance")}
+      status={<StatusBadge status={status} />}
+      selection={
+        <Checkbox
+          aria-label={`Select ${service.displayName || service.name} for bulk actions`}
+          checked={selectedBulk}
+          onCheckedChange={onToggle}
+        />
       }
-    >
-      <Checkbox
-        aria-label={`Select ${service.displayName || service.name}`}
-        checked={selectedBulk}
-        onCheckedChange={onToggle}
-      />
-      <button
-        className="service-resource-button"
-        aria-pressed={selected}
-        onClick={onSelect}
-        type="button"
-      >
-        <span className="service-resource-title">
-          <strong>{service.displayName || service.name}</strong>
-          <StatusBadge status={status} />
-        </span>
-        <span className="service-resource-meta">
-          {service.name} · {pluralize(instanceCount, "instance")}
-        </span>
-      </button>
-    </div>
+    />
   );
 }
 
@@ -1007,7 +997,12 @@ function InstanceDetails(
                                 {formatProtocol(endpoint.protocol)}
                               </TableCell>
                               <TableCell>:{endpoint.port}</TableCell>
-                              <TableCell>{endpoint.path || "-"}</TableCell>
+                              <TableCell>
+                                {endpointPath(
+                                  endpoint.protocol,
+                                  endpoint.path,
+                                ) || "-"}
+                              </TableCell>
                               <TableCell>
                                 {endpoint.primary ? "Primary" : "-"}
                               </TableCell>
@@ -1031,7 +1026,10 @@ function InstanceDetails(
                                         name: endpoint.name,
                                         protocol: endpoint.protocol,
                                         port: endpoint.port,
-                                        path: endpoint.path,
+                                        path: endpointPath(
+                                          endpoint.protocol,
+                                          endpoint.path,
+                                        ),
                                         primary: endpoint.primary,
                                         enabled: endpoint.enabled,
                                       });

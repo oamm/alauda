@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import {
   newEndpoint,
+  endpointPath,
   validateEndpoint,
   validateEndpointCollection,
   type EndpointFormValue,
@@ -333,7 +334,7 @@ function AuthenticatedApp({
       ),
     [selectedServiceInstances],
   );
-  const servicePageSize = 10;
+  const servicePageSize = 25;
   const filteredServices = useMemo(() => {
     const query = serviceSearch.trim().toLowerCase();
     const tagQuery = serviceTagFilter.trim().toLowerCase();
@@ -830,7 +831,7 @@ function AuthenticatedApp({
       name: endpoint.name,
       protocol: endpoint.protocol,
       port: endpoint.port,
-      path: endpoint.path ?? "",
+      path: endpointPath(endpoint.protocol, endpoint.path),
       enabled: endpoint.enabled,
       primary: endpoint.primary,
     });

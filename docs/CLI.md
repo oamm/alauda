@@ -22,6 +22,15 @@ alauda services resolve Authentication.Grpc --environment stg --output value
 
 The shorthand uses the bare address as Instance name, Endpoint name `default`, protocol `http`, path `/`. IPv6 and addresses that cannot form a resource key require explicit `--instance`. Repeating registration is an atomic UPSERT; IDs stay stable. Omitted mutable fields and endpoints are preserved. Only a new singleton with Primary omitted defaults to Primary. Promotion is explicit with `--primary-endpoint`; file `primary: false` is respected. See [PUBLIC_API.md](PUBLIC_API.md) for canonical reconciliation and lifecycle semantics.
 
+Path applies only to HTTP/HTTPS. TCP, UDP and gRPC registration omit it automatically; explicitly supplying a nonempty incompatible path fails before submission. The same rule applies to repeated endpoints and registration files when protocol is specified; partial file updates resolve omitted protocols on the server.
+
+```sh
+alauda services register --name PostgreSQL --environment development --address 192.168.0.109 --protocol tcp --port 5432
+alauda services register --name Web --environment development --address web.internal --protocol http --port 8080 --path /api
+```
+
+The existing discovery URI schemes remain intentional: `tcp://host:5432`, `udp://host:port`, and cleartext logical `grpc://host:81`, without trailing paths. No `grpcs`/TLS or generic gRPC method path is implied. Internal numeric endpoint commands use HTTP=1, HTTPS=2, GRPC=3, TCP=4, UDP=5.
+
 ```bash
 alauda services register --name Authentication.Grpc --environment stg --instance auth-01 --address lynx-authentication.lynx --endpoint default,http,81,/ --endpoint metrics,http,9090,/metrics
 alauda services register --file service.yaml

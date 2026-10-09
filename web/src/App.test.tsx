@@ -23,6 +23,48 @@ class MockEventSource {
 }
 
 describe("App", () => {
+  it("pages a larger catalog at 25 rows with a single identity, filters and preserved bulk selection", async () => {
+    const services = Array.from({length:26},(_,index)=>({id:`svc-${index+1}`,name:`ExternalServices.Betterstack.Ingestion-${index}`,displayName:`ExternalServices.Betterstack.Ingestion-${index}`,tags:{team:index===0?"payments":"other"}}));
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async(input,init)=>input.toString().includes("/api/v1/services?") ? new Response(JSON.stringify({services}),{status:200}) : original(input,init));
+    window.history.replaceState({},"","/services");render(<App/>);
+    const catalog = await screen.findByRole("list",{name:"Services catalog"});
+    await waitFor(()=>expect(within(catalog).getAllByRole("listitem")).toHaveLength(25));
+    expect(within(catalog).getAllByText(services[0].name)).toHaveLength(1);
+    expect(within(catalog).getByTitle(services[0].name)).toBeInTheDocument();
+    expect(within(catalog).getAllByRole("checkbox")).toHaveLength(25);
+    expect(within(catalog).getByText("1 instance")).toBeInTheDocument();
+    fireEvent.click(within(catalog).getAllByRole("checkbox")[0]);
+    expect(screen.getByRole("button",{name:"Copy IDs"})).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("navigation",{name:"Pagination"})).getByRole("button",{name:"Next"}));
+    expect(within(catalog).getAllByRole("listitem")).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText("Search services"),{target:{value:"Ingestion-0"}});
+    expect(within(catalog).getByTitle(services[0].name)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox",{name:"Filter by tag"}),{target:{value:"other"}});
+    expect(screen.getByText("No matching services")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Clear filters"}));
+    fireEvent.change(screen.getByLabelText("Health"),{target:{value:"healthy"}});
+    expect(screen.getByText("No matching services")).toBeInTheDocument();
+  });
+  it("uses protocol-aware fields in registration, standalone creation and endpoint editing", async () => {
+    window.history.replaceState({},"","/services/svc-1/instances");render(<App/>);
+    await screen.findByRole("button",{name:"Add instance"});
+    fireEvent.click(screen.getByRole("button",{name:"Add instance"}));
+    let dialog = screen.getByRole("dialog",{name:"Add instance"});
+    fireEvent.change(within(dialog).getByRole("combobox",{name:/protocol/i}),{target:{value:"PROTOCOL_TCP"}});
+    expect(within(dialog).queryByRole("textbox",{name:/path/i})).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button",{name:"Cancel"}));
+    fireEvent.click(screen.getByRole("button",{name:"View details for checkout-a"}));
+    fireEvent.click(screen.getByRole("button",{name:"Add endpoint"}));
+    dialog = screen.getByRole("dialog",{name:"Add endpoint"});
+    fireEvent.change(within(dialog).getByLabelText("Protocol"),{target:{value:"PROTOCOL_GRPC"}});
+    expect(within(dialog).queryByLabelText("Path")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button",{name:"Cancel"}));
+    fireEvent.click(screen.getByRole("button",{name:"Edit endpoint healthz"}));
+    dialog = screen.getByRole("dialog",{name:"Edit endpoint"});
+    fireEvent.change(within(dialog).getByLabelText("Protocol"),{target:{value:"PROTOCOL_UDP"}});
+    expect(within(dialog).queryByLabelText("Path")).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
@@ -1112,7 +1154,7 @@ describe("App", () => {
     });
     window.history.replaceState({}, "", "/services/svc-1/health");
     render(<App />);
-    await waitFor(() => expect(document.querySelector(".service-resource-button")).toHaveTextContent("Unhealthy"));
+    await waitFor(() => expect(screen.getByRole("list", { name: "Services catalog" })).toHaveTextContent("Unhealthy"));
     expect(document.querySelector(".service-detail-header-new")).toHaveTextContent("Unhealthy");
     expect(screen.queryByText("All monitored services operational")).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Current health" })).toHaveTextContent(

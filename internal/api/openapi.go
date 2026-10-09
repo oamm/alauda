@@ -118,6 +118,7 @@ func buildPublicOpenAPI() schemaMap {
 	ep["port"] = schemaMap{"type": "integer", "minimum": 1, "maximum": 65535, "nullable": true}
 	ep["protocol"] = schemaMap{"type": "string", "enum": []string{"http", "https", "tcp", "udp", "grpc"}, "nullable": true}
 	ep["name"] = key
+	ep["path"] = schemaMap{"type": "string", "nullable": true, "description": "Optional HTTP/HTTPS path without query, fragment or authority. TCP/UDP/gRPC require empty or omitted path; incompatible values are validation errors."}
 	ip := rp["instance"].(schemaMap)["properties"].(schemaMap)
 	ip["name"] = key
 	ip["address"] = schemaMap{"type": "string", "description": "Bare DNS hostname, IPv4 or IPv6; scheme and embedded port are rejected.", "nullable": true}

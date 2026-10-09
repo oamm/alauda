@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/company/service-registry/internal/address"
 	"github.com/company/service-registry/internal/contract"
 	"io"
 	"net/http"
@@ -115,7 +116,7 @@ func newPublicRegisterCommand() *cobra.Command {
 					if err != nil {
 						return err
 					}
-					epPath := "/"
+					epPath := address.PublicPath(parts[1], "/")
 					if len(parts) == 4 {
 						epPath = parts[3]
 					}
@@ -123,7 +124,7 @@ func newPublicRegisterCommand() *cobra.Command {
 				}
 			}
 			if len(input.Endpoints) == 0 && cmd.Flags().Changed("port") {
-				input.Endpoints = []contract.EndpointPatch{{Name: "default", Protocol: contract.Pointer(protocol), Path: contract.Pointer(path)}}
+				input.Endpoints = []contract.EndpointPatch{{Name: "default", Protocol: contract.Pointer(protocol), Path: contract.Pointer(address.PublicPath(protocol, path))}}
 			}
 			if len(input.Endpoints) > 1 && (cmd.Flags().Changed("port") || cmd.Flags().Changed("protocol") || cmd.Flags().Changed("path") || cmd.Flags().Changed("endpoint-enabled")) {
 				return fmt.Errorf("endpoint override flags require exactly one endpoint")
@@ -141,7 +142,11 @@ func newPublicRegisterCommand() *cobra.Command {
 					ep.Protocol = contract.Pointer(protocol)
 				}
 				if cmd.Flags().Changed("path") || ep.Path == nil && cmd.Flags().Changed("port") && (file == "" || len(endpoints) > 0) {
-					ep.Path = contract.Pointer(path)
+					value := path
+					if !cmd.Flags().Changed("path") && ep.Protocol != nil {
+						value = address.PublicPath(*ep.Protocol, value)
+					}
+					ep.Path = contract.Pointer(value)
 				}
 				if cmd.Flags().Changed("endpoint-enabled") {
 					ep.Enabled = contract.Pointer(endpointEnabled)
@@ -160,6 +165,15 @@ func newPublicRegisterCommand() *cobra.Command {
 				}
 			}
 			for _, ep := range input.Endpoints {
+				if ep.Protocol != nil {
+					endpointPath := ""
+					if ep.Path != nil {
+						endpointPath = *ep.Path
+					}
+					if err := address.ValidateEndpointPath(*ep.Protocol, endpointPath); err != nil {
+						return fmt.Errorf("endpoint %q: %w", ep.Name, err)
+					}
+				}
 				if ep.Port != nil {
 					if _, err := parsePublicPort(strconv.FormatInt(int64(*ep.Port), 10)); err != nil {
 						return err
@@ -195,7 +209,7 @@ func newPublicRegisterCommand() *cobra.Command {
 	c.Flags().StringArrayVar(&endpoints, "endpoints", nil, "Legacy alias for --endpoint")
 	_ = c.Flags().MarkDeprecated("endpoints", "use repeated --endpoint")
 	c.Flags().StringVar(&protocol, "protocol", "http", "Shorthand endpoint protocol")
-	c.Flags().StringVar(&path, "path", "/", "Shorthand endpoint path")
+	c.Flags().StringVar(&path, "path", "/", "HTTP/HTTPS endpoint path; omitted for TCP/UDP/gRPC")
 	c.Flags().Int64Var(&port, "port", 0, "Endpoint port 1..65535")
 	c.Flags().StringVar(&description, "description", "", "Instance description; empty explicitly clears")
 	c.Flags().StringVar(&file, "file", "", "Strict YAML or JSON registration file")

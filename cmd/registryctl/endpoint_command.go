@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/company/service-registry/internal/address"
 
 	"connectrpc.com/connect"
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
@@ -76,6 +77,9 @@ func newEndpointCreateCommand() *cobra.Command {
 			if instanceID == "" || name == "" {
 				return fmt.Errorf("--instance-id and --name are required")
 			}
+			if err := address.ValidateEndpoint(registryv1.Protocol(protocol).String(), port, path); err != nil {
+				return err
+			}
 			ctx, cancel := newContext()
 			defer cancel()
 
@@ -97,7 +101,7 @@ func newEndpointCreateCommand() *cobra.Command {
 	}
 	c.Flags().StringVar(&instanceID, "instance-id", "", "Instance ID")
 	c.Flags().StringVar(&name, "name", "", "Endpoint name")
-	c.Flags().Int32Var(&protocol, "protocol", 0, "Protocol (0=UNSPECIFIED, 1=HTTP, 2=HTTPS, 3=TCP, 4=GRPC)")
+	c.Flags().Int32Var(&protocol, "protocol", 0, "Protocol (1=HTTP, 2=HTTPS, 3=GRPC, 4=TCP, 5=UDP)")
 	c.Flags().Int32Var(&port, "port", 0, "Port number")
 	c.Flags().StringVar(&path, "path", "", "Path (for HTTP/HTTPS)")
 	c.Flags().BoolVar(&enabled, "enabled", true, "Enable endpoint")
@@ -115,6 +119,11 @@ func newEndpointUpdateCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
+			}
+			if protocol != 0 {
+				if err := address.ValidateEndpointPath(registryv1.Protocol(protocol).String(), path); err != nil {
+					return err
+				}
 			}
 			ctx, cancel := newContext()
 			defer cancel()
@@ -136,7 +145,7 @@ func newEndpointUpdateCommand() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&name, "name", "", "Endpoint name")
-	c.Flags().Int32Var(&protocol, "protocol", 0, "Protocol (0=UNSPECIFIED, 1=HTTP, 2=HTTPS, 3=TCP, 4=GRPC)")
+	c.Flags().Int32Var(&protocol, "protocol", 0, "Protocol (0=unchanged, 1=HTTP, 2=HTTPS, 3=GRPC, 4=TCP, 5=UDP)")
 	c.Flags().Int32Var(&port, "port", 0, "Port number")
 	c.Flags().StringVar(&path, "path", "", "Path (for HTTP/HTTPS)")
 	c.Flags().BoolVar(&enabled, "enabled", true, "Enable endpoint")

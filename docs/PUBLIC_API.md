@@ -34,6 +34,10 @@ Deregistration soft-deletes only the Instance, preserving endpoints, checks and 
 
 ## Discovery
 
+Endpoint protocols are `http`, `https`, `tcp`, `udp`, and `grpc`. Only HTTP/HTTPS support an optional path, without query, fragment, authority or control characters. TCP/UDP/gRPC require an empty or omitted path; incompatible supplied paths return `validation_failed` with a field error. Protocol changes clear incompatible retained paths when Path is omitted. Health Check path overrides are separate configuration, not generic gRPC service/method paths.
+
+Discovery and endpoint-management responses omit Path for non-path protocols, including legacy stored values, without rewriting those records. Existing representations remain `http://host:port/path`, `https://host:port/path`, `tcp://host:port`, `udp://host:port`, and logical cleartext `grpc://host:port`. Ports must be 1..65535; no `:0` or irrelevant trailing slash is generated. No new gRPC TLS scheme is introduced.
+
 `GET /api/v1/discovery/{serviceKey}?environment=stg` returns all enabled instances and endpoints. Known unhealthy and disabled health states are excluded by default; unknown health is usable until a check reports otherwise. Add `health=all` to inspect all enabled candidates.
 
 `GET /api/v1/discovery/{serviceKey}/resolve?environment=stg&endpoint=grpc` returns one address. A named endpoint is selected when supplied; otherwise the enabled primary endpoint is selected, falling back to the first enabled endpoint in deterministic name order. Healthy Instances rank before other eligible states; ties use Instance name order. This is deterministic selection, not load balancing. See [SERVICE_DISCOVERY.md](SERVICE_DISCOVERY.md) for the canonical health policy and freshness rules.

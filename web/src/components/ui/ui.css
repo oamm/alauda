@@ -43,7 +43,8 @@
 .alauda-checkbox:focus-visible,
 .alauda-switch:focus-visible,
 .alauda-radio:focus-visible,
-.alauda-button:focus-visible {
+.alauda-button:focus-visible,
+.alauda-catalog-link:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   box-shadow: none;
@@ -706,3 +707,17 @@ textarea.alauda-control:read-only {
     grid-template-columns: 1fr;
   }
 }
+.alauda-catalog-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+}
+.alauda-catalog-row:last-child { border-bottom: 0; }
+.alauda-catalog-row.is-selected { background: var(--surface-muted); box-shadow: inset 2px 0 var(--accent); }
+.alauda-catalog-link { display: grid; gap: 0; min-width: 0; flex: 1; padding: 0; border: 0; background: transparent; text-align: left; }
+.alauda-catalog-identity { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.alauda-catalog-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
+.alauda-catalog-meta { color: var(--text-muted); font-size: 12px; line-height: 16px; }

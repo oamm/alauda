@@ -10,6 +10,7 @@ import (
 	"time"
 
 	registryv1 "github.com/company/service-registry/gen/go/api/registry/v1"
+	"github.com/company/service-registry/internal/address"
 	"github.com/google/uuid"
 )
 
@@ -17,11 +18,16 @@ type EndpointRepository struct {
 	db *Database
 }
 
+var ErrInvalidEndpoint = errors.New("invalid endpoint fields")
+
 func NewEndpointRepository(db *Database) *EndpointRepository {
 	return &EndpointRepository{db: db}
 }
 
 func (r *EndpointRepository) Create(ctx context.Context, req *registryv1.CreateEndpointRequest) (*registryv1.Endpoint, error) {
+	if err := address.ValidateEndpoint(req.GetProtocol().String(), req.GetPort(), req.GetPath()); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidEndpoint, err)
+	}
 	id := uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	tagsJSON, err := json.Marshal(req.GetTags())
@@ -184,6 +190,28 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 	defer tx.Rollback()
 
 	var instanceID string
+	current, err := scanEndpoint(tx.QueryRowContext(ctx, `SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE id=? AND deleted_at IS NULL`, req.GetId()))
+	if err != nil {
+		return nil, err
+	}
+	protocol, endpointPort, endpointPath := current.Protocol, current.Port, address.PublicPath(current.Protocol.String(), current.Path)
+	if req.GetProtocol() != 0 {
+		protocol = req.GetProtocol()
+	}
+	if req.GetPort() != 0 {
+		endpointPort = req.GetPort()
+	}
+	if req.GetPath() != "" {
+		endpointPath = req.GetPath()
+	}
+	capabilities, capabilityError := address.Capabilities(protocol.String())
+	if capabilityError == nil && !capabilities.SupportsPath && req.GetPath() == "" {
+		endpointPath = ""
+	}
+	if err := address.ValidateEndpoint(protocol.String(), endpointPort, endpointPath); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidEndpoint, err)
+	}
+	path = &endpointPath
 	var primary *bool
 	if req.Primary != nil {
 		primary = req.Primary

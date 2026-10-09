@@ -11,3 +11,4 @@ export * from "./navigation";
 export * from "./sonner";
 export * from "./table";
 export * from "./tabs";
+export * from "./catalog-row";

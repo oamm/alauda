@@ -74,6 +74,10 @@ func Build(protocol, host string, port int32, path string) (string, error) {
 	if port < 1 || port > 65535 {
 		return "", fmt.Errorf("port must be between 1 and 65535")
 	}
+	path = PublicPath(protocol, path)
+	if _, err := Capabilities(protocol); err != nil {
+		return "", err
+	}
 	if err := ValidatePath(path); err != nil {
 		return "", err
 	}

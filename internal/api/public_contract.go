@@ -245,6 +245,11 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 			if err := address.ValidatePath(*ep.Path); err != nil {
 				fields[key+".path"] = []string{err.Error()}
 			}
+			if ep.Protocol != nil {
+				if err := address.ValidateEndpointPath(*ep.Protocol, *ep.Path); err != nil {
+					fields[key+".path"] = []string{err.Error()}
+				}
+			}
 		}
 		if ep.Primary != nil && *ep.Primary {
 			primaries++
@@ -295,7 +300,7 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 	}
 	response.Instance.Healthy = response.Instance.HealthState == "Healthy"
 	for _, item := range result.Endpoints {
-		response.Endpoints = append(response.Endpoints, publicEndpoint{ID: item.Id, Name: item.Name, Protocol: strings.ToLower(strings.TrimPrefix(item.Protocol.String(), "PROTOCOL_")), Port: item.Port, Path: item.Path, Primary: item.Primary, Enabled: item.Enabled, Address: endpointAddress(item.Protocol, item.Path, result.Instance.Address, item.Port), Tags: item.Tags, Metadata: item.Metadata})
+		response.Endpoints = append(response.Endpoints, publicEndpoint{ID: item.Id, Name: item.Name, Protocol: strings.ToLower(strings.TrimPrefix(item.Protocol.String(), "PROTOCOL_")), Port: item.Port, Path: address.PublicPath(item.Protocol.String(), item.Path), Primary: item.Primary, Enabled: item.Enabled, Address: endpointAddress(item.Protocol, item.Path, result.Instance.Address, item.Port), Tags: item.Tags, Metadata: item.Metadata})
 	}
 	writeJSON(w, 200, response)
 }
@@ -478,7 +483,7 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 			indices[id] = idx
 			response.Instances = append(response.Instances, publicInstance{ID: id, Name: name, Address: host, Description: description, Enabled: true, Healthy: state == "Healthy", HealthState: state, Endpoints: []publicEndpoint{}})
 		}
-		response.Instances[idx].Endpoints = append(response.Instances[idx].Endpoints, publicEndpoint{ID: eid, Name: ename, Protocol: p, Port: port, Path: path, Primary: primary, Enabled: true, Address: fullAddress})
+		response.Instances[idx].Endpoints = append(response.Instances[idx].Endpoints, publicEndpoint{ID: eid, Name: ename, Protocol: p, Port: port, Path: address.PublicPath(p, path), Primary: primary, Enabled: true, Address: fullAddress})
 	}
 	if err := rows.Err(); err != nil {
 		publicStorageError(w, err)

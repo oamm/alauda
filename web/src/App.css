@@ -3014,20 +3014,13 @@ button.button-sm,
 .service-filters-new { display: grid; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); }
 .form-stack-new { display: grid; gap: var(--form-gap); }
 .service-filter-pair, .form-grid-new { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.service-resource-list { display: grid; }
-.service-resource-item { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 12px; }
-.service-resource-item + .service-resource-item { border-top: 1px solid var(--border); }
-.service-resource-item.selected { background: var(--surface-muted); box-shadow: inset 2px 0 var(--accent); }
-.service-resource-button { display: grid; gap: 3px; width: 100%; min-height: 0; padding: 0; border: 0; background: transparent; text-align: left; }
-.service-resource-title, .service-resource-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
-.service-resource-meta, .service-detail-meta, .service-detail-description { color: var(--text-muted); font-size: 12px; }
+.service-detail-meta, .service-detail-description { color: var(--text-muted); font-size: 12px; }
 .service-bulk-new, .service-actions-menu > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .service-bulk-new { padding: 8px 0; border-block: 1px solid var(--border); margin-block: 8px; }
 .service-skeleton-list { display: grid; gap: 8px; }
 .service-detail-header-new { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .service-detail-header-new h2 { margin: 0; font-size: 18px; font-weight: 600; }
 .service-detail-header-new p { margin: 4px 0 0; overflow-wrap: anywhere; }
-.service-resource-title strong { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
 .service-actions-menu { position: relative; }
 .service-actions-menu summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; color: var(--text-muted); }
 .service-actions-menu summary::-webkit-details-marker { display: none; }
