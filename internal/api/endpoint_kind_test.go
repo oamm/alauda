@@ -10,11 +10,11 @@ import (
 	"testing"
 )
 
-func TestProtocolPathWritesAndLegacyDiscovery(t *testing.T) {
-	for _, protocol := range []string{"tcp", "udp", "grpc"} {
-		t.Run(protocol, func(t *testing.T) {
+func TestEndpointKindPathWritesAndStructuredDiscovery(t *testing.T) {
+	for _, kind := range []string{"tcp", "udp", "grpc"} {
+		t.Run(kind, func(t *testing.T) {
 			f := newPublicFixture(t)
-			invalid := fmt.Sprintf(`{"environment":"stg","instance":{"name":"node","address":"host"},"endpoints":[{"name":"default","protocol":%q,"port":81,"path":"/bad"}]}`, protocol)
+			invalid := fmt.Sprintf(`{"environment":"stg","instance":{"name":"node","address":"host"},"endpoints":[{"name":"default","kind":%q,"port":81,"path":"/bad"}]}`, kind)
 			rejected := f.request("POST", registerRoute, invalid)
 			if rejected.Code != 400 || !strings.Contains(rejected.Body.String(), "endpoints[0].path") {
 				t.Fatalf("%d %s", rejected.Code, rejected.Body.String())
@@ -26,12 +26,12 @@ func TestProtocolPathWritesAndLegacyDiscovery(t *testing.T) {
 				t.Fatalf("%+v", ep)
 			}
 			handler := &endpointHandler{repo: storage.NewEndpointRepository(f.db)}
-			enum := v1.Protocol(v1.Protocol_value["PROTOCOL_"+strings.ToUpper(protocol)])
-			_, err := handler.CreateEndpoint(context.Background(), connect.NewRequest(&v1.CreateEndpointRequest{InstanceId: out.Instance.ID, Name: "invalid", Protocol: enum, Port: 81, Path: "/bad"}))
+			enum := v1.EndpointKind(v1.EndpointKind_value["ENDPOINT_KIND_"+strings.ToUpper(kind)])
+			_, err := handler.CreateEndpoint(context.Background(), connect.NewRequest(&v1.CreateEndpointRequest{InstanceId: out.Instance.ID, Name: "invalid", Kind: enum, Port: 81, Path: "/bad"}))
 			if connect.CodeOf(err) != connect.CodeInvalidArgument {
 				t.Fatalf("create: %v", err)
 			}
-			_, err = handler.UpdateEndpoint(context.Background(), connect.NewRequest(&v1.UpdateEndpointRequest{Id: ep.ID, Protocol: enum, Path: "/bad", Enabled: true}))
+			_, err = handler.UpdateEndpoint(context.Background(), connect.NewRequest(&v1.UpdateEndpointRequest{Id: ep.ID, Kind: enum, Path: "/bad", Enabled: true}))
 			if connect.CodeOf(err) != connect.CodeInvalidArgument {
 				t.Fatalf("update: %v", err)
 			}
@@ -52,19 +52,19 @@ func TestProtocolPathWritesAndLegacyDiscovery(t *testing.T) {
 	}
 }
 
-func TestEndpointProtocolTransitionClearsPath(t *testing.T) {
+func TestEndpointKindTransitionClearsPath(t *testing.T) {
 	f := newPublicFixture(t)
 	out := requireRegistration(t, f.request("POST", registerRoute, initialRegistration))
 	handler := &endpointHandler{repo: storage.NewEndpointRepository(f.db)}
-	preserved, err := handler.UpdateEndpoint(context.Background(), connect.NewRequest(&v1.UpdateEndpointRequest{Id: out.Endpoints[0].ID, Protocol: v1.Protocol_PROTOCOL_HTTPS, Enabled: true}))
+	preserved, err := handler.UpdateEndpoint(context.Background(), connect.NewRequest(&v1.UpdateEndpointRequest{Id: out.Endpoints[0].ID, Kind: v1.EndpointKind_ENDPOINT_KIND_HTTPS, Enabled: true}))
 	if err != nil || preserved.Msg.Endpoint.Path != "/original" {
 		t.Fatalf("omitted HTTP path changed: %v %v", preserved, err)
 	}
-	updated, err := handler.UpdateEndpoint(context.Background(), connect.NewRequest(&v1.UpdateEndpointRequest{Id: out.Endpoints[0].ID, Protocol: v1.Protocol_PROTOCOL_TCP, Port: 5432, Enabled: true}))
+	updated, err := handler.UpdateEndpoint(context.Background(), connect.NewRequest(&v1.UpdateEndpointRequest{Id: out.Endpoints[0].ID, Kind: v1.EndpointKind_ENDPOINT_KIND_TCP, Port: 5432, Enabled: true}))
 	if err != nil || updated.Msg.Endpoint.Path != "" {
 		t.Fatalf("transition: %v %v", updated, err)
 	}
-	// A partial update without protocol resolves the stored protocol before validating Path.
+	// A partial update without kind resolves the stored kind before validating Path.
 	_, err = handler.UpdateEndpoint(context.Background(), connect.NewRequest(&v1.UpdateEndpointRequest{Id: out.Endpoints[0].ID, Path: "/invalid", Enabled: true}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("partial update: %v", err)

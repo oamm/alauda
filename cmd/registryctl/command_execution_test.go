@@ -115,7 +115,7 @@ func TestCatalogCommandExecutionPaths(t *testing.T) {
 	runCommand(t, newInstanceGetCommand(), instanceID)
 	runCommand(t, newInstanceUpdateCommand(), instanceID, "--address", "127.0.0.2", "--port", "9090", "--enabled=true")
 
-	runCommand(t, newEndpointCreateCommand(), "--instance-id", instanceID, "--name", "ready", "--protocol", "1", "--port", "9090", "--path", "/ready", "--enabled=true")
+	runCommand(t, newEndpointCreateCommand(), "--instance-id", instanceID, "--name", "ready", "--kind", "1", "--port", "9090", "--path", "/ready", "--enabled=true")
 	endpoints, _, err := storage.NewEndpointRepository(db).List(ctx, instanceID, 10, "")
 	if err != nil {
 		t.Fatalf("list endpoints: %v", err)
@@ -126,7 +126,7 @@ func TestCatalogCommandExecutionPaths(t *testing.T) {
 	endpointID := endpoints[0].GetId()
 	runCommand(t, newEndpointListCommand(), "--instance-id", instanceID)
 	runCommand(t, newEndpointGetCommand(), endpointID)
-	runCommand(t, newEndpointUpdateCommand(), endpointID, "--name", "ready", "--protocol", "1", "--port", "9091", "--path", "/healthz", "--enabled=true")
+	runCommand(t, newEndpointUpdateCommand(), endpointID, "--name", "ready", "--kind", "1", "--port", "9091", "--path", "/healthz", "--enabled=true")
 
 	runCommand(t, newHealthCheckCreateCommand(), "--instance-id", instanceID, "--endpoint-id", endpointID, "--name", "ready", "--type", "http", "--interval-seconds", "10", "--timeout-seconds", "1", "--failures-before-unhealthy", "1", "--successes-before-healthy", "1")
 	checks, _, err := storage.NewHealthRepository(db).ListHealthChecks(ctx, instanceID, true, 10, "")

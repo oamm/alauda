@@ -171,7 +171,7 @@ func buildHTTPURL(target Target) (string, error) {
 		path = "/" + path
 	}
 
-	return address.Build(scheme, target.Address, target.Port, path)
+	return address.FormatValue(scheme, target.Address, target.Port, path)
 }
 
 func expectedStatus(check *registryv1.HealthCheck, statusCode int) bool {

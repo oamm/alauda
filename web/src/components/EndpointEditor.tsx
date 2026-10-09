@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { FormField, IconButton, Input, Select, Switch } from "./ui";
 import {
-  endpointProtocols,
+  endpointKinds,
   supportsEndpointPath,
   endpointPath,
   validateEndpoint,
@@ -51,20 +51,20 @@ export function EndpointEditor({
           onChange={(event) => change({ name: event.target.value })}
         />
       </FormField>
-      <FormField label="Protocol" error={validation.protocol}>
+      <FormField label="Endpoint type" error={validation.kind}>
         <Select
           disabled={disabled}
-          aria-label={label("Protocol")}
-          value={value.protocol}
+          aria-label={label("Endpoint type")}
+          value={value.kind}
           onChange={(event) =>
             change({
-              protocol: event.target.value,
+              kind: event.target.value,
               path: endpointPath(event.target.value, value.path),
             })
           }
         >
-          {endpointProtocols.map(([protocol, text]) => (
-            <option key={protocol} value={protocol}>
+          {endpointKinds.map(([kind, text]) => (
+            <option key={kind} value={kind}>
               {text}
             </option>
           ))}
@@ -74,7 +74,7 @@ export function EndpointEditor({
         label="Port"
         error={validation.port}
         className={
-          supportsEndpointPath(value.protocol) ? undefined : "sm:col-span-2"
+          supportsEndpointPath(value.kind) ? undefined : "sm:col-span-2"
         }
       >
         <Input
@@ -89,7 +89,7 @@ export function EndpointEditor({
           onChange={(event) => change({ port: Number(event.target.value) })}
         />
       </FormField>
-      {supportsEndpointPath(value.protocol) ? (
+      {supportsEndpointPath(value.kind) ? (
         <FormField label="Path" error={validation.path}>
           <Input
             disabled={disabled}

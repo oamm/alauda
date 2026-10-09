@@ -80,7 +80,7 @@ func (r *RuntimeRepository) RegisterRuntime(ctx context.Context, req *registryv1
 func (r *RuntimeRepository) RegisterRuntimeUpsert(ctx context.Context, req *registryv1.RegisterRuntimeRequest, replace bool) (*registryv1.RegisterRuntimeResponse, error) {
 	p := contract.Registration{Replace: replace, Instance: contract.InstancePatch{Name: req.GetInstance().GetName(), Address: contract.Pointer(req.GetInstance().GetAddress()), Description: contract.Pointer(req.GetInstance().GetDescription()), Enabled: contract.Pointer(req.GetInstance().GetEnabled()), Tags: req.GetInstance().GetTags(), Metadata: req.GetInstance().GetMetadata()}}
 	for _, e := range req.GetEndpoints() {
-		p.Endpoints = append(p.Endpoints, contract.EndpointPatch{Name: e.Name, Protocol: contract.Pointer(strings.ToLower(strings.TrimPrefix(e.Protocol.String(), "PROTOCOL_"))), Port: contract.Pointer(e.Port), Path: contract.Pointer(e.Path), Primary: contract.Pointer(e.Primary), Enabled: contract.Pointer(e.Enabled), Tags: e.Tags, Metadata: e.Metadata})
+		p.Endpoints = append(p.Endpoints, contract.EndpointPatch{Name: e.Name, Kind: contract.Pointer(strings.ToLower(strings.TrimPrefix(e.Kind.String(), "ENDPOINT_KIND_"))), Port: contract.Pointer(e.Port), Path: contract.Pointer(e.Path), Primary: contract.Pointer(e.Primary), Enabled: contract.Pointer(e.Enabled), Tags: e.Tags, Metadata: e.Metadata})
 	}
 	return r.RegisterPublicRuntime(ctx, req.ServiceId, req.EnvironmentId, p)
 }
@@ -147,20 +147,24 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 	merged := &registryv1.RegisterRuntimeRequest{ServiceId: serviceID, EnvironmentId: environmentID, Instance: instance}
 	primaries := 0
 	for _, ep := range patch.Endpoints {
-		old, err := scanEndpoint(tx.QueryRowContext(ctx, `SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE instance_id=? AND name=?`, existing.Id, ep.Name))
+		old, err := scanEndpoint(tx.QueryRowContext(ctx, `SELECT id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE instance_id=? AND name=?`, existing.Id, ep.Name))
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
 		if old == nil {
 			old = &registryv1.Endpoint{Name: ep.Name, Enabled: true}
 		}
-		item := &registryv1.RuntimeEndpointRegistration{Name: ep.Name, Protocol: old.Protocol, Port: old.Port, Path: address.PublicPath(old.Protocol.String(), old.Path), Enabled: old.Enabled, Primary: old.Primary, Tags: old.Tags, Metadata: old.Metadata}
-		if ep.Protocol != nil {
-			value, ok := registryv1.Protocol_value["PROTOCOL_"+strings.ToUpper(*ep.Protocol)]
+		item := &registryv1.RuntimeEndpointRegistration{Name: ep.Name, Kind: old.Kind, Port: old.Port, Path: address.PublicPath(old.Kind.String(), old.Path), Enabled: old.Enabled, Primary: old.Primary, Tags: old.Tags, Metadata: old.Metadata}
+		endpointKind := ep.Kind
+		if ep.Kind != nil {
+			endpointKind = ep.Kind
+		}
+		if endpointKind != nil {
+			value, ok := registryv1.EndpointKind_value["ENDPOINT_KIND_"+strings.ToUpper(*endpointKind)]
 			if !ok {
 				return nil, ErrInvalidRuntimeRegistration
 			}
-			item.Protocol = registryv1.Protocol(value)
+			item.Kind = registryv1.EndpointKind(value)
 		}
 		if ep.Port != nil {
 			item.Port = *ep.Port
@@ -168,7 +172,7 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 		if ep.Path != nil {
 			item.Path = *ep.Path
 		} else {
-			item.Path = address.PublicPath(item.Protocol.String(), item.Path)
+			item.Path = address.PublicPath(item.Kind.String(), item.Path)
 		}
 		if ep.Enabled != nil {
 			item.Enabled = *ep.Enabled
@@ -209,11 +213,11 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 	}
 	for i, ep := range merged.Endpoints {
 		prefix := fmt.Sprintf("endpoints[%d]", i)
-		if err := address.ValidateEndpointPath(ep.Protocol.String(), ep.Path); err != nil {
+		if err := address.ValidateEndpointPath(ep.Kind.String(), ep.Path); err != nil {
 			fields[prefix+".path"] = []string{err.Error()}
 		}
-		if ep.Protocol == registryv1.Protocol_PROTOCOL_UNSPECIFIED {
-			fields[prefix+".protocol"] = []string{"Protocol is required for a new Endpoint."}
+		if ep.Kind == registryv1.EndpointKind_ENDPOINT_KIND_UNSPECIFIED {
+			fields[prefix+".Kind"] = []string{"kind is required for a new Endpoint."}
 		}
 		if ep.Port < 1 || ep.Port > 65535 {
 			fields[prefix+".port"] = []string{"Port must be between 1 and 65535."}
@@ -226,7 +230,7 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 		return nil, err
 	}
 	for _, ep := range merged.Endpoints {
-		if _, err := address.Build(strings.ToLower(strings.TrimPrefix(ep.Protocol.String(), "PROTOCOL_")), instance.Address, ep.Port, ep.Path); err != nil {
+		if _, err := address.FormatValue(strings.ToLower(strings.TrimPrefix(ep.Kind.String(), "ENDPOINT_KIND_")), instance.Address, ep.Port, ep.Path); err != nil {
 			return nil, ErrInvalidRuntimeRegistration
 		}
 	}
@@ -265,7 +269,7 @@ func (r *RuntimeRepository) registerPublicRuntimeOnce(ctx context.Context, servi
 		}
 	}
 	items := []*registryv1.Endpoint{}
-	rows, err := tx.QueryContext(ctx, `SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE instance_id=? AND deleted_at IS NULL ORDER BY name`, existing.Id)
+	rows, err := tx.QueryContext(ctx, `SELECT id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE instance_id=? AND deleted_at IS NULL ORDER BY name`, existing.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -302,12 +306,12 @@ func (r *RuntimeRepository) upsertRuntimeEndpoint(ctx context.Context, tx transa
 		err = tx.QueryRowContext(ctx, `SELECT id FROM endpoints WHERE instance_id=? AND name=? AND deleted_at IS NOT NULL`, instanceID, req.GetName()).Scan(&id)
 		if errors.Is(err, sql.ErrNoRows) {
 			id = uuid.NewString()
-			_, err = tx.ExecContext(ctx, `INSERT INTO endpoints (id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, id, instanceID, req.GetName(), int32(req.GetProtocol()), req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), primary, now, now)
+			_, err = tx.ExecContext(ctx, `INSERT INTO endpoints (id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, id, instanceID, req.GetName(), int32(req.GetKind()), req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), primary, now, now)
 		} else if err == nil {
-			_, err = tx.ExecContext(ctx, `UPDATE endpoints SET protocol=?, port=?, path=?, enabled=?, tags=?, metadata=?, primary_endpoint=?, deleted_at=NULL, updated_at=? WHERE id=?`, int32(req.GetProtocol()), req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), primary, now, id)
+			_, err = tx.ExecContext(ctx, `UPDATE endpoints SET kind=?, port=?, path=?, enabled=?, tags=?, metadata=?, primary_endpoint=?, deleted_at=NULL, updated_at=? WHERE id=?`, int32(req.GetKind()), req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), primary, now, id)
 		}
 	} else if err == nil {
-		_, err = tx.ExecContext(ctx, `UPDATE endpoints SET protocol=?, port=?, path=?, enabled=?, tags=?, metadata=?, primary_endpoint=?, updated_at=? WHERE id=?`, int32(req.GetProtocol()), req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), primary, now, id)
+		_, err = tx.ExecContext(ctx, `UPDATE endpoints SET kind=?, port=?, path=?, enabled=?, tags=?, metadata=?, primary_endpoint=?, updated_at=? WHERE id=?`, int32(req.GetKind()), req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), primary, now, id)
 	}
 	if err != nil {
 		return nil, err
@@ -317,7 +321,7 @@ func (r *RuntimeRepository) upsertRuntimeEndpoint(ctx context.Context, tx transa
 			return nil, err
 		}
 	}
-	return scanEndpoint(tx.QueryRowContext(ctx, `SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE id=? AND deleted_at IS NULL`, id))
+	return scanEndpoint(tx.QueryRowContext(ctx, `SELECT id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE id=? AND deleted_at IS NULL`, id))
 }
 
 func validateRuntimeRegistration(req *registryv1.RegisterRuntimeRequest) error {
@@ -331,14 +335,14 @@ func validateRuntimeRegistration(req *registryv1.RegisterRuntimeRequest) error {
 
 	primaryCount := 0
 	for _, endpoint := range req.GetEndpoints() {
-		if err := address.ValidateEndpoint(endpoint.GetProtocol().String(), endpoint.GetPort(), endpoint.GetPath()); err != nil {
+		if err := address.ValidateEndpoint(endpoint.GetKind().String(), endpoint.GetPort(), endpoint.GetPath()); err != nil {
 			return fmt.Errorf("%w: %v", ErrInvalidRuntimeRegistration, err)
 		}
 		if strings.TrimSpace(endpoint.GetName()) == "" {
 			return fmt.Errorf("%w: endpoint name is required", ErrInvalidRuntimeRegistration)
 		}
-		if endpoint.GetProtocol() == registryv1.Protocol_PROTOCOL_UNSPECIFIED {
-			return fmt.Errorf("%w: endpoint protocol is required", ErrInvalidRuntimeRegistration)
+		if endpoint.GetKind() == registryv1.EndpointKind_ENDPOINT_KIND_UNSPECIFIED {
+			return fmt.Errorf("%w: endpoint kind is required", ErrInvalidRuntimeRegistration)
 		}
 		if endpoint.GetPort() < 1 || endpoint.GetPort() > 65535 {
 			return fmt.Errorf("%w: endpoint port must be between 1 and 65535", ErrInvalidRuntimeRegistration)
@@ -456,15 +460,15 @@ func (r *RuntimeRepository) createRuntimeEndpoint(ctx context.Context, tx transa
 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO endpoints (
-			id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at
+			id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, id, instanceID, req.GetName(), int32(req.GetProtocol()), req.GetPort(), req.GetPath(), enabled, string(tagsJSON), string(metadataJSON), primary, now, now); err != nil {
+	`, id, instanceID, req.GetName(), int32(req.GetKind()), req.GetPort(), req.GetPath(), enabled, string(tagsJSON), string(metadataJSON), primary, now, now); err != nil {
 		return nil, fmt.Errorf("failed to create endpoint: %w", err)
 	}
 
 	row := tx.QueryRowContext(ctx, `
-		SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint
+		SELECT id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint
 		FROM endpoints
 		WHERE id = ? AND deleted_at IS NULL
 	`, id)

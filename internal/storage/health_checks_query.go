@@ -41,7 +41,7 @@ type HealthCheckRecord struct {
 	Address                 string `json:"address"`
 	EndpointID              string `json:"endpointId"`
 	Endpoint                string `json:"endpoint"`
-	Protocol                string `json:"protocol"`
+	Kind                    string `json:"kind"`
 	Port                    int32  `json:"port"`
 	LatestStatus            string `json:"latestStatus"`
 	LatestResultAt          string `json:"latestResultAt"`
@@ -87,7 +87,7 @@ func (r *HealthRepository) QueryHealthChecks(ctx context.Context, q HealthChecks
 		if err := rows.Scan(&item.ID, &item.Name, &enabled, &item.Type, &item.IntervalSeconds, &item.TimeoutSeconds,
 			&item.FailuresBeforeUnhealthy, &item.SuccessesBeforeHealthy, &item.Description, &item.Path, &item.ExpectedStatus,
 			&item.ServiceID, &item.Service, &item.EnvironmentID, &item.Environment, &item.InstanceID, &item.Instance, &item.Address,
-			&item.EndpointID, &item.Endpoint, &item.Protocol, &item.Port, &latestStatus, &latestAt, &latestDuration, &latestCode, &latestError); err != nil {
+			&item.EndpointID, &item.Endpoint, &item.Kind, &item.Port, &latestStatus, &latestAt, &latestDuration, &latestCode, &latestError); err != nil {
 			return HealthChecksQueryResult{}, err
 		}
 		item.Enabled = enabled
@@ -130,7 +130,7 @@ func healthChecksQuerySQL(q HealthChecksQuery) (string, []any, error) {
 		hc.failures_before_unhealthy, hc.successes_before_healthy, COALESCE(hc.description, ''),
 		COALESCE(json_extract(hc.metadata, '$.path'), ''), COALESCE(json_extract(hc.metadata, '$.expectedStatus'), ''),
 		s.id, COALESCE(NULLIF(s.display_name, ''), s.name), e.id, e.name, i.id, i.name, i.address,
-		COALESCE(ep.id, ''), COALESCE(ep.name, 'Instance address'), COALESCE(ep.protocol, ''), COALESCE(ep.port, i.port, 0),
+		COALESCE(ep.id, ''), COALESCE(ep.name, 'Instance address'), COALESCE(ep.kind, ''), COALESCE(ep.port, i.port, 0),
 		` + latest + `, ` + latestAt + `, ` + latestDuration + `, ` + latestCode + `, ` + latestError + `
 		FROM health_checks hc
 		JOIN service_instances i ON i.id = hc.instance_id AND i.deleted_at IS NULL

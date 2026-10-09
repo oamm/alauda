@@ -9,6 +9,7 @@ import {
   listHealthResults,
 } from "../api";
 import { formatTimestamp, pluralize } from "../utils/format";
+import { getEndpointKindCapabilities } from "../lib/endpoint-form";
 import {
   Alert,
   Button,
@@ -150,7 +151,7 @@ export function ServiceHealthView(props: Props) {
       (endpoint) => endpoint.id === check.endpointId,
     );
     return instance
-      ? `${instance.name} · ${instance.address}${endpoint ? ` · ${endpoint.protocol.replace("PROTOCOL_", "")} :${endpoint.port}${endpoint.path || ""}` : instance.port ? `:${instance.port}` : ""}`
+      ? `${instance.name} · ${instance.address}${endpoint ? ` · ${getEndpointKindCapabilities(endpoint.kind)?.displayName ?? endpoint.kind} :${endpoint.port}${endpoint.path || ""}` : instance.port ? `:${instance.port}` : ""}`
       : "Target not available in this scope";
   }
   async function run(check: HealthCheck) {

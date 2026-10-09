@@ -31,7 +31,7 @@ func TestScopedApplicationKeyCannotBypassEnvironmentBoundary(t *testing.T) {
 	denied, _ := er.Create(ctx, &v1.CreateEnvironmentRequest{Key: "prod", Name: "Production"})
 	sr := storage.NewServiceRepository(db)
 	service, _ := sr.Create(ctx, &v1.CreateServiceRequest{Name: "private", DisplayName: "Private"})
-	runtime, err := storage.NewRuntimeRepository(db).RegisterRuntime(ctx, &v1.RegisterRuntimeRequest{ServiceId: service.Id, EnvironmentId: denied.Id, Instance: &v1.RuntimeInstanceRegistration{Name: "private-01", Address: "private-host"}, Endpoints: []*v1.RuntimeEndpointRegistration{{Name: "default", Protocol: v1.Protocol_PROTOCOL_HTTP, Port: 81, Enabled: true}}})
+	runtime, err := storage.NewRuntimeRepository(db).RegisterRuntime(ctx, &v1.RegisterRuntimeRequest{ServiceId: service.Id, EnvironmentId: denied.Id, Instance: &v1.RuntimeInstanceRegistration{Name: "private-01", Address: "private-host"}, Endpoints: []*v1.RuntimeEndpointRegistration{{Name: "default", Kind: v1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 81, Enabled: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestScopedApplicationKeyCannotBypassEnvironmentBoundary(t *testing.T) {
 			t.Fatalf("filter bypass: %s", res.Body.String())
 		}
 	}
-	allowedRuntime, err := storage.NewRuntimeRepository(db).RegisterRuntime(ctx, &v1.RegisterRuntimeRequest{ServiceId: service.Id, EnvironmentId: allowed.Id, Instance: &v1.RuntimeInstanceRegistration{Name: "allowed-01", Address: "allowed-host"}, Endpoints: []*v1.RuntimeEndpointRegistration{{Name: "default", Protocol: v1.Protocol_PROTOCOL_HTTP, Port: 81, Enabled: true}}})
+	allowedRuntime, err := storage.NewRuntimeRepository(db).RegisterRuntime(ctx, &v1.RegisterRuntimeRequest{ServiceId: service.Id, EnvironmentId: allowed.Id, Instance: &v1.RuntimeInstanceRegistration{Name: "allowed-01", Address: "allowed-host"}, Endpoints: []*v1.RuntimeEndpointRegistration{{Name: "default", Kind: v1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 81, Enabled: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}

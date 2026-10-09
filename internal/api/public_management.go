@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	v1 "github.com/company/service-registry/gen/go/api/registry/v1"
@@ -211,7 +210,8 @@ func (a *publicContractAPI) management(w http.ResponseWriter, r *http.Request, p
 	}
 	result := []publicEndpoint{}
 	for _, ep := range endpoints {
-		result = append(result, publicEndpoint{ID: ep.Id, Name: ep.Name, Protocol: strings.ToLower(strings.TrimPrefix(ep.Protocol.String(), "PROTOCOL_")), Port: ep.Port, Path: address.PublicPath(ep.Protocol.String(), ep.Path), Primary: ep.Primary, Enabled: ep.Enabled, Address: endpointAddress(ep.Protocol, ep.Path, items[0].Address, ep.Port), Tags: ep.Tags, Metadata: ep.Metadata})
+		kind := kindFromDB(ep.Kind.String())
+		result = append(result, publicEndpoint{ID: ep.Id, Name: ep.Name, Kind: kind, Port: ep.Port, Path: address.PublicPath(kind, ep.Path), Primary: ep.Primary, Enabled: ep.Enabled, Address: items[0].Address, Tags: ep.Tags, Metadata: ep.Metadata})
 	}
 	writeJSON(w, 200, map[string]any{"service": svc.Name, "environment": env.Key, "instance": items[0].Name, "endpoints": result, "nextPageToken": token})
 }

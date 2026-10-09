@@ -375,7 +375,7 @@ type Endpoint struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	InstanceId    string                 `protobuf:"bytes,2,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Protocol      Protocol               `protobuf:"varint,4,opt,name=protocol,proto3,enum=registry.v1.Protocol" json:"protocol,omitempty"`
+	Kind          EndpointKind           `protobuf:"varint,4,opt,name=kind,proto3,enum=registry.v1.EndpointKind" json:"kind,omitempty"`
 	Port          int32                  `protobuf:"varint,5,opt,name=port,proto3" json:"port,omitempty"`
 	Path          string                 `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`
 	Enabled       bool                   `protobuf:"varint,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -437,11 +437,11 @@ func (x *Endpoint) GetName() string {
 	return ""
 }
 
-func (x *Endpoint) GetProtocol() Protocol {
+func (x *Endpoint) GetKind() EndpointKind {
 	if x != nil {
-		return x.Protocol
+		return x.Kind
 	}
-	return Protocol_PROTOCOL_UNSPECIFIED
+	return EndpointKind_ENDPOINT_KIND_UNSPECIFIED
 }
 
 func (x *Endpoint) GetPort() int32 {
@@ -1773,7 +1773,7 @@ func (x *RuntimeInstanceRegistration) GetMetadata() map[string]string {
 type RuntimeEndpointRegistration struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Protocol      Protocol               `protobuf:"varint,2,opt,name=protocol,proto3,enum=registry.v1.Protocol" json:"protocol,omitempty"`
+	Kind          EndpointKind           `protobuf:"varint,2,opt,name=kind,proto3,enum=registry.v1.EndpointKind" json:"kind,omitempty"`
 	Port          int32                  `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
 	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	Enabled       bool                   `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -1821,11 +1821,11 @@ func (x *RuntimeEndpointRegistration) GetName() string {
 	return ""
 }
 
-func (x *RuntimeEndpointRegistration) GetProtocol() Protocol {
+func (x *RuntimeEndpointRegistration) GetKind() EndpointKind {
 	if x != nil {
-		return x.Protocol
+		return x.Kind
 	}
-	return Protocol_PROTOCOL_UNSPECIFIED
+	return EndpointKind_ENDPOINT_KIND_UNSPECIFIED
 }
 
 func (x *RuntimeEndpointRegistration) GetPort() int32 {
@@ -2410,7 +2410,7 @@ type CreateEndpointRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	InstanceId    string                 `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Protocol      Protocol               `protobuf:"varint,3,opt,name=protocol,proto3,enum=registry.v1.Protocol" json:"protocol,omitempty"`
+	Kind          EndpointKind           `protobuf:"varint,3,opt,name=kind,proto3,enum=registry.v1.EndpointKind" json:"kind,omitempty"`
 	Port          int32                  `protobuf:"varint,4,opt,name=port,proto3" json:"port,omitempty"`
 	Path          string                 `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
 	Enabled       bool                   `protobuf:"varint,6,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -2465,11 +2465,11 @@ func (x *CreateEndpointRequest) GetName() string {
 	return ""
 }
 
-func (x *CreateEndpointRequest) GetProtocol() Protocol {
+func (x *CreateEndpointRequest) GetKind() EndpointKind {
 	if x != nil {
-		return x.Protocol
+		return x.Kind
 	}
-	return Protocol_PROTOCOL_UNSPECIFIED
+	return EndpointKind_ENDPOINT_KIND_UNSPECIFIED
 }
 
 func (x *CreateEndpointRequest) GetPort() int32 {
@@ -2754,7 +2754,7 @@ type UpdateEndpointRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Protocol      Protocol               `protobuf:"varint,3,opt,name=protocol,proto3,enum=registry.v1.Protocol" json:"protocol,omitempty"`
+	Kind          EndpointKind           `protobuf:"varint,3,opt,name=kind,proto3,enum=registry.v1.EndpointKind" json:"kind,omitempty"`
 	Port          int32                  `protobuf:"varint,4,opt,name=port,proto3" json:"port,omitempty"`
 	Path          string                 `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
 	Enabled       bool                   `protobuf:"varint,6,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -2809,11 +2809,11 @@ func (x *UpdateEndpointRequest) GetName() string {
 	return ""
 }
 
-func (x *UpdateEndpointRequest) GetProtocol() Protocol {
+func (x *UpdateEndpointRequest) GetKind() EndpointKind {
 	if x != nil {
-		return x.Protocol
+		return x.Kind
 	}
-	return Protocol_PROTOCOL_UNSPECIFIED
+	return EndpointKind_ENDPOINT_KIND_UNSPECIFIED
 }
 
 func (x *UpdateEndpointRequest) GetPort() int32 {
@@ -3047,13 +3047,13 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xca\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc6\x03\n" +
 	"\bEndpoint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vinstance_id\x18\x02 \x01(\tR\n" +
 	"instanceId\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\x121\n" +
-	"\bprotocol\x18\x04 \x01(\x0e2\x15.registry.v1.ProtocolR\bprotocol\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12-\n" +
+	"\x04kind\x18\x04 \x01(\x0e2\x19.registry.v1.EndpointKindR\x04kind\x12\x12\n" +
 	"\x04port\x18\x05 \x01(\x05R\x04port\x12\x12\n" +
 	"\x04path\x18\x06 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\a \x01(\bR\aenabled\x123\n" +
@@ -3198,10 +3198,10 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd2\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xce\x03\n" +
 	"\x1bRuntimeEndpointRegistration\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x121\n" +
-	"\bprotocol\x18\x02 \x01(\x0e2\x15.registry.v1.ProtocolR\bprotocol\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12-\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\x19.registry.v1.EndpointKindR\x04kind\x12\x12\n" +
 	"\x04port\x18\x03 \x01(\x05R\x04port\x12\x12\n" +
 	"\x04path\x18\x04 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\x05 \x01(\bR\aenabled\x12\x18\n" +
@@ -3258,12 +3258,12 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\binstance\x18\x01 \x01(\v2\x1c.registry.v1.ServiceInstanceR\binstance\"'\n" +
 	"\x15DeleteInstanceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x18\n" +
-	"\x16DeleteInstanceResponse\"\xe1\x03\n" +
+	"\x16DeleteInstanceResponse\"\xdd\x03\n" +
 	"\x15CreateEndpointRequest\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
-	"\bprotocol\x18\x03 \x01(\x0e2\x15.registry.v1.ProtocolR\bprotocol\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12-\n" +
+	"\x04kind\x18\x03 \x01(\x0e2\x19.registry.v1.EndpointKindR\x04kind\x12\x12\n" +
 	"\x04port\x18\x04 \x01(\x05R\x04port\x12\x12\n" +
 	"\x04path\x18\x05 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\x06 \x01(\bR\aenabled\x12@\n" +
@@ -3292,11 +3292,11 @@ const file_api_registry_v1_catalog_proto_rawDesc = "" +
 	"\tendpoints\x18\x01 \x03(\v2\x15.registry.v1.EndpointR\tendpoints\x12?\n" +
 	"\n" +
 	"pagination\x18\x02 \x01(\v2\x1f.registry.v1.PaginationResponseR\n" +
-	"pagination\"\xe1\x03\n" +
+	"pagination\"\xdd\x03\n" +
 	"\x15UpdateEndpointRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
-	"\bprotocol\x18\x03 \x01(\x0e2\x15.registry.v1.ProtocolR\bprotocol\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12-\n" +
+	"\x04kind\x18\x03 \x01(\x0e2\x19.registry.v1.EndpointKindR\x04kind\x12\x12\n" +
 	"\x04port\x18\x04 \x01(\x05R\x04port\x12\x12\n" +
 	"\x04path\x18\x05 \x01(\tR\x04path\x12\x18\n" +
 	"\aenabled\x18\x06 \x01(\bR\aenabled\x12@\n" +
@@ -3435,7 +3435,7 @@ var file_api_registry_v1_catalog_proto_goTypes = []any{
 	nil,                                 // 74: registry.v1.UpdateEndpointRequest.TagsEntry
 	nil,                                 // 75: registry.v1.UpdateEndpointRequest.MetadataEntry
 	(*timestamppb.Timestamp)(nil),       // 76: google.protobuf.Timestamp
-	(Protocol)(0),                       // 77: registry.v1.Protocol
+	(EndpointKind)(0),                   // 77: registry.v1.EndpointKind
 	(*PaginationRequest)(nil),           // 78: registry.v1.PaginationRequest
 	(*PaginationResponse)(nil),          // 79: registry.v1.PaginationResponse
 }
@@ -3453,7 +3453,7 @@ var file_api_registry_v1_catalog_proto_depIdxs = []int32{
 	76, // 10: registry.v1.ServiceInstance.created_at:type_name -> google.protobuf.Timestamp
 	76, // 11: registry.v1.ServiceInstance.updated_at:type_name -> google.protobuf.Timestamp
 	76, // 12: registry.v1.ServiceInstance.last_seen_at:type_name -> google.protobuf.Timestamp
-	77, // 13: registry.v1.Endpoint.protocol:type_name -> registry.v1.Protocol
+	77, // 13: registry.v1.Endpoint.kind:type_name -> registry.v1.EndpointKind
 	54, // 14: registry.v1.Endpoint.tags:type_name -> registry.v1.Endpoint.TagsEntry
 	55, // 15: registry.v1.Endpoint.metadata:type_name -> registry.v1.Endpoint.MetadataEntry
 	56, // 16: registry.v1.CreateServiceRequest.tags:type_name -> registry.v1.CreateServiceRequest.TagsEntry
@@ -3481,7 +3481,7 @@ var file_api_registry_v1_catalog_proto_depIdxs = []int32{
 	2,  // 38: registry.v1.CreateInstanceResponse.instance:type_name -> registry.v1.ServiceInstance
 	66, // 39: registry.v1.RuntimeInstanceRegistration.tags:type_name -> registry.v1.RuntimeInstanceRegistration.TagsEntry
 	67, // 40: registry.v1.RuntimeInstanceRegistration.metadata:type_name -> registry.v1.RuntimeInstanceRegistration.MetadataEntry
-	77, // 41: registry.v1.RuntimeEndpointRegistration.protocol:type_name -> registry.v1.Protocol
+	77, // 41: registry.v1.RuntimeEndpointRegistration.kind:type_name -> registry.v1.EndpointKind
 	68, // 42: registry.v1.RuntimeEndpointRegistration.tags:type_name -> registry.v1.RuntimeEndpointRegistration.TagsEntry
 	69, // 43: registry.v1.RuntimeEndpointRegistration.metadata:type_name -> registry.v1.RuntimeEndpointRegistration.MetadataEntry
 	26, // 44: registry.v1.RegisterRuntimeRequest.instance:type_name -> registry.v1.RuntimeInstanceRegistration
@@ -3496,7 +3496,7 @@ var file_api_registry_v1_catalog_proto_depIdxs = []int32{
 	70, // 53: registry.v1.UpdateInstanceRequest.tags:type_name -> registry.v1.UpdateInstanceRequest.TagsEntry
 	71, // 54: registry.v1.UpdateInstanceRequest.metadata:type_name -> registry.v1.UpdateInstanceRequest.MetadataEntry
 	2,  // 55: registry.v1.UpdateInstanceResponse.instance:type_name -> registry.v1.ServiceInstance
-	77, // 56: registry.v1.CreateEndpointRequest.protocol:type_name -> registry.v1.Protocol
+	77, // 56: registry.v1.CreateEndpointRequest.kind:type_name -> registry.v1.EndpointKind
 	72, // 57: registry.v1.CreateEndpointRequest.tags:type_name -> registry.v1.CreateEndpointRequest.TagsEntry
 	73, // 58: registry.v1.CreateEndpointRequest.metadata:type_name -> registry.v1.CreateEndpointRequest.MetadataEntry
 	3,  // 59: registry.v1.CreateEndpointResponse.endpoint:type_name -> registry.v1.Endpoint
@@ -3504,7 +3504,7 @@ var file_api_registry_v1_catalog_proto_depIdxs = []int32{
 	78, // 61: registry.v1.ListEndpointsRequest.pagination:type_name -> registry.v1.PaginationRequest
 	3,  // 62: registry.v1.ListEndpointsResponse.endpoints:type_name -> registry.v1.Endpoint
 	79, // 63: registry.v1.ListEndpointsResponse.pagination:type_name -> registry.v1.PaginationResponse
-	77, // 64: registry.v1.UpdateEndpointRequest.protocol:type_name -> registry.v1.Protocol
+	77, // 64: registry.v1.UpdateEndpointRequest.kind:type_name -> registry.v1.EndpointKind
 	74, // 65: registry.v1.UpdateEndpointRequest.tags:type_name -> registry.v1.UpdateEndpointRequest.TagsEntry
 	75, // 66: registry.v1.UpdateEndpointRequest.metadata:type_name -> registry.v1.UpdateEndpointRequest.MetadataEntry
 	3,  // 67: registry.v1.UpdateEndpointResponse.endpoint:type_name -> registry.v1.Endpoint

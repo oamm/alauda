@@ -9,9 +9,9 @@ import {
 } from "../lib/endpoint-form";
 import { CatalogRow, StatusBadge, ResourceList } from "./ui";
 
-function Editor({ protocol = "PROTOCOL_HTTP" }: { protocol?: string }) {
+function Editor({ kind = "HTTP" }: { kind?: string }) {
   const [value, setValue] = useState<EndpointFormValue>(
-    newEndpoint([], { protocol }),
+    newEndpoint([], { kind }),
   );
   return (
     <>
@@ -20,10 +20,10 @@ function Editor({ protocol = "PROTOCOL_HTTP" }: { protocol?: string }) {
     </>
   );
 }
-describe("Endpoint protocol capabilities", () => {
-  for (const protocol of ["PROTOCOL_HTTP", "PROTOCOL_HTTPS"])
-    it(`${protocol} shows and preserves Path`, () => {
-      render(<Editor protocol={protocol} />);
+describe("kind capabilities", () => {
+  for (const kind of ["HTTP", "HTTPS"])
+    it(`${kind} shows and preserves Path`, () => {
+      render(<Editor kind={kind} />);
       fireEvent.change(screen.getByLabelText("Path"), {
         target: { value: "/metrics" },
       });
@@ -31,26 +31,40 @@ describe("Endpoint protocol capabilities", () => {
         '"path":"/metrics"',
       );
     });
-  for (const protocol of ["PROTOCOL_TCP", "PROTOCOL_UDP", "PROTOCOL_GRPC"])
-    it(`${protocol} hides Path and clears stale state on selection`, () => {
+  for (const kind of [
+    "TCP",
+    "UDP",
+    "GRPC",
+    "POSTGRES",
+    "REDIS",
+    "CUSTOM",
+  ])
+    it(`${kind} hides Path and clears stale state on selection`, () => {
       render(<Editor />);
       fireEvent.change(screen.getByLabelText("Path"), {
         target: { value: "/api" },
       });
-      fireEvent.change(screen.getByLabelText("Protocol"), {
-        target: { value: protocol },
+      fireEvent.change(screen.getByLabelText("Endpoint type"), {
+        target: { value: kind },
       });
       expect(screen.queryByLabelText("Path")).not.toBeInTheDocument();
       expect(screen.getByLabelText("Draft")).toHaveTextContent('"path":""');
-      fireEvent.change(screen.getByLabelText("Protocol"), {
-        target: { value: "PROTOCOL_HTTP" },
+      fireEvent.change(screen.getByLabelText("Endpoint type"), {
+        target: { value: "HTTP" },
       });
       expect(screen.getByLabelText("Path")).toHaveValue("");
     });
   it("rejects incompatible paths in shared validation rather than silently submitting", () => {
-    for (const protocol of ["PROTOCOL_TCP", "PROTOCOL_UDP", "PROTOCOL_GRPC"])
+    for (const kind of [
+      "TCP",
+      "UDP",
+      "GRPC",
+      "POSTGRES",
+      "REDIS",
+      "CUSTOM",
+    ])
       expect(
-        validateEndpoint({ ...newEndpoint(), protocol, path: "/bad" }).path,
+        validateEndpoint({ ...newEndpoint(), kind, path: "/bad" }).path,
       ).toBeDefined();
     for (const path of [
       "//host",
@@ -62,7 +76,7 @@ describe("Endpoint protocol capabilities", () => {
   });
   it("normalizes legacy non-path values when loading editable defaults", () => {
     expect(
-      newEndpoint([], { protocol: "PROTOCOL_TCP", path: "/legacy" }).path,
+      newEndpoint([], { kind: "TCP", path: "/legacy" }).path,
     ).toBe("");
   });
 });

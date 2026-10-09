@@ -14,17 +14,27 @@ Environment restrictions apply at the backend boundary, including legacy REST an
 
 ## Registration
 
+## Endpoint semantics
+
+Service is the logical resource. Instance is a running/network location with a host-only `address`. Endpoint is a consumable interface of that Instance. EndpointKind is the semantic type of that interface, using `HTTP`, `HTTPS`, `GRPC`, `POSTGRES`, `REDIS`, `TCP`, `UDP`, or `CUSTOM`. `port` is always separate. `path` is kind-dependent and supported only for HTTP/HTTPS. Alauda discovers these network facts; consumers build technology-specific connection strings.
+
+PostgreSQL example: address `db.internal`, port `5432`, kind `POSTGRES`, resolved value `db.internal:5432`.
+
+gRPC example: address `lynx-authentication.lynx`, port `81`, kind `GRPC`, resolved value `lynx-authentication.lynx:81`.
+
+HTTP example: address `api.internal`, port `8080`, kind `HTTP`, path `/api`, resolved value `http://api.internal:8080/api`.
+
 `POST /api/v1/services/{serviceKey}/instances` requires an existing Service and Environment. Registration resolves both by key and returns `404` with `service_not_found` or `environment_not_found` when either is missing.
 
 ```json
 {
   "environment": "stg",
   "instance": {"name": "authentication-01", "address": "lynx-authentication.lynx"},
-  "endpoints": [{"name": "default", "protocol": "http", "port": 81, "path": "/", "primary": true}]
+  "endpoints": [{"name": "default", "kind": "HTTP", "port": 81, "path": "/", "primary": true}]
 }
 ```
 
-Registration is an atomic UPSERT keyed by Service + Environment + Instance name. Matching endpoints are updated, new endpoints are created, and omitted endpoints are preserved. Omitted mutable fields preserve stored values, including Enabled, description, tags and metadata; explicit empty strings/maps clear those fields where valid. Null is not a clear operation. New resources require address/protocol/port; Enabled defaults true. Set `replaceEndpoints: true` to retire omitted endpoints. Responses contain the full active endpoint set.
+Registration is an atomic UPSERT keyed by Service + Environment + Instance name. Matching endpoints are updated, new endpoints are created, and omitted endpoints are preserved. Omitted mutable fields preserve stored values, including Enabled, description, tags and metadata; explicit empty strings/maps clear those fields where valid. Null is not a clear operation. New resources require address/kind/port; Enabled defaults true. `protocol` is not a public field. Set `replaceEndpoints: true` to retire omitted endpoints. Responses contain the full active endpoint set.
 
 Concurrent UPSERTs are serialized transactionally; later successful updates win for the fields they supply. SQLite busy/locked snapshots retry the complete transaction with a bounded backoff; exhaustion returns temporarily_unavailable, never a raw constraint or duplicate resource. A response/transport failure after commit can be retried safely with the same identity.
 
@@ -34,13 +44,27 @@ Deregistration soft-deletes only the Instance, preserving endpoints, checks and 
 
 ## Discovery
 
-Endpoint protocols are `http`, `https`, `tcp`, `udp`, and `grpc`. Only HTTP/HTTPS support an optional path, without query, fragment, authority or control characters. TCP/UDP/gRPC require an empty or omitted path; incompatible supplied paths return `validation_failed` with a field error. Protocol changes clear incompatible retained paths when Path is omitted. Health Check path overrides are separate configuration, not generic gRPC service/method paths.
+Endpoint kinds are `HTTP`, `HTTPS`, `GRPC`, `POSTGRES`, `REDIS`, `TCP`, `UDP`, and `CUSTOM`. Kind describes endpoint semantics and presentation behavior; it is not automatically a URI scheme. Only HTTP/HTTPS support an optional path, without query, fragment, authority or control characters. gRPC/PostgreSQL/Redis/TCP/UDP/Custom require an empty or omitted path; incompatible supplied paths return `validation_failed` with a field error. Kind changes clear incompatible retained paths when Path is omitted. Health Check path overrides are separate configuration, not generic gRPC service/method paths.
 
-Discovery and endpoint-management responses omit Path for non-path protocols, including legacy stored values, without rewriting those records. Existing representations remain `http://host:port/path`, `https://host:port/path`, `tcp://host:port`, `udp://host:port`, and logical cleartext `grpc://host:port`. Ports must be 1..65535; no `:0` or irrelevant trailing slash is generated. No new gRPC TLS scheme is introduced.
+Discovery and endpoint-management responses are structured: endpoint `address` is the bare host/IP, `port` remains numeric, `kind` is explicit, and `path` is present only for HTTP/HTTPS. HTTP/HTTPS value formatting is `http://host:port/path` or `https://host:port/path`; non-URI kinds format as `host:port` for CLI value output. No `tcp://`, `udp://`, `grpc://`, database DSN, Redis URI, Kafka URI, credentials, database name, TLS material or secret data is generated by Alauda.
+
+Example PostgreSQL resolve response:
+
+```json
+{
+  "service": "postgres",
+  "environment": "development",
+  "instance": {"name": "postgres-01", "address": "192.168.0.109"},
+  "endpoint": {"name": "default", "kind": "POSTGRES", "port": 5432, "primary": true, "enabled": true},
+  "resolvedValue": "192.168.0.109:5432"
+}
+```
+
+Connection strings are client responsibility. For PostgreSQL, Redis, Kafka and similar systems, applications combine Alauda's address/port/kind with their own database name, credentials, TLS policy and Secret Manager configuration. For gRPC, Alauda returns address + port + `GRPC`; the consuming client decides cleartext/TLS transport from its own policy.
 
 `GET /api/v1/discovery/{serviceKey}?environment=stg` returns all enabled instances and endpoints. Known unhealthy and disabled health states are excluded by default; unknown health is usable until a check reports otherwise. Add `health=all` to inspect all enabled candidates.
 
-`GET /api/v1/discovery/{serviceKey}/resolve?environment=stg&endpoint=grpc` returns one address. A named endpoint is selected when supplied; otherwise the enabled primary endpoint is selected, falling back to the first enabled endpoint in deterministic name order. Healthy Instances rank before other eligible states; ties use Instance name order. This is deterministic selection, not load balancing. See [SERVICE_DISCOVERY.md](SERVICE_DISCOVERY.md) for the canonical health policy and freshness rules.
+`GET /api/v1/discovery/{serviceKey}/resolve?environment=stg&endpoint=grpc` returns one structured endpoint. A named endpoint is selected when supplied; otherwise the enabled primary endpoint is selected, falling back to the first enabled endpoint in deterministic name order. Healthy Instances rank before other eligible states; ties use Instance name order. This is deterministic selection, not load balancing. See [SERVICE_DISCOVERY.md](SERVICE_DISCOVERY.md) for the canonical health policy and freshness rules.
 
 `DELETE /api/v1/services/{serviceKey}/instances/{instanceName}?environment=stg` deregisters by human-readable identity.
 

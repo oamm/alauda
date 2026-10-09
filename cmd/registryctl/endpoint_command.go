@@ -68,7 +68,7 @@ func newEndpointGetCommand() *cobra.Command {
 
 func newEndpointCreateCommand() *cobra.Command {
 	var instanceID, name, path string
-	var protocol, port int32
+	var kind, port int32
 	var enabled bool
 	c := &cobra.Command{
 		Use:   "create",
@@ -77,7 +77,7 @@ func newEndpointCreateCommand() *cobra.Command {
 			if instanceID == "" || name == "" {
 				return fmt.Errorf("--instance-id and --name are required")
 			}
-			if err := address.ValidateEndpoint(registryv1.Protocol(protocol).String(), port, path); err != nil {
+			if err := address.ValidateEndpoint(registryv1.EndpointKind(kind).String(), port, path); err != nil {
 				return err
 			}
 			ctx, cancel := newContext()
@@ -87,7 +87,7 @@ func newEndpointCreateCommand() *cobra.Command {
 			resp, err := client.CreateEndpoint(ctx, connect.NewRequest(&registryv1.CreateEndpointRequest{
 				InstanceId: instanceID,
 				Name:       name,
-				Protocol:   registryv1.Protocol(protocol),
+				Kind:       registryv1.EndpointKind(kind),
 				Port:       port,
 				Path:       path,
 				Enabled:    enabled,
@@ -101,7 +101,7 @@ func newEndpointCreateCommand() *cobra.Command {
 	}
 	c.Flags().StringVar(&instanceID, "instance-id", "", "Instance ID")
 	c.Flags().StringVar(&name, "name", "", "Endpoint name")
-	c.Flags().Int32Var(&protocol, "protocol", 0, "Protocol (1=HTTP, 2=HTTPS, 3=GRPC, 4=TCP, 5=UDP)")
+	c.Flags().Int32Var(&kind, "kind", 0, "kind (1=HTTP, 2=HTTPS, 3=GRPC, 4=TCP, 5=UDP, 6=POSTGRES, 7=REDIS, 8=CUSTOM)")
 	c.Flags().Int32Var(&port, "port", 0, "Port number")
 	c.Flags().StringVar(&path, "path", "", "Path (for HTTP/HTTPS)")
 	c.Flags().BoolVar(&enabled, "enabled", true, "Enable endpoint")
@@ -110,7 +110,7 @@ func newEndpointCreateCommand() *cobra.Command {
 
 func newEndpointUpdateCommand() *cobra.Command {
 	var name, path string
-	var protocol, port int32
+	var kind, port int32
 	var enabled bool
 	c := &cobra.Command{
 		Use:   "update <endpoint-id>",
@@ -120,8 +120,8 @@ func newEndpointUpdateCommand() *cobra.Command {
 			if name == "" {
 				return fmt.Errorf("--name is required")
 			}
-			if protocol != 0 {
-				if err := address.ValidateEndpointPath(registryv1.Protocol(protocol).String(), path); err != nil {
+			if kind != 0 {
+				if err := address.ValidateEndpointPath(registryv1.EndpointKind(kind).String(), path); err != nil {
 					return err
 				}
 			}
@@ -130,12 +130,12 @@ func newEndpointUpdateCommand() *cobra.Command {
 
 			client := registryv1connect.NewEndpointServiceClient(newHTTPClient(), cliConfig.ServerURL)
 			resp, err := client.UpdateEndpoint(ctx, connect.NewRequest(&registryv1.UpdateEndpointRequest{
-				Id:       args[0],
-				Name:     name,
-				Protocol: registryv1.Protocol(protocol),
-				Port:     port,
-				Path:     path,
-				Enabled:  enabled,
+				Id:      args[0],
+				Name:    name,
+				Kind:    registryv1.EndpointKind(kind),
+				Port:    port,
+				Path:    path,
+				Enabled: enabled,
 			}))
 			if err != nil {
 				return err
@@ -145,7 +145,7 @@ func newEndpointUpdateCommand() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&name, "name", "", "Endpoint name")
-	c.Flags().Int32Var(&protocol, "protocol", 0, "Protocol (0=unchanged, 1=HTTP, 2=HTTPS, 3=GRPC, 4=TCP, 5=UDP)")
+	c.Flags().Int32Var(&kind, "kind", 0, "kind (0=unchanged, 1=HTTP, 2=HTTPS, 3=GRPC, 4=TCP, 5=UDP, 6=POSTGRES, 7=REDIS, 8=CUSTOM)")
 	c.Flags().Int32Var(&port, "port", 0, "Port number")
 	c.Flags().StringVar(&path, "path", "", "Path (for HTTP/HTTPS)")
 	c.Flags().BoolVar(&enabled, "enabled", true, "Enable endpoint")

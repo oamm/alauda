@@ -13,8 +13,8 @@ import (
 
 func TestHealthStatusConsistentAcrossPublicSurfaces(t *testing.T) {
 	f := newPublicFixture(t)
-	first := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one","address":"host-one"},"endpoints":[{"name":"default","protocol":"http","port":81}]}`))
-	second := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"two","address":"host-two"},"endpoints":[{"name":"default","protocol":"http","port":82}]}`))
+	first := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one","address":"host-one"},"endpoints":[{"name":"default","kind":"http","port":81}]}`))
+	second := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"two","address":"host-two"},"endpoints":[{"name":"default","kind":"http","port":82}]}`))
 	if _, err := f.db.Exec(context.Background(), "UPDATE service_deployments SET health_enabled=1 WHERE service_id=? AND environment_id=?", f.serviceID, f.environmentID); err != nil {
 		t.Fatal(err)
 	}

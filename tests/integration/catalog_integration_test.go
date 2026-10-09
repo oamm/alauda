@@ -139,7 +139,7 @@ func TestCatalogLifecycleOverConnect(t *testing.T) {
 	createEndpointResp, err := endpointClient.CreateEndpoint(ctx, connect.NewRequest(&registryv1.CreateEndpointRequest{
 		InstanceId: instID,
 		Name:       "public-http",
-		Protocol:   registryv1.Protocol_PROTOCOL_HTTP,
+		Kind:   registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 		Port:       9090,
 		Path:       "/healthz",
 		Enabled:    true,
@@ -157,7 +157,7 @@ func TestCatalogLifecycleOverConnect(t *testing.T) {
 	if _, err := endpointClient.UpdateEndpoint(ctx, connect.NewRequest(&registryv1.UpdateEndpointRequest{
 		Id:       endpointID,
 		Name:     "internal-http",
-		Protocol: registryv1.Protocol_PROTOCOL_HTTP,
+		Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 		Port:     9091,
 		Path:     "/readyz",
 		Enabled:  true,

@@ -150,7 +150,7 @@ func TestCatalogRepositoriesLifecycleAndEnvironmentIsolation(t *testing.T) {
 	endpoint, err := endpointRepo.Create(ctx, &registryv1.CreateEndpointRequest{
 		InstanceId: instance.GetId(),
 		Name:       "http",
-		Protocol:   registryv1.Protocol_PROTOCOL_HTTP,
+		Kind:   registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 		Port:       9090,
 		Path:       "/healthz",
 		Enabled:    true,
@@ -161,7 +161,7 @@ func TestCatalogRepositoriesLifecycleAndEnvironmentIsolation(t *testing.T) {
 	if _, err := endpointRepo.Update(ctx, &registryv1.UpdateEndpointRequest{
 		Id:       endpoint.GetId(),
 		Name:     "ready",
-		Protocol: registryv1.Protocol_PROTOCOL_HTTP,
+		Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 		Port:     9091,
 		Path:     "/readyz",
 		Enabled:  true,

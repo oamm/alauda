@@ -1,5 +1,4 @@
-// Package address defines server-generated endpoint addresses. grpc is a
-// logical cleartext gRPC authority, not an HTTP URL or a TLS configuration.
+// Package address defines server-generated endpoint presentation.
 package address
 
 import (
@@ -15,18 +14,6 @@ func NormalizeHost(value string) (string, error) {
 	host := strings.TrimSpace(value)
 	if host == "" {
 		return "", fmt.Errorf("address must be a bare DNS name or IP address without scheme, port or path")
-	}
-	if strings.Contains(host, "://") {
-		parsed, err := url.Parse(host)
-		if err != nil || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
-			return "", fmt.Errorf("address must be a bare DNS name or IP address without scheme, port or path")
-		}
-		host = parsed.Hostname()
-	}
-	if strings.Contains(host, ":") && net.ParseIP(host) == nil {
-		if parsedHost, _, err := net.SplitHostPort(host); err == nil {
-			host = parsedHost
-		}
 	}
 	if err := ValidateHost(host); err != nil {
 		return "", err
@@ -67,30 +54,26 @@ func ValidatePath(path string) error {
 	}
 	return nil
 }
-func Build(protocol, host string, port int32, path string) (string, error) {
+func FormatValue(kind, host string, port int32, path string) (string, error) {
 	if err := ValidateHost(host); err != nil {
 		return "", err
 	}
 	if port < 1 || port > 65535 {
 		return "", fmt.Errorf("port must be between 1 and 65535")
 	}
-	path = PublicPath(protocol, path)
-	if _, err := Capabilities(protocol); err != nil {
+	capabilities, err := Capabilities(kind)
+	if err != nil {
 		return "", err
 	}
+	path = PublicPath(kind, path)
 	if err := ValidatePath(path); err != nil {
 		return "", err
 	}
-	protocol = strings.ToLower(protocol)
-	switch protocol {
-	case "http", "https":
+	if capabilities.HasURIScheme {
 		if path != "" && !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
-	case "grpc", "tcp", "udp":
-		path = ""
-	default:
-		return "", fmt.Errorf("unsupported protocol")
+		return (&url.URL{Scheme: capabilities.URIScheme, Host: net.JoinHostPort(host, strconv.Itoa(int(port))), Path: path}).String(), nil
 	}
-	return (&url.URL{Scheme: protocol, Host: net.JoinHostPort(host, strconv.Itoa(int(port))), Path: path}).String(), nil
+	return net.JoinHostPort(host, strconv.Itoa(int(port))), nil
 }

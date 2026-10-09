@@ -23,7 +23,7 @@ import (
 
 func TestAllRPCResourceReferencesEnforceEnvironment(t *testing.T) {
 	f := newPublicFixture(t)
-	out := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01","address":"host"},"endpoints":[{"name":"default","protocol":"http","port":81}]}`))
+	out := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01","address":"host"},"endpoints":[{"name":"default","kind":"http","port":81}]}`))
 	var deploymentID string
 	if err := f.db.QueryRow(context.Background(), "SELECT deployment_id FROM service_instances WHERE id=?", out.Instance.ID).Scan(&deploymentID); err != nil {
 		t.Fatal(err)

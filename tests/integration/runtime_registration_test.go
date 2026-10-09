@@ -34,8 +34,8 @@ func TestRegisterRuntimeCreatesDeploymentAndEndpoints(t *testing.T) {
 			Description: "primary checkout instance",
 		},
 		Endpoints: []*registryv1.RuntimeEndpointRegistration{
-			{Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTPS, Port: 8080, Path: "/", Primary: true},
-			{Name: "grpc", Protocol: registryv1.Protocol_PROTOCOL_GRPC, Port: 5001},
+			{Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTPS, Port: 8080, Path: "/", Primary: true},
+			{Name: "grpc", Kind: registryv1.EndpointKind_ENDPOINT_KIND_GRPC, Port: 5001},
 		},
 	}))
 	if err != nil {
@@ -115,7 +115,7 @@ func TestRegisterRuntimeReusesDeploymentAndRollsBackDuplicateInstance(t *testing
 			Address: "10.0.1.10",
 		},
 		Endpoints: []*registryv1.RuntimeEndpointRegistration{
-			{Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 8080},
+			{Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 8080},
 		},
 	}
 	resp, err := instanceClient.RegisterRuntime(ctx, connect.NewRequest(registerReq))
@@ -180,7 +180,7 @@ func TestRegisterRuntimeEnvironmentIsolation(t *testing.T) {
 			EnvironmentId: item.envID,
 			Instance:      &registryv1.RuntimeInstanceRegistration{Name: item.name, Address: "orders.internal"},
 			Endpoints: []*registryv1.RuntimeEndpointRegistration{
-				{Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 8080},
+				{Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 8080},
 			},
 		})); err != nil {
 			t.Fatalf("register %s: %v", item.name, err)

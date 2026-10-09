@@ -1008,9 +1008,9 @@ function CheckDetail(props: {
                 <dd>{item.address}</dd>
                 <dt>Endpoint</dt>
                 <dd>{item.endpoint}</dd>
-                <dt>Protocol / port</dt>
+                <dt>kind / port</dt>
                 <dd>
-                  {item.protocol || "Instance address"} :{item.port}
+                  {item.kind || "Instance address"} :{item.port}
                 </dd>
                 <dt>Path</dt>
                 <dd>{item.path || "Not specified"}</dd>

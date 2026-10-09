@@ -35,7 +35,7 @@ describe("Public browser contract", () => {
           {
             id: "e1",
             name: "default",
-            protocol: "http",
+            kind: "HTTP",
             port: 81,
             path: "/",
             enabled: true,
@@ -58,7 +58,7 @@ describe("Public browser contract", () => {
       endpoints: [
         {
           name: "default",
-          protocol: "PROTOCOL_HTTP",
+          kind: "HTTP",
           port: 81,
           path: "/",
           enabled: true,
@@ -81,14 +81,14 @@ describe("Public browser contract", () => {
     expect(payload).not.toHaveProperty("deploymentId");
     expect(payload.environment).toBe("stg");
     expect(payload.endpoints[0]).toMatchObject({
-      protocol: "http",
+      kind: "HTTP",
       primary: false,
     });
     expect(first.instance.id).toBe(second.instance.id);
     expect(first.endpoints[0]).toMatchObject({
       instanceId: "i1",
       address: "http://[::1]:81/",
-      protocol: "PROTOCOL_HTTP",
+      kind: "HTTP",
     });
   });
 

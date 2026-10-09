@@ -5,22 +5,29 @@ import (
 	"strings"
 )
 
-// ProtocolCapabilities describes the existing public endpoint representations.
-type ProtocolCapabilities struct{ SupportsPath bool }
+// EndpointCapabilities describes public endpoint semantics. Endpoint kind is
+// not a URI scheme unless HasURIScheme is true.
+type EndpointCapabilities struct {
+	SupportsPath bool
+	HasURIScheme bool
+	URIScheme    string
+}
 
-func Capabilities(protocol string) (ProtocolCapabilities, error) {
-	switch strings.ToLower(strings.TrimPrefix(protocol, "PROTOCOL_")) {
-	case "http", "https":
-		return ProtocolCapabilities{SupportsPath: true}, nil
-	case "tcp", "udp", "grpc":
-		return ProtocolCapabilities{}, nil
+func Capabilities(kind string) (EndpointCapabilities, error) {
+	switch strings.ToLower(strings.TrimPrefix(kind, "ENDPOINT_KIND_")) {
+	case "http":
+		return EndpointCapabilities{SupportsPath: true, HasURIScheme: true, URIScheme: "http"}, nil
+	case "https":
+		return EndpointCapabilities{SupportsPath: true, HasURIScheme: true, URIScheme: "https"}, nil
+	case "tcp", "udp", "grpc", "postgres", "redis", "custom":
+		return EndpointCapabilities{}, nil
 	default:
-		return ProtocolCapabilities{}, fmt.Errorf("unsupported endpoint protocol")
+		return EndpointCapabilities{}, fmt.Errorf("unsupported endpoint kind")
 	}
 }
 
-func ValidateEndpointPath(protocol, path string) error {
-	capabilities, err := Capabilities(protocol)
+func ValidateEndpointPath(kind, path string) error {
+	capabilities, err := Capabilities(kind)
 	if err != nil {
 		return err
 	}
@@ -30,16 +37,16 @@ func ValidateEndpointPath(protocol, path string) error {
 	return ValidatePath(path)
 }
 
-func ValidateEndpoint(protocol string, port int32, path string) error {
+func ValidateEndpoint(kind string, port int32, path string) error {
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535")
 	}
-	return ValidateEndpointPath(protocol, path)
+	return ValidateEndpointPath(kind, path)
 }
 
-// PublicPath omits incompatible legacy values without rewriting stored records.
-func PublicPath(protocol, path string) string {
-	capabilities, err := Capabilities(protocol)
+// PublicPath omits incompatible values from public projection.
+func PublicPath(kind, path string) string {
+	capabilities, err := Capabilities(kind)
 	if err != nil || !capabilities.SupportsPath {
 		return ""
 	}

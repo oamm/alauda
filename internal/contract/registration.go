@@ -20,7 +20,7 @@ type InstancePatch struct {
 }
 type EndpointPatch struct {
 	Name     string            `json:"name" yaml:"name"`
-	Protocol *string           `json:"protocol,omitempty" yaml:"protocol,omitempty"`
+	Kind     *string           `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Port     *int32            `json:"port,omitempty" yaml:"port,omitempty"`
 	Path     *string           `json:"path,omitempty" yaml:"path,omitempty"`
 	Primary  *bool             `json:"primary,omitempty" yaml:"primary,omitempty"`

@@ -26,7 +26,7 @@ type HealthResultRecord struct {
 	Instance       string `json:"instance"`
 	EndpointID     string `json:"endpointId"`
 	Endpoint       string `json:"endpoint"`
-	Protocol       int32  `json:"protocol"`
+	Kind           int32  `json:"kind"`
 	Port           int32  `json:"port"`
 	Address        string `json:"address"`
 	CheckID        string `json:"checkId"`
@@ -95,7 +95,7 @@ func (r *HealthRepository) QueryHealthResults(ctx context.Context, q HealthResul
 		q.Offset = 0
 	}
 	query := `SELECT hr.id, hr.timestamp, s.id, COALESCE(NULLIF(s.display_name,''),s.name), env.id, env.name,
-	 si.id, si.name, COALESCE(e.id,''), COALESCE(e.name,''), COALESCE(e.protocol,0), COALESCE(e.port,si.port), si.address,
+	 si.id, si.name, COALESCE(e.id,''), COALESCE(e.name,''), COALESCE(e.kind,0), COALESCE(e.port,si.port), si.address,
 	 hc.id, hc.name, hc.type, hc.metadata, COALESCE(e.path,''), hr.success, hr.latency_ms, hr.status_code, COALESCE(hr.error_type,''), COALESCE(hr.error_message,'')
 	 FROM health_results hr JOIN health_checks hc ON hc.id=hr.health_check_id
 	 JOIN service_instances si ON si.id=hr.instance_id JOIN service_deployments d ON d.id=si.deployment_id
@@ -112,7 +112,7 @@ func (r *HealthRepository) QueryHealthResults(ctx context.Context, q HealthResul
 		var item HealthResultRecord
 		var metadata string
 		var latency, status sql.NullInt32
-		if err := rows.Scan(&item.ID, &item.Timestamp, &item.ServiceID, &item.Service, &item.EnvironmentID, &item.Environment, &item.InstanceID, &item.Instance, &item.EndpointID, &item.Endpoint, &item.Protocol, &item.Port, &item.Address, &item.CheckID, &item.Check, &item.Type, &metadata, &item.Path, &item.Success, &latency, &status, &item.ErrorType, &item.ErrorMessage); err != nil {
+		if err := rows.Scan(&item.ID, &item.Timestamp, &item.ServiceID, &item.Service, &item.EnvironmentID, &item.Environment, &item.InstanceID, &item.Instance, &item.EndpointID, &item.Endpoint, &item.Kind, &item.Port, &item.Address, &item.CheckID, &item.Check, &item.Type, &metadata, &item.Path, &item.Success, &latency, &status, &item.ErrorType, &item.ErrorMessage); err != nil {
 			return nil, "", err
 		}
 		if latency.Valid {

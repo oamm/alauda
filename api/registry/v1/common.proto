@@ -27,14 +27,18 @@ enum HealthCheckType {
   HEALTH_CHECK_TYPE_HEARTBEAT = 6;
 }
 
-// Protocol enumeration
-enum Protocol {
-  PROTOCOL_UNSPECIFIED = 0;
-  PROTOCOL_HTTP = 1;
-  PROTOCOL_HTTPS = 2;
-  PROTOCOL_GRPC = 3;
-  PROTOCOL_TCP = 4;
-  PROTOCOL_UDP = 5;
+// Endpoint kind enumeration. Values describe endpoint semantics, not mandatory
+// URI schemes.
+enum EndpointKind {
+  ENDPOINT_KIND_UNSPECIFIED = 0;
+  ENDPOINT_KIND_HTTP = 1;
+  ENDPOINT_KIND_HTTPS = 2;
+  ENDPOINT_KIND_GRPC = 3;
+  ENDPOINT_KIND_TCP = 4;
+  ENDPOINT_KIND_UDP = 5;
+  ENDPOINT_KIND_POSTGRES = 6;
+  ENDPOINT_KIND_REDIS = 7;
+  ENDPOINT_KIND_CUSTOM = 8;
 }
 
 // Incident state enumeration

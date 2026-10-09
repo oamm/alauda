@@ -90,17 +90,17 @@ func runSharedStorageContract(t *testing.T, ctx context.Context, db *Database) {
 		t.Fatalf("environment list parity failed: %v, %v", environments, err)
 	}
 	if db.Provider() == "postgres" {
-		var protocolType string
-		if err := db.QueryRow(ctx, `SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'endpoints' AND column_name = 'protocol'`).Scan(&protocolType); err != nil {
+		var kindType string
+		if err := db.QueryRow(ctx, `SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'endpoints' AND column_name = 'kind'`).Scan(&kindType); err != nil {
 			t.Fatal(err)
 		}
-		if protocolType != "integer" {
-			t.Fatalf("endpoint protocol column type = %s, want integer", protocolType)
+		if kindType != "integer" {
+			t.Fatalf("endpoint kind column type = %s, want integer", kindType)
 		}
 	}
 	registration := contract.Registration{Instance: contract.InstancePatch{Name: "node", Address: contract.Pointer("127.0.0.1")}, Endpoints: []contract.EndpointPatch{
-		{Name: "http", Protocol: contract.Pointer("http"), Port: contract.Pointer(int32(8080)), Path: contract.Pointer("/"), Primary: contract.Pointer(true)},
-		{Name: "metrics", Protocol: contract.Pointer("http"), Port: contract.Pointer(int32(9090)), Path: contract.Pointer("/metrics"), Primary: contract.Pointer(false)},
+		{Name: "http", Kind: contract.Pointer("http"), Port: contract.Pointer(int32(8080)), Path: contract.Pointer("/"), Primary: contract.Pointer(true)},
+		{Name: "metrics", Kind: contract.Pointer("http"), Port: contract.Pointer(int32(9090)), Path: contract.Pointer("/metrics"), Primary: contract.Pointer(false)},
 	}}
 	registered, err := NewRuntimeRepository(db).RegisterPublicRuntime(ctx, service.GetId(), environment.GetId(), registration)
 	if err != nil {

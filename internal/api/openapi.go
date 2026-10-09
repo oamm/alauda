@@ -114,16 +114,21 @@ func buildPublicOpenAPI() schemaMap {
 	rp["environment"] = key
 	rp["mode"] = schemaMap{"type": "string", "enum": []string{"upsert"}, "default": "upsert"}
 	rp["replaceEndpoints"] = schemaMap{"type": "boolean", "default": false}
+	kindEnum := []string{"HTTP", "HTTPS", "GRPC", "POSTGRES", "REDIS", "TCP", "UDP", "CUSTOM"}
+	schemas["EndpointKind"] = schemaMap{"type": "string", "enum": kindEnum, "description": "The endpoint kind describes the semantic type of a registered endpoint. It does not necessarily correspond to a URI scheme."}
 	ep := rp["endpoints"].(schemaMap)["items"].(schemaMap)["properties"].(schemaMap)
 	ep["port"] = schemaMap{"type": "integer", "minimum": 1, "maximum": 65535, "nullable": true}
-	ep["protocol"] = schemaMap{"type": "string", "enum": []string{"http", "https", "tcp", "udp", "grpc"}, "nullable": true}
+	ep["kind"] = schemaRef("EndpointKind")
 	ep["name"] = key
-	ep["path"] = schemaMap{"type": "string", "nullable": true, "description": "Optional HTTP/HTTPS path without query, fragment or authority. TCP/UDP/gRPC require empty or omitted path; incompatible values are validation errors."}
+	ep["path"] = schemaMap{"type": "string", "nullable": true, "description": "Optional HTTP/HTTPS path without query, fragment or authority. Non-HTTP kinds require empty or omitted path; incompatible values are validation errors."}
 	ip := rp["instance"].(schemaMap)["properties"].(schemaMap)
 	ip["name"] = key
-	ip["address"] = schemaMap{"type": "string", "description": "Bare DNS hostname, IPv4 or IPv6; scheme and embedded port are rejected.", "nullable": true}
-	registration["example"] = schemaMap{"environment": "stg", "instance": schemaMap{"name": "lynx-authentication.lynx", "address": "lynx-authentication.lynx"}, "endpoints": []any{schemaMap{"name": "default", "protocol": "http", "port": 81, "path": "/"}}}
-	schemas["Resolve"] = objectSchema(schemaMap{"service": stringSchema(), "environment": stringSchema(), "instance": stringSchema(), "endpoint": stringSchema(), "address": schemaMap{"type": "string", "format": "uri"}}, "service", "environment", "instance", "endpoint", "address")
+	ip["address"] = schemaMap{"type": "string", "description": "Bare DNS hostname, IPv4 or IPv6. URI schemes, embedded ports, credentials, query, fragment and paths are rejected.", "nullable": true}
+	registration["example"] = schemaMap{"environment": "stg", "instance": schemaMap{"name": "lynx-authentication.lynx", "address": "lynx-authentication.lynx"}, "endpoints": []any{schemaMap{"name": "default", "kind": "HTTP", "port": 81, "path": "/"}}}
+	schemas["RegistrationEndpoint"] = rp["endpoints"].(schemaMap)["items"]
+	schemas["DiscoveryEndpoint"] = objectSchema(schemaMap{"name": key, "kind": schemaRef("EndpointKind"), "port": schemaMap{"type": "integer", "minimum": 1, "maximum": 65535}, "path": schemaMap{"type": "string", "description": "Optional resource path. Supported only by endpoint kinds whose capability model includes path semantics, such as HTTP and HTTPS."}, "primary": schemaMap{"type": "boolean"}, "enabled": schemaMap{"type": "boolean"}}, "name", "kind", "port", "primary", "enabled")
+	schemas["DiscoveryInstance"] = objectSchema(schemaMap{"name": key, "address": schemaMap{"type": "string", "description": "Hostname or IP address. URI schemes are not accepted."}, "healthState": schemaMap{"type": "string", "enum": []string{"Healthy", "Unknown", "Degraded", "Unhealthy", "Disabled"}}}, "name", "address")
+	schemas["Resolve"] = objectSchema(schemaMap{"service": stringSchema(), "environment": stringSchema(), "instance": schemaRef("DiscoveryInstance"), "endpoint": schemaRef("DiscoveryEndpoint"), "resolvedValue": schemaMap{"type": "string", "description": "Convenience value: HTTP/HTTPS URI, otherwise host:port. Structured instance and endpoint fields are authoritative."}}, "service", "environment", "instance", "endpoint")
 	healthStatus := schemaMap{"type": "string", "enum": []string{"Healthy", "Degraded", "Unhealthy", "Unknown", "Disabled"}}
 	schemas["Service"] = objectSchema(schemaMap{"id": stringSchema(), "name": key, "displayName": stringSchema(), "description": stringSchema(), "tags": stringMap, "metadata": stringMap, "healthStatus": healthStatus}, "id", "name", "displayName", "description", "tags", "metadata", "healthStatus")
 	schemas["HealthStatusSnapshot"] = objectSchema(schemaMap{"services": schemaMap{"type": "object", "additionalProperties": healthStatus}, "instances": schemaMap{"type": "object", "additionalProperties": healthStatus}, "monitored": schemaMap{"type": "object", "additionalProperties": schemaMap{"type": "boolean"}}}, "services", "instances", "monitored")
@@ -218,9 +223,9 @@ func buildPublicOpenAPI() schemaMap {
 		op["description"] = "Enabled Environment/Instances/Endpoints only. usable excludes known Unhealthy/Disabled and allows Unknown/Degraded; healthy requires fresh Healthy; all includes health states but not disabled lifecycle resources. Missing checks, disabled monitoring and stale health become Unknown. Healthy candidates rank first, then name order. Resolve selects named Endpoint, otherwise Primary, then lexicographic Endpoint name. No load balancing. Cache-Control: no-store."
 	}
 
-	schemas["Resolve"].(schemaMap)["example"] = schemaMap{"service": "Authentication.Grpc", "environment": "stg", "instance": "lynx-authentication.lynx", "endpoint": "default", "address": "http://lynx-authentication.lynx:81/"}
+	schemas["Resolve"].(schemaMap)["example"] = schemaMap{"service": "Authentication.Grpc", "environment": "stg", "instance": schemaMap{"name": "lynx-authentication.lynx", "address": "lynx-authentication.lynx", "healthState": "Healthy"}, "endpoint": schemaMap{"name": "default", "kind": "HTTP", "port": 81, "path": "/", "primary": true, "enabled": true}, "resolvedValue": "http://lynx-authentication.lynx:81/"}
 	exampleInstance := publicInstance{Name: "lynx-authentication.lynx", Address: "lynx-authentication.lynx", Enabled: true, HealthState: "Unknown"}
-	exampleEndpoint := publicEndpoint{Name: "default", Protocol: "http", Port: 81, Path: "/", Primary: true, Enabled: true, Address: "http://lynx-authentication.lynx:81/"}
+	exampleEndpoint := publicEndpoint{Name: "default", Kind: "HTTP", Port: 81, Path: "/", Primary: true, Enabled: true, Address: "lynx-authentication.lynx"}
 	exampleInstance.Endpoints = []publicEndpoint{exampleEndpoint}
 	schemas["RegistrationResponse"].(schemaMap)["example"] = publicRegistrationResponse{Service: "Authentication.Grpc", Environment: "stg", Instance: exampleInstance, Endpoints: []publicEndpoint{exampleEndpoint}}
 	schemas["Discovery"].(schemaMap)["example"] = publicDiscoveryResponse{Service: "Authentication.Grpc", Environment: "stg", Instances: []publicInstance{exampleInstance}}

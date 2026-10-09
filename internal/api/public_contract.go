@@ -60,7 +60,7 @@ type publicInstance struct {
 type publicEndpoint struct {
 	ID       string            `json:"id,omitempty"`
 	Name     string            `json:"name"`
-	Protocol string            `json:"protocol"`
+	Kind     string            `json:"kind"`
 	Port     int32             `json:"port"`
 	Path     string            `json:"path,omitempty"`
 	Primary  bool              `json:"primary"`
@@ -74,6 +74,29 @@ type publicDiscoveryResponse struct {
 	Service     string           `json:"service"`
 	Environment string           `json:"environment"`
 	Instances   []publicInstance `json:"instances"`
+}
+
+type publicResolveInstance struct {
+	Name        string `json:"name"`
+	Address     string `json:"address"`
+	HealthState string `json:"healthState,omitempty"`
+}
+
+type publicResolveEndpoint struct {
+	Name    string `json:"name"`
+	Kind    string `json:"kind"`
+	Port    int32  `json:"port"`
+	Path    string `json:"path,omitempty"`
+	Primary bool   `json:"primary"`
+	Enabled bool   `json:"enabled"`
+}
+
+type publicResolveResponse struct {
+	Service       string                `json:"service"`
+	Environment   string                `json:"environment"`
+	Instance      publicResolveInstance `json:"instance"`
+	Endpoint      publicResolveEndpoint `json:"endpoint"`
+	ResolvedValue string                `json:"resolvedValue,omitempty"`
 }
 
 func RegisterPublicContractREST(mux *http.ServeMux, db *storage.Database) {
@@ -221,7 +244,8 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 	}
 	seen := map[string]bool{}
 	primaries := 0
-	for i, ep := range input.Endpoints {
+	for i := range input.Endpoints {
+		ep := &input.Endpoints[i]
 		key := fmt.Sprintf("endpoints[%d]", i)
 		if strings.TrimSpace(ep.Name) == "" {
 			fields[key+".name"] = []string{"Endpoint name is required."}
@@ -233,9 +257,9 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 			fields[key+".name"] = []string{"Endpoint name is duplicated."}
 		}
 		seen[ep.Name] = true
-		if ep.Protocol != nil {
-			if _, ok := publicProtocol(*ep.Protocol); !ok {
-				fields[key+".protocol"] = []string{"Protocol must be http, https, grpc, tcp or udp."}
+		if ep.Kind != nil {
+			if _, ok := publicKind(*ep.Kind); !ok {
+				fields[key+".kind"] = []string{"Kind must be http, https, grpc, postgres, redis, tcp, udp or custom."}
 			}
 		}
 		if ep.Port != nil && (*ep.Port < 1 || *ep.Port > 65535) {
@@ -245,8 +269,8 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 			if err := address.ValidatePath(*ep.Path); err != nil {
 				fields[key+".path"] = []string{err.Error()}
 			}
-			if ep.Protocol != nil {
-				if err := address.ValidateEndpointPath(*ep.Protocol, *ep.Path); err != nil {
+			if ep.Kind != nil {
+				if err := address.ValidateEndpointPath(*ep.Kind, *ep.Path); err != nil {
 					fields[key+".path"] = []string{err.Error()}
 				}
 			}
@@ -286,7 +310,7 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 		if errors.As(err, &fields) {
 			publicError(w, 400, "validation_failed", "Registration validation failed.", fields.Fields)
 		} else if errors.Is(err, storage.ErrInvalidRuntimeRegistration) {
-			publicError(w, 400, "validation_failed", "New resources require an address, endpoint protocol and valid port.", nil)
+			publicError(w, 400, "validation_failed", "New resources require an address, endpoint kind and valid port.", nil)
 		} else {
 			publicStorageError(w, err)
 		}
@@ -300,7 +324,8 @@ func (a *publicContractAPI) register(w http.ResponseWriter, r *http.Request, ser
 	}
 	response.Instance.Healthy = response.Instance.HealthState == "Healthy"
 	for _, item := range result.Endpoints {
-		response.Endpoints = append(response.Endpoints, publicEndpoint{ID: item.Id, Name: item.Name, Protocol: strings.ToLower(strings.TrimPrefix(item.Protocol.String(), "PROTOCOL_")), Port: item.Port, Path: address.PublicPath(item.Protocol.String(), item.Path), Primary: item.Primary, Enabled: item.Enabled, Address: endpointAddress(item.Protocol, item.Path, result.Instance.Address, item.Port), Tags: item.Tags, Metadata: item.Metadata})
+		kind := kindFromDB(item.Kind.String())
+		response.Endpoints = append(response.Endpoints, publicEndpoint{ID: item.Id, Name: item.Name, Kind: strings.ToUpper(kind), Port: item.Port, Path: address.PublicPath(kind, item.Path), Primary: item.Primary, Enabled: item.Enabled, Address: result.Instance.Address, Tags: item.Tags, Metadata: item.Metadata})
 	}
 	writeJSON(w, 200, response)
 }
@@ -439,7 +464,7 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 		publicLookupError(w, err, "service_not_found", "Service does not exist.")
 		return
 	}
-	query := "SELECT si.id,si.name,si.address,COALESCE(si.description,''),e.id,e.name,e.protocol,e.port,COALESCE(e.path,''),e.primary_endpoint FROM services s JOIN service_deployments d ON d.service_id=s.id AND d.environment_id=? AND d.deleted_at IS NULL JOIN service_instances si ON si.deployment_id=d.id AND si.deleted_at IS NULL AND si.enabled=1 JOIN endpoints e ON e.instance_id=si.id AND e.deleted_at IS NULL AND e.enabled=1 WHERE s.name=? AND s.deleted_at IS NULL ORDER BY si.name,e.name"
+	query := "SELECT si.id,si.name,si.address,COALESCE(si.description,''),e.id,e.name,e.kind,e.port,COALESCE(e.path,''),e.primary_endpoint FROM services s JOIN service_deployments d ON d.service_id=s.id AND d.environment_id=? AND d.deleted_at IS NULL JOIN service_instances si ON si.deployment_id=d.id AND si.deleted_at IS NULL AND si.enabled=1 JOIN endpoints e ON e.instance_id=si.id AND e.deleted_at IS NULL AND e.enabled=1 WHERE s.name=? AND s.deleted_at IS NULL ORDER BY si.name,e.name"
 	snapshot, err := storage.NewHealthRepository(a.db).CurrentHealth(r.Context(), env.Id)
 	if err != nil {
 		publicStorageError(w, err)
@@ -455,10 +480,10 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 	indices := map[string]int{}
 	namedExists := false
 	for rows.Next() {
-		var id, name, host, description, eid, ename, protocol, path string
+		var id, name, host, description, eid, ename, kind, path string
 		var port int32
 		var primary bool
-		if err := rows.Scan(&id, &name, &host, &description, &eid, &ename, &protocol, &port, &path, &primary); err != nil {
+		if err := rows.Scan(&id, &name, &host, &description, &eid, &ename, &kind, &port, &path, &primary); err != nil {
 			publicStorageError(w, err)
 			return
 		}
@@ -472,9 +497,8 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 		if policy == "healthy" && state != "Healthy" || policy == "usable" && (state == "Unhealthy" || state == "Disabled") {
 			continue
 		}
-		p := protocolFromDB(protocol)
-		fullAddress, err := address.Build(p, host, port, path)
-		if err != nil {
+		p := kindFromDB(kind)
+		if _, err := address.FormatValue(p, host, port, path); err != nil {
 			continue
 		}
 		idx, ok := indices[id]
@@ -483,7 +507,7 @@ func (a *publicContractAPI) discovery(w http.ResponseWriter, r *http.Request) {
 			indices[id] = idx
 			response.Instances = append(response.Instances, publicInstance{ID: id, Name: name, Address: host, Description: description, Enabled: true, Healthy: state == "Healthy", HealthState: state, Endpoints: []publicEndpoint{}})
 		}
-		response.Instances[idx].Endpoints = append(response.Instances[idx].Endpoints, publicEndpoint{ID: eid, Name: ename, Protocol: p, Port: port, Path: address.PublicPath(p, path), Primary: primary, Enabled: true, Address: fullAddress})
+		response.Instances[idx].Endpoints = append(response.Instances[idx].Endpoints, publicEndpoint{ID: eid, Name: ename, Kind: strings.ToUpper(p), Port: port, Path: address.PublicPath(p, path), Primary: primary, Enabled: true, Address: host})
 	}
 	if err := rows.Err(); err != nil {
 		publicStorageError(w, err)
@@ -535,45 +559,79 @@ func (a *publicContractAPI) resolveDiscovery(w http.ResponseWriter, r *http.Requ
 		publicError(w, http.StatusNotFound, "no_primary_endpoint", "No matching endpoint was found.", nil)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"service": response.Service, "environment": response.Environment, "instance": instance.Name, "endpoint": selected.Name, "address": selected.Address})
+	resolvedValue, err := address.FormatValue(selected.Kind, instance.Address, selected.Port, selected.Path)
+	if err != nil {
+		publicError(w, http.StatusInternalServerError, "server_error", "Resolved endpoint could not be formatted.", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, publicResolveResponse{
+		Service:     response.Service,
+		Environment: response.Environment,
+		Instance: publicResolveInstance{
+			Name:        instance.Name,
+			Address:     instance.Address,
+			HealthState: instance.HealthState,
+		},
+		Endpoint: publicResolveEndpoint{
+			Name:    selected.Name,
+			Kind:    selected.Kind,
+			Port:    selected.Port,
+			Path:    selected.Path,
+			Primary: selected.Primary,
+			Enabled: selected.Enabled,
+		},
+		ResolvedValue: resolvedValue,
+	})
 }
 
-func publicProtocol(value string) (registryv1.Protocol, bool) {
+func publicKind(value string) (registryv1.EndpointKind, bool) {
 	switch strings.ToLower(value) {
 	case "http":
-		return registryv1.Protocol_PROTOCOL_HTTP, true
+		return registryv1.EndpointKind_ENDPOINT_KIND_HTTP, true
 	case "https":
-		return registryv1.Protocol_PROTOCOL_HTTPS, true
+		return registryv1.EndpointKind_ENDPOINT_KIND_HTTPS, true
 	case "grpc":
-		return registryv1.Protocol_PROTOCOL_GRPC, true
+		return registryv1.EndpointKind_ENDPOINT_KIND_GRPC, true
 	case "tcp":
-		return registryv1.Protocol_PROTOCOL_TCP, true
+		return registryv1.EndpointKind_ENDPOINT_KIND_TCP, true
 	case "udp":
-		return registryv1.Protocol_PROTOCOL_UDP, true
+		return registryv1.EndpointKind_ENDPOINT_KIND_UDP, true
+	case "postgres", "postgresql":
+		return registryv1.EndpointKind_ENDPOINT_KIND_POSTGRES, true
+	case "redis":
+		return registryv1.EndpointKind_ENDPOINT_KIND_REDIS, true
+	case "custom":
+		return registryv1.EndpointKind_ENDPOINT_KIND_CUSTOM, true
 	}
-	return registryv1.Protocol_PROTOCOL_UNSPECIFIED, false
+	return registryv1.EndpointKind_ENDPOINT_KIND_UNSPECIFIED, false
 }
-func protocolFromDB(value string) string {
+func kindFromDB(value string) string {
 	switch value {
-	case "1", "PROTOCOL_HTTP":
+	case "1", "ENDPOINT_KIND_HTTP":
 		return "http"
-	case "2", "PROTOCOL_HTTPS":
+	case "2", "ENDPOINT_KIND_HTTPS":
 		return "https"
-	case "3", "PROTOCOL_GRPC":
+	case "3", "ENDPOINT_KIND_GRPC":
 		return "grpc"
-	case "4", "PROTOCOL_TCP":
+	case "4", "ENDPOINT_KIND_TCP":
 		return "tcp"
-	case "5", "PROTOCOL_UDP":
+	case "5", "ENDPOINT_KIND_UDP":
 		return "udp"
+	case "6", "ENDPOINT_KIND_POSTGRES":
+		return "postgres"
+	case "7", "ENDPOINT_KIND_REDIS":
+		return "redis"
+	case "8", "ENDPOINT_KIND_CUSTOM":
+		return "custom"
 	}
-	return strings.ToLower(strings.TrimPrefix(value, "PROTOCOL_"))
+	return strings.ToLower(strings.TrimPrefix(value, "ENDPOINT_KIND_"))
 }
-func publicAddress(protocol, path, host string, port int32) string {
-	value, _ := address.Build(protocol, host, port, path)
+func publicAddress(kind, path, host string, port int32) string {
+	value, _ := address.FormatValue(kind, host, port, path)
 	return value
 }
-func endpointAddress(protocol registryv1.Protocol, path, host string, port int32) string {
-	return publicAddress(protocolFromDB(protocol.String()), path, host, port)
+func endpointAddress(kind registryv1.EndpointKind, path, host string, port int32) string {
+	return publicAddress(kindFromDB(kind.String()), path, host, port)
 }
 func publicError(w http.ResponseWriter, status int, code, detail string, fields map[string][]string) {
 	problem.Write(w, status, code, detail, fields)

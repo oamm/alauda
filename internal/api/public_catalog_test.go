@@ -120,7 +120,7 @@ func TestPublicManagementRESTBootstrapAndReadResources(t *testing.T) {
 	}{
 		{method: http.MethodPost, path: "/api/v1/environments", body: `{"key":"prod","name":"Production"}`, want: http.StatusCreated},
 		{method: http.MethodPost, path: "/api/v1/services", body: `{"name":"payments","displayName":"Payments"}`, want: http.StatusCreated},
-		{method: http.MethodPost, path: "/api/v1/services/payments/instances", body: `{"environment":"prod","instance":{"name":"payments-1","address":"payments.internal"},"endpoints":[{"name":"http","protocol":"http","port":8080,"path":"/ready","primary":true}]}`, want: http.StatusOK},
+		{method: http.MethodPost, path: "/api/v1/services/payments/instances", body: `{"environment":"prod","instance":{"name":"payments-1","address":"payments.internal"},"endpoints":[{"name":"http","kind":"http","port":8080,"path":"/ready","primary":true}]}`, want: http.StatusOK},
 		{method: http.MethodGet, path: "/api/v1/services/payments?environment=prod", want: http.StatusOK},
 		{method: http.MethodGet, path: "/api/v1/services/payments/instances?environment=prod&pageSize=1", want: http.StatusOK},
 		{method: http.MethodGet, path: "/api/v1/services/payments/instances/payments-1?environment=prod", want: http.StatusOK},

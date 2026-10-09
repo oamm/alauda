@@ -1,35 +1,74 @@
 import { object, string, number, boolean, type infer as Infer } from "zod";
 
-export const endpointProtocols = [
-  ["PROTOCOL_HTTP", "HTTP"],
-  ["PROTOCOL_HTTPS", "HTTPS"],
-  ["PROTOCOL_GRPC", "gRPC"],
-  ["PROTOCOL_TCP", "TCP"],
-  ["PROTOCOL_UDP", "UDP"],
+export type EndpointKind =
+  | "HTTP"
+  | "HTTPS"
+  | "GRPC"
+  | "POSTGRES"
+  | "REDIS"
+  | "TCP"
+  | "UDP"
+  | "CUSTOM";
+
+export const endpointKinds = [
+  ["HTTP", "HTTP"],
+  ["HTTPS", "HTTPS"],
+  ["GRPC", "gRPC"],
+  ["POSTGRES", "PostgreSQL"],
+  ["REDIS", "Redis"],
+  ["TCP", "TCP"],
+  ["UDP", "UDP"],
+  ["CUSTOM", "Custom"],
 ] as const;
 
-export const endpointCapabilities: Record<string, { supportsPath: boolean }> =
-  Object.fromEntries(
-    endpointProtocols.map(([protocol]) => [
-      protocol,
-      {
-        supportsPath:
-          protocol === "PROTOCOL_HTTP" || protocol === "PROTOCOL_HTTPS",
-      },
-    ]),
-  );
-export function supportsEndpointPath(protocol: string) {
-  return endpointCapabilities[protocol]?.supportsPath === true;
+type EndpointKindCapabilities = {
+  supportsPath: boolean;
+  displayName: string;
+  valueFormat: "uri" | "hostPort";
+};
+
+export const endpointCapabilities: Record<
+  EndpointKind,
+  EndpointKindCapabilities
+> = {
+  HTTP: { supportsPath: true, displayName: "HTTP", valueFormat: "uri" },
+  HTTPS: { supportsPath: true, displayName: "HTTPS", valueFormat: "uri" },
+  GRPC: { supportsPath: false, displayName: "gRPC", valueFormat: "hostPort" },
+  POSTGRES: {
+    supportsPath: false,
+    displayName: "PostgreSQL",
+    valueFormat: "hostPort",
+  },
+  REDIS: { supportsPath: false, displayName: "Redis", valueFormat: "hostPort" },
+  TCP: { supportsPath: false, displayName: "TCP", valueFormat: "hostPort" },
+  UDP: { supportsPath: false, displayName: "UDP", valueFormat: "hostPort" },
+  CUSTOM: {
+    supportsPath: false,
+    displayName: "Custom",
+    valueFormat: "hostPort",
+  },
+};
+
+export function normalizeEndpointKind(kind: string): EndpointKind {
+  return kind.replace(/^ENDPOINT_KIND_/, "").toUpperCase() as EndpointKind;
 }
-export function endpointPath(protocol: string, path = "") {
-  return supportsEndpointPath(protocol) ? path : "";
+
+export function getEndpointKindCapabilities(kind: string) {
+  return endpointCapabilities[normalizeEndpointKind(kind)];
+}
+
+export function supportsEndpointPath(kind: string) {
+  return getEndpointKindCapabilities(kind)?.supportsPath === true;
+}
+export function endpointPath(kind: string, path = "") {
+  return supportsEndpointPath(kind) ? path : "";
 }
 
 export const endpointSchema = object({
   name: string().trim().min(1, "Endpoint name is required."),
-  protocol: string().refine(
-    (value) => endpointProtocols.some(([protocol]) => protocol === value),
-    "Choose a protocol.",
+  kind: string().refine(
+    (value) => endpointKinds.some(([kind]) => kind === value),
+    "Choose an endpoint type.",
   ),
   port: number()
     .int()
@@ -39,7 +78,7 @@ export const endpointSchema = object({
   primary: boolean(),
   enabled: boolean(),
 }).superRefine((value, context) => {
-  if (!supportsEndpointPath(value.protocol) && value.path)
+  if (!supportsEndpointPath(value.kind) && value.path)
     context.addIssue({
       code: "custom",
       path: ["path"],
@@ -83,14 +122,14 @@ export function newEndpoint(
     name = `default-${suffix}`;
   const value = {
     name,
-    protocol: "PROTOCOL_HTTP",
+    kind: "HTTP",
     port: 8080,
     path: "/",
     primary: existingNames.length === 0,
     enabled: true,
     ...overrides,
   };
-  return { ...value, path: endpointPath(value.protocol, value.path) };
+  return { ...value, path: endpointPath(value.kind, value.path) };
 }
 
 export function validateEndpointCollection(values: EndpointFormValue[]) {

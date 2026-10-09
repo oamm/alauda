@@ -25,7 +25,7 @@ func NewEndpointRepository(db *Database) *EndpointRepository {
 }
 
 func (r *EndpointRepository) Create(ctx context.Context, req *registryv1.CreateEndpointRequest) (*registryv1.Endpoint, error) {
-	if err := address.ValidateEndpoint(req.GetProtocol().String(), req.GetPort(), req.GetPath()); err != nil {
+	if err := address.ValidateEndpoint(req.GetKind().String(), req.GetPort(), req.GetPath()); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidEndpoint, err)
 	}
 	id := uuid.NewString()
@@ -67,16 +67,16 @@ func (r *EndpointRepository) Create(ctx context.Context, req *registryv1.CreateE
 		id = deletedID
 		_, err = tx.ExecContext(ctx, `
 			UPDATE endpoints
-			SET protocol = ?, port = ?, path = ?, enabled = ?, tags = ?, metadata = ?,
+			SET kind = ?, port = ?, path = ?, enabled = ?, tags = ?, metadata = ?,
 			    primary_endpoint = ?, deleted_at = NULL, updated_at = ?
 			WHERE id = ? AND deleted_at IS NOT NULL
-		`, int32(req.GetProtocol()), req.GetPort(), req.GetPath(), req.GetEnabled(),
+		`, int32(req.GetKind()), req.GetPort(), req.GetPath(), req.GetEnabled(),
 			string(tagsJSON), string(metadataJSON), req.GetPrimary(), now, id)
 	} else {
 		_, err = tx.ExecContext(ctx, `
-			INSERT INTO endpoints (id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at)
+			INSERT INTO endpoints (id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		`, id, req.GetInstanceId(), req.GetName(), int32(req.GetProtocol()),
+		`, id, req.GetInstanceId(), req.GetName(), int32(req.GetKind()),
 			req.GetPort(), req.GetPath(), req.GetEnabled(), string(tagsJSON), string(metadataJSON), req.GetPrimary(), now, now)
 	}
 	if err != nil {
@@ -90,7 +90,7 @@ func (r *EndpointRepository) Create(ctx context.Context, req *registryv1.CreateE
 
 func (r *EndpointRepository) Get(ctx context.Context, id string) (*registryv1.Endpoint, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint
+		SELECT id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint
 		FROM endpoints
 		WHERE id = ? AND deleted_at IS NULL
 	`, id)
@@ -110,7 +110,7 @@ func (r *EndpointRepository) List(ctx context.Context, instanceID string, pageSi
 	}
 
 	query := `
-		SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint
+		SELECT id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint
 		FROM endpoints
 		WHERE deleted_at IS NULL
 	`
@@ -157,7 +157,7 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 	query := `
 		UPDATE endpoints
 		SET name = COALESCE(?, name),
-		    protocol = COALESCE(?, protocol),
+		    kind = COALESCE(?, kind),
 		    port = COALESCE(?, port),
 		    path = COALESCE(?, path),
 		    enabled = ?,
@@ -170,8 +170,8 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 		name = &req.Name
 	}
 	var proto *int32
-	if req.GetProtocol() != 0 {
-		p := int32(req.GetProtocol())
+	if req.GetKind() != 0 {
+		p := int32(req.GetKind())
 		proto = &p
 	}
 	var port *int32
@@ -190,13 +190,13 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 	defer tx.Rollback()
 
 	var instanceID string
-	current, err := scanEndpoint(tx.QueryRowContext(ctx, `SELECT id, instance_id, name, protocol, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE id=? AND deleted_at IS NULL`, req.GetId()))
+	current, err := scanEndpoint(tx.QueryRowContext(ctx, `SELECT id, instance_id, name, kind, port, path, enabled, tags, metadata, primary_endpoint FROM endpoints WHERE id=? AND deleted_at IS NULL`, req.GetId()))
 	if err != nil {
 		return nil, err
 	}
-	protocol, endpointPort, endpointPath := current.Protocol, current.Port, address.PublicPath(current.Protocol.String(), current.Path)
-	if req.GetProtocol() != 0 {
-		protocol = req.GetProtocol()
+	kind, endpointPort, endpointPath := current.Kind, current.Port, address.PublicPath(current.Kind.String(), current.Path)
+	if req.GetKind() != 0 {
+		kind = req.GetKind()
 	}
 	if req.GetPort() != 0 {
 		endpointPort = req.GetPort()
@@ -204,11 +204,11 @@ func (r *EndpointRepository) Update(ctx context.Context, req *registryv1.UpdateE
 	if req.GetPath() != "" {
 		endpointPath = req.GetPath()
 	}
-	capabilities, capabilityError := address.Capabilities(protocol.String())
+	capabilities, capabilityError := address.Capabilities(kind.String())
 	if capabilityError == nil && !capabilities.SupportsPath && req.GetPath() == "" {
 		endpointPath = ""
 	}
-	if err := address.ValidateEndpoint(protocol.String(), endpointPort, endpointPath); err != nil {
+	if err := address.ValidateEndpoint(kind.String(), endpointPort, endpointPath); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidEndpoint, err)
 	}
 	path = &endpointPath
@@ -266,7 +266,7 @@ func scanEndpoint(scanner interface{ Scan(...interface{}) error }) (*registryv1.
 		id           string
 		instanceID   string
 		name         string
-		protocol     int32
+		kind         int32
 		port         int32
 		path         string
 		enabled      bool
@@ -275,7 +275,7 @@ func scanEndpoint(scanner interface{ Scan(...interface{}) error }) (*registryv1.
 		primary      bool
 	)
 
-	err := scanner.Scan(&id, &instanceID, &name, &protocol, &port, &path, &enabled, &tagsJSON, &metadataJSON, &primary)
+	err := scanner.Scan(&id, &instanceID, &name, &kind, &port, &path, &enabled, &tagsJSON, &metadataJSON, &primary)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, sql.ErrNoRows
@@ -287,7 +287,7 @@ func scanEndpoint(scanner interface{ Scan(...interface{}) error }) (*registryv1.
 		Id:         id,
 		InstanceId: instanceID,
 		Name:       name,
-		Protocol:   registryv1.Protocol(protocol),
+		Kind:       registryv1.EndpointKind(kind),
 		Port:       port,
 		Path:       path,
 		Enabled:    enabled,

@@ -5,6 +5,7 @@ import { EndpointEditor } from "./EndpointEditor";
 import {
   validateEndpointCollection,
   endpointPath,
+  getEndpointKindCapabilities,
   type EndpointFormValue,
 } from "../lib/endpoint-form";
 import { Copy, MoreHorizontal, Plus, Trash2, Pencil } from "lucide-react";
@@ -982,7 +983,7 @@ function InstanceDetails(
                       <Table aria-label="Instance endpoints">
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Protocol</TableHead>
+                            <TableHead>kind</TableHead>
                             <TableHead>Port</TableHead>
                             <TableHead>Path</TableHead>
                             <TableHead>Primary</TableHead>
@@ -994,12 +995,12 @@ function InstanceDetails(
                           {endpoints.map((endpoint) => (
                             <TableRow key={endpoint.id}>
                               <TableCell>
-                                {formatProtocol(endpoint.protocol)}
+                                {formatKind(endpoint.kind)}
                               </TableCell>
                               <TableCell>:{endpoint.port}</TableCell>
                               <TableCell>
                                 {endpointPath(
-                                  endpoint.protocol,
+                                  endpoint.kind,
                                   endpoint.path,
                                 ) || "-"}
                               </TableCell>
@@ -1024,10 +1025,10 @@ function InstanceDetails(
                                       props.setEditingEndpointId(endpoint.id);
                                       props.setEndpointEditForm({
                                         name: endpoint.name,
-                                        protocol: endpoint.protocol,
+                                        kind: endpoint.kind,
                                         port: endpoint.port,
                                         path: endpointPath(
-                                          endpoint.protocol,
+                                          endpoint.kind,
                                           endpoint.path,
                                         ),
                                         primary: endpoint.primary,
@@ -1585,7 +1586,7 @@ function RegisteredInstanceSuccess(
               <strong>Endpoints</strong>
               {runtime.endpoints.map((e) => (
                 <span key={e.id}>
-                  {e.name} · {formatProtocol(e.protocol)} :{e.port}
+                  {e.name} · {formatKind(e.kind)} :{e.port}
                   {e.path || ""}
                 </span>
               ))}
@@ -1679,8 +1680,8 @@ function environmentName(environments: Environment[], id: string) {
     "Unknown environment"
   );
 }
-function formatProtocol(value: string) {
-  return value.replace("PROTOCOL_", "").toUpperCase();
+function formatKind(value: string) {
+  return getEndpointKindCapabilities(value)?.displayName ?? value;
 }
 function formatHealthState(value: string) {
   return value.replace("HEALTH_STATE_", "").toLowerCase();

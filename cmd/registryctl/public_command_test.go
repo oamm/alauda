@@ -40,7 +40,7 @@ func TestRegistrationContractAndPrecedence(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "registration.yaml")
 	// Test fixtures are written at runtime; production file registration uses the shared DTO.
-	if err := os.WriteFile(path, []byte("service: Authentication.Grpc\ninstance:\n  name: auth-01\n  address: auth-host\n  enabled: false\n  tags: {}\nendpoints:\n  - name: metrics\n    protocol: http\n    port: 9090\n    primary: false\n    enabled: false\nreplaceEndpoints: true\n"), 0600); err != nil {
+	if err := os.WriteFile(path, []byte("service: Authentication.Grpc\ninstance:\n  name: auth-01\n  address: auth-host\n  enabled: false\n  tags: {}\nendpoints:\n  - name: metrics\n    kind: http\n    port: 9090\n    primary: false\n    enabled: false\nreplaceEndpoints: true\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := run("services", "register", "--file", path, "--environment", "prod", "--address", "override-host"); err != nil {
@@ -105,7 +105,7 @@ func TestNonsecretConfigAndFileEnvironmentPrecedence(t *testing.T) {
 	if err := os.WriteFile(cfg, []byte("server: "+server.URL+"\nenvironment: configured\noutput: yaml\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(file, []byte("service: Authentication.Grpc\ninstance:\n  name: auth\n  address: host\nendpoints:\n  - name: default\n    protocol: http\n    port: 81\n"), 0600); err != nil {
+	if err := os.WriteFile(file, []byte("service: Authentication.Grpc\ninstance:\n  name: auth\n  address: host\nendpoints:\n  - name: default\n    kind: http\n    port: 81\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	run := func(flags ...string) {
@@ -125,7 +125,7 @@ func TestNonsecretConfigAndFileEnvironmentPrecedence(t *testing.T) {
 	if received.Environment != "from-env" || cliConfig.Output != "json" {
 		t.Fatal("environment/output override ignored")
 	}
-	if err := os.WriteFile(file, []byte("service: Authentication.Grpc\nenvironment: from-file\ninstance:\n  name: auth\n  address: host\nendpoints:\n  - name: default\n    protocol: http\n    port: 81\n"), 0600); err != nil {
+	if err := os.WriteFile(file, []byte("service: Authentication.Grpc\nenvironment: from-file\ninstance:\n  name: auth\n  address: host\nendpoints:\n  - name: default\n    kind: http\n    port: 81\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	run()

@@ -8,6 +8,7 @@ import {
 } from "../api";
 import { formatTimestamp } from "../utils/format";
 import { EmptyState, StatusBadge } from "./OperationsUI";
+import { getEndpointKindCapabilities } from "../lib/endpoint-form";
 
 type RuntimeTopologyProps = {
   deployments: ServiceDeployment[];
@@ -119,7 +120,7 @@ export function RuntimeTopology({
                           <div className="topology-leaf" key={endpoint.id}>
                             <span>Endpoint</span>
                             <strong>
-                              {endpoint.name} · {formatProtocol(endpoint.protocol)}{" "}
+                              {endpoint.name} · {formatKind(endpoint.kind)}{" "}
                               :{endpoint.port}
                               {endpoint.path || ""}
                             </strong>
@@ -170,8 +171,8 @@ function environmentName(environments: Environment[], id: string) {
   );
 }
 
-function formatProtocol(value: string) {
-  return value.replace("PROTOCOL_", "").toUpperCase();
+function formatKind(value: string) {
+  return getEndpointKindCapabilities(value)?.displayName ?? value;
 }
 
 function formatCheckType(value: string) {

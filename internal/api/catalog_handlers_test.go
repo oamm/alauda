@@ -65,7 +65,7 @@ func TestCatalogHandlersLifecycle(t *testing.T) {
 	endpointResp, err := endpointHandler.CreateEndpoint(ctx, connect.NewRequest(&registryv1.CreateEndpointRequest{
 		InstanceId: instanceID,
 		Name:       "http",
-		Protocol:   registryv1.Protocol_PROTOCOL_HTTP,
+		Kind:   registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 		Port:       8080,
 		Path:       "/healthz",
 		Enabled:    true,
@@ -75,7 +75,7 @@ func TestCatalogHandlersLifecycle(t *testing.T) {
 	}
 	endpointID := endpointResp.Msg.GetEndpoint().GetId()
 	secondEndpoint, err := endpointHandler.CreateEndpoint(ctx, connect.NewRequest(&registryv1.CreateEndpointRequest{
-		InstanceId: instanceID, Name: "metrics", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 9090, Enabled: true,
+		InstanceId: instanceID, Name: "metrics", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 9090, Enabled: true,
 	}))
 	if err != nil {
 		t.Fatalf("create second endpoint: %v", err)

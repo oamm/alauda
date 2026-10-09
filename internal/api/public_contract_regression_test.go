@@ -80,7 +80,7 @@ func TestPublicHealthExecutionAndRetainedLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := fmt.Sprintf(`{"environment":"stg","instance":{"name":"probe","address":"%s"},"endpoints":[{"name":"default","protocol":"http","port":%d}]}`, u.Hostname(), port)
+	body := fmt.Sprintf(`{"environment":"stg","instance":{"name":"probe","address":"%s"},"endpoints":[{"name":"default","kind":"http","port":%d}]}`, u.Hostname(), port)
 	out := requireRegistration(t, f.request("POST", registerRoute, body))
 	path := registerRoute + "/probe/health-checks"
 	w := f.request("POST", path+"?environment=stg", `{"name":"alive","endpoint":"default","type":"http","successesBeforeHealthy":1}`)
@@ -161,7 +161,7 @@ func TestPublicMembershipBeyondFirstPageAndScopedPagination(t *testing.T) {
 func TestDiscoveryIterationFailureDoesNotReturnPartialSuccess(t *testing.T) {
 	f := newPublicFixture(t)
 	for _, name := range []string{"a-good", "z-broken"} {
-		body := fmt.Sprintf(`{"environment":"stg","instance":{"name":"%s","address":"host"},"endpoints":[{"name":"default","protocol":"http","port":81}]}`, name)
+		body := fmt.Sprintf(`{"environment":"stg","instance":{"name":"%s","address":"host"},"endpoints":[{"name":"default","kind":"http","port":81}]}`, name)
 		requireRegistration(t, f.request("POST", registerRoute, body))
 	}
 	if _, err := f.db.Exec(context.Background(), "ALTER TABLE service_instances RENAME TO instance_fixture"); err != nil {
@@ -179,7 +179,7 @@ func TestDiscoveryIterationFailureDoesNotReturnPartialSuccess(t *testing.T) {
 func TestPublicDiscoveryHealthPoliciesAndOrdering(t *testing.T) {
 	f := newPublicFixture(t)
 	for _, item := range []struct{ name, state string }{{"a-unknown", "Unknown"}, {"z-healthy", "Healthy"}, {"b-unhealthy", "Unhealthy"}, {"c-degraded", "Degraded"}, {"d-disabled", "Disabled"}} {
-		body := `{"environment":"stg","instance":{"name":"` + item.name + `","address":"auth-host"},"endpoints":[{"name":"default","protocol":"http","port":81},{"name":"grpc","protocol":"grpc","port":82}]}`
+		body := `{"environment":"stg","instance":{"name":"` + item.name + `","address":"auth-host"},"endpoints":[{"name":"default","kind":"http","port":81},{"name":"grpc","kind":"grpc","port":82}]}`
 		out := requireRegistration(t, f.request("POST", registerRoute, body))
 		if out.Instance.Healthy || out.Instance.HealthState != "Unknown" {
 			t.Fatal("registration invented healthy state")
@@ -226,7 +226,7 @@ func TestPublicDiscoveryHealthPoliciesAndOrdering(t *testing.T) {
 		}
 	}
 	w := f.request("GET", "/api/v1/discovery/Authentication.Grpc/resolve?environment=stg&endpoint=grpc", "")
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"address":"grpc://auth-host:82"`) || !strings.Contains(w.Body.String(), `"instance":"z-healthy"`) {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"address":"auth-host"`) || !strings.Contains(w.Body.String(), `"kind":"GRPC"`) || !strings.Contains(w.Body.String(), `"port":82`) || !strings.Contains(w.Body.String(), `"name":"z-healthy"`) || !strings.Contains(w.Body.String(), `"resolvedValue":"auth-host:82"`) {
 		t.Fatal(w.Body.String())
 	}
 	for _, path := range []string{"/api/v1/discovery/Authentication.Grpc/resolve/extra?environment=stg", "/api/v1/discovery/Authentication.Grpc/wrong?environment=stg"} {
@@ -258,7 +258,7 @@ func TestPublicDiscoveryHealthPoliciesAndOrdering(t *testing.T) {
 
 func TestPublicDiscoveryEndpointEligibilityAndFallback(t *testing.T) {
 	f := newPublicFixture(t)
-	requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one","address":"::1"},"endpoints":[{"name":"z-primary","protocol":"http","port":81,"primary":true},{"name":"a-secondary","protocol":"https","port":82}]}`))
+	requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one","address":"::1"},"endpoints":[{"name":"z-primary","kind":"http","port":81,"primary":true},{"name":"a-secondary","kind":"https","port":82}]}`))
 	resolve := func(query string, code int, fragment string) {
 		t.Helper()
 		w := f.request("GET", "/api/v1/discovery/Authentication.Grpc/resolve?environment=stg"+query, "")
@@ -266,11 +266,11 @@ func TestPublicDiscoveryEndpointEligibilityAndFallback(t *testing.T) {
 			t.Fatalf("%d %s", w.Code, w.Body.String())
 		}
 	}
-	resolve("", 200, `"address":"http://[::1]:81"`)
+	resolve("", 200, `"address":"::1"`)
 	requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one"},"endpoints":[{"name":"z-primary","primary":false}]}`))
-	resolve("", 200, `"endpoint":"a-secondary"`)
+	resolve("", 200, `"name":"a-secondary"`)
 	requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one"},"endpoints":[{"name":"a-secondary","enabled":false}]}`))
-	resolve("", 200, `"endpoint":"z-primary"`)
+	resolve("", 200, `"name":"z-primary"`)
 	resolve("&endpoint=a-secondary", 404, "endpoint_not_found")
 	resolve("&endpoint=missing", 404, "endpoint_not_found")
 	requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"one","enabled":false},"endpoints":[]}`))
@@ -320,7 +320,7 @@ func (f *publicFixture) request(method, path, body string) *httptest.ResponseRec
 }
 
 const registerRoute = "/api/v1/services/Authentication.Grpc/instances"
-const initialRegistration = `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host","description":"retain","enabled":false,"tags":{"team":"auth"}},"endpoints":[{"name":"default","protocol":"http","port":81,"path":"/original","primary":true,"enabled":false},{"name":"metrics","protocol":"http","port":9090}]}`
+const initialRegistration = `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host","description":"retain","enabled":false,"tags":{"team":"auth"}},"endpoints":[{"name":"default","kind":"http","port":81,"path":"/original","primary":true,"enabled":false},{"name":"metrics","kind":"http","port":9090}]}`
 
 func requireRegistration(t *testing.T, w *httptest.ResponseRecorder) publicRegistrationResponse {
 	t.Helper()
@@ -348,7 +348,7 @@ func TestPublicUpsertPreservesFieldsAndPromotesPrimaryAtomically(t *testing.T) {
 	if repeated.Endpoints[1].ID != out.Endpoints[1].ID {
 		t.Fatal("endpoint identity changed")
 	}
-	out = requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01"},"endpoints":[{"name":"admin","protocol":"http","port":9000,"primary":true}]}`))
+	out = requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01"},"endpoints":[{"name":"admin","kind":"http","port":9000,"primary":true}]}`))
 	if len(out.Endpoints) != 3 || !out.Endpoints[0].Primary || out.Endpoints[2].Primary {
 		t.Fatalf("add Primary=%+v", out.Endpoints)
 	}
@@ -359,11 +359,11 @@ func TestPublicUpsertPreservesFieldsAndPromotesPrimaryAtomically(t *testing.T) {
 }
 func TestPublicSingletonReplacementRestoreAndRollback(t *testing.T) {
 	f := newPublicFixture(t)
-	out := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host"},"endpoints":[{"name":"default","protocol":"http","port":81,"primary":false}]}`))
+	out := requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host"},"endpoints":[{"name":"default","kind":"http","port":81,"primary":false}]}`))
 	if out.Endpoints[0].Primary {
 		t.Fatal("explicit false ignored")
 	}
-	out = requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01"},"endpoints":[{"name":"metrics","protocol":"http","port":9090}]}`))
+	out = requireRegistration(t, f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01"},"endpoints":[{"name":"metrics","kind":"http","port":9090}]}`))
 	if out.Endpoints[1].Primary {
 		t.Fatal("incremental singleton promoted")
 	}
@@ -371,7 +371,7 @@ func TestPublicSingletonReplacementRestoreAndRollback(t *testing.T) {
 	if _, err := f.db.Exec(context.Background(), `CREATE TRIGGER fail_endpoint BEFORE INSERT ON endpoints WHEN NEW.name='fail' BEGIN SELECT RAISE(ABORT,'test failure'); END`); err != nil {
 		t.Fatal(err)
 	}
-	failed := f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01","address":"changed"},"endpoints":[{"name":"default","port":82},{"name":"fail","protocol":"http","port":9000,"primary":true}]}`)
+	failed := f.request("POST", registerRoute, `{"environment":"stg","instance":{"name":"auth-01","address":"changed"},"endpoints":[{"name":"default","port":82},{"name":"fail","kind":"http","port":9000,"primary":true}]}`)
 	if failed.Code != 409 {
 		t.Fatalf("rollback=%d %s", failed.Code, failed.Body.String())
 	}
@@ -399,7 +399,7 @@ func TestPublicSingletonReplacementRestoreAndRollback(t *testing.T) {
 }
 func TestPublicConcurrentUpsertAndStrictBody(t *testing.T) {
 	f := newPublicFixture(t)
-	body := `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host"},"endpoints":[{"name":"default","protocol":"http","port":81}]}`
+	body := `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host"},"endpoints":[{"name":"default","kind":"http","port":81}]}`
 	var wg sync.WaitGroup
 	results := make(chan *httptest.ResponseRecorder, 6)
 	for i := 0; i < 6; i++ {
@@ -426,7 +426,7 @@ func TestPublicConcurrentUpsertAndStrictBody(t *testing.T) {
 
 func TestPublicProblemDetailsAndUntruncatedRequest(t *testing.T) {
 	f := newPublicFixture(t)
-	body := `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host","description":"` + strings.Repeat("x", 80*1024) + `"},"endpoints":[{"name":"default","protocol":"http","port":81}]}`
+	body := `{"environment":"stg","instance":{"name":"auth-01","address":"auth-host","description":"` + strings.Repeat("x", 80*1024) + `"},"endpoints":[{"name":"default","kind":"http","port":81}]}`
 	out := requireRegistration(t, f.request("POST", registerRoute, body))
 	if len(out.Instance.Description) != 80*1024 {
 		t.Fatal("audit truncated application request")

@@ -53,8 +53,8 @@ function localDateTime(value: string) {
     .toISOString()
     .slice(0, 16);
 }
-function protocolName(protocol: number) {
-  return ["", "HTTP", "HTTPS", "gRPC", "TCP", "UDP"][protocol] || "";
+function kindName(kind: number) {
+  return ["", "HTTP", "HTTPS", "gRPC", "TCP", "UDP"][kind] || "";
 }
 function typeName(type: string) {
   return type.replace("HEALTH_CHECK_TYPE_", "");
@@ -608,7 +608,7 @@ export function HealthResultsPage(props: Props) {
 
 function TargetSummary({ result }: { result: HealthResultRecord }) {
   const endpointTarget = !!result.endpointId && !!result.endpoint;
-  const protocol = protocolName(result.protocol);
+  const kind = kindName(result.kind);
   const port = result.port > 0 ? result.port : null;
   return (
     <div className="health-target">
@@ -618,7 +618,7 @@ function TargetSummary({ result }: { result: HealthResultRecord }) {
       <div className="health-target-instance">{result.instance}</div>
       <div className="health-target-detail">
         {endpointTarget
-          ? `${result.endpoint}${protocol ? ` · ${protocol}` : ""}${port ? ` :${port}` : ""}`
+          ? `${result.endpoint}${kind ? ` · ${kind}` : ""}${port ? ` :${port}` : ""}`
           : result.address || "Instance-level check"}
         {!endpointTarget && result.address ? " · Instance target" : null}
         {!endpointTarget && !result.address ? "Instance-level check" : null}
@@ -710,10 +710,10 @@ function ResultDetail(props: {
                 <dd>{result.endpoint || "Instance-level check"}</dd>
                 <dt>Address</dt>
                 <dd>{result.address}</dd>
-                <dt>Protocol / port</dt>
+                <dt>kind / port</dt>
                 <dd>
                   {result.endpointId && result.endpoint
-                    ? `${protocolName(result.protocol)}${result.port > 0 ? ` :${result.port}` : ""}`
+                    ? `${kindName(result.kind)}${result.port > 0 ? ` :${result.port}` : ""}`
                     : "Instance target"}
                 </dd>
                 <dt>Path</dt>

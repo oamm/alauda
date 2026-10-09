@@ -50,7 +50,7 @@ message Endpoint {
   string id = 1;
   string instance_id = 2;
   string name = 3;
-  Protocol protocol = 4;
+  EndpointKind kind = 4;
   int32 port = 5;
   string path = 6;
   bool enabled = 7;
@@ -142,7 +142,7 @@ message RuntimeInstanceRegistration {
 }
 message RuntimeEndpointRegistration {
   string name = 1;
-  Protocol protocol = 2;
+  EndpointKind kind = 2;
   int32 port = 3;
   string path = 4;
   bool enabled = 5;
@@ -187,7 +187,7 @@ message DeleteInstanceResponse {}
 message CreateEndpointRequest {
   string instance_id = 1;
   string name = 2;
-  Protocol protocol = 3;
+  EndpointKind kind = 3;
   int32 port = 4;
   string path = 5;
   bool enabled = 6;
@@ -209,7 +209,7 @@ message ListEndpointsResponse {
 message UpdateEndpointRequest {
   string id = 1;
   string name = 2;
-  Protocol protocol = 3;
+  EndpointKind kind = 3;
   int32 port = 4;
   string path = 5;
   bool enabled = 6;

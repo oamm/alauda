@@ -21,7 +21,7 @@ func TestCreateEndpointRestoresSoftDeletedName(t *testing.T) {
 			instance := createEndpointTestInstance(t, ctx, db)
 			repo := NewEndpointRepository(db)
 			original, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-				InstanceId: instance.GetId(), Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP,
+				InstanceId: instance.GetId(), Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 				Port: 8080, Path: "/old", Enabled: true, Primary: true,
 				Tags: map[string]string{"old": "tag"}, Metadata: map[string]string{"old": "value"},
 			})
@@ -36,7 +36,7 @@ func TestCreateEndpointRestoresSoftDeletedName(t *testing.T) {
 				t.Fatalf("deleted endpoint list = %v, error %v; want empty", visible, err)
 			}
 			restoredEmpty, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-				InstanceId: instance.GetId(), Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP,
+				InstanceId: instance.GetId(), Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 				Port: 8081, Enabled: true,
 			})
 			if err != nil || restoredEmpty.GetId() != original.GetId() {
@@ -46,7 +46,7 @@ func TestCreateEndpointRestoresSoftDeletedName(t *testing.T) {
 				t.Fatal(err)
 			}
 			other, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-				InstanceId: instance.GetId(), Name: "tcp", Protocol: registryv1.Protocol_PROTOCOL_TCP,
+				InstanceId: instance.GetId(), Name: "tcp", Kind: registryv1.EndpointKind_ENDPOINT_KIND_TCP,
 				Port: 9000, Enabled: true, Primary: true,
 			})
 			if err != nil {
@@ -54,14 +54,14 @@ func TestCreateEndpointRestoresSoftDeletedName(t *testing.T) {
 			}
 			for attempt := 0; attempt < 2; attempt++ {
 				restored, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-					InstanceId: instance.GetId(), Name: "http", Protocol: registryv1.Protocol_PROTOCOL_TCP,
+					InstanceId: instance.GetId(), Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_TCP,
 					Port: 9090, Path: "", Enabled: false, Primary: primary,
 					Tags: map[string]string{"new": "tag"}, Metadata: map[string]string{},
 				})
 				if err != nil {
 					t.Fatalf("restore attempt %d: %v", attempt, err)
 				}
-				if restored.GetId() != original.GetId() || restored.GetProtocol() != registryv1.Protocol_PROTOCOL_TCP ||
+				if restored.GetId() != original.GetId() || restored.GetKind() != registryv1.EndpointKind_ENDPOINT_KIND_TCP ||
 					restored.GetPort() != 9090 || restored.GetPath() != "" || restored.GetEnabled() || restored.GetPrimary() != primary {
 					t.Fatalf("restored endpoint does not match submitted settings: %+v", restored)
 				}
@@ -92,7 +92,7 @@ func TestCreateEndpointRejectsActiveDuplicateWithoutChangingPrimary(t *testing.T
 	repo := NewEndpointRepository(db)
 	for _, name := range []string{"http", "tcp"} {
 		_, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-			InstanceId: instance.GetId(), Name: name, Protocol: registryv1.Protocol_PROTOCOL_HTTP,
+			InstanceId: instance.GetId(), Name: name, Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP,
 			Port: 8080, Enabled: true, Primary: name == "tcp",
 		})
 		if err != nil {
@@ -100,7 +100,7 @@ func TestCreateEndpointRejectsActiveDuplicateWithoutChangingPrimary(t *testing.T
 		}
 	}
 	_, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-		InstanceId: instance.GetId(), Name: "http", Protocol: registryv1.Protocol_PROTOCOL_TCP,
+		InstanceId: instance.GetId(), Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_TCP,
 		Port: 9090, Enabled: false, Primary: true,
 	})
 	if err == nil || !strings.Contains(err.Error(), "UNIQUE constraint failed: endpoints.instance_id, endpoints.name") {
@@ -130,7 +130,7 @@ func TestCreateEndpointDeletedNameIsScopedToInstance(t *testing.T) {
 	}
 	repo := NewEndpointRepository(db)
 	original, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-		InstanceId: first.GetId(), Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 80, Enabled: true,
+		InstanceId: first.GetId(), Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 80, Enabled: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +139,7 @@ func TestCreateEndpointDeletedNameIsScopedToInstance(t *testing.T) {
 		t.Fatal(err)
 	}
 	created, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
-		InstanceId: second.GetId(), Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 81, Enabled: true,
+		InstanceId: second.GetId(), Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 81, Enabled: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -191,8 +191,8 @@ func TestRegisterRuntimeEndpointEnabledAndPrimarySemantics(t *testing.T) {
 			ServiceId: deployment.GetServiceId(), EnvironmentId: deployment.GetEnvironmentId(),
 			Instance: &registryv1.RuntimeInstanceRegistration{Name: name, Address: "127.0.0.2", Enabled: true},
 			Endpoints: []*registryv1.RuntimeEndpointRegistration{
-				{Name: "default", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 80, Enabled: false},
-				{Name: "metrics", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 80, Enabled: true, Primary: true},
+				{Name: "default", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 80, Enabled: false},
+				{Name: "metrics", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 80, Enabled: true, Primary: true},
 			},
 		})
 		if err != nil {
@@ -232,8 +232,8 @@ func TestRegisterRuntimeUpsertAdaptsRuntimeRequestToPublicRegistration(t *testin
 			Metadata:    map[string]string{"version": "1"},
 		},
 		Endpoints: []*registryv1.RuntimeEndpointRegistration{
-			{Name: "http", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 8080, Path: "/ready", Primary: true, Enabled: true, Tags: map[string]string{"kind": "traffic"}, Metadata: map[string]string{"probe": "ready"}},
-			{Name: "metrics", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 9090, Path: "/metrics", Enabled: true},
+			{Name: "http", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 8080, Path: "/ready", Primary: true, Enabled: true, Tags: map[string]string{"kind": "traffic"}, Metadata: map[string]string{"probe": "ready"}},
+			{Name: "metrics", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 9090, Path: "/metrics", Enabled: true},
 		},
 	}, true)
 	if err != nil {

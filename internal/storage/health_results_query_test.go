@@ -14,7 +14,7 @@ func TestQueryHealthResultsFiltersOrderingPaginationAndContext(t *testing.T) {
 	defer db.Close()
 	repo := NewHealthRepository(db)
 	check := createTestHealthCheck(t, ctx, db)
-	endpoint, err := NewEndpointRepository(db).Create(ctx, &registryv1.CreateEndpointRequest{InstanceId: check.GetInstanceId(), Name: "default", Protocol: registryv1.Protocol_PROTOCOL_HTTP, Port: 9090, Enabled: true})
+	endpoint, err := NewEndpointRepository(db).Create(ctx, &registryv1.CreateEndpointRequest{InstanceId: check.GetInstanceId(), Name: "default", Kind: registryv1.EndpointKind_ENDPOINT_KIND_HTTP, Port: 9090, Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}

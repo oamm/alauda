@@ -62,7 +62,7 @@ export type Endpoint = {
   id: string;
   instanceId: string;
   name: string;
-  protocol: string;
+  kind: string;
   port: number;
   path: string;
   enabled: boolean;
@@ -96,7 +96,7 @@ export type HealthCheckRecord = HealthCheck & {
   instance: string;
   address: string;
   endpoint: string;
-  protocol: string;
+  kind: string;
   port: number;
   latestStatus: "healthy" | "unhealthy" | "unknown";
   latestResultAt?: string;
@@ -812,7 +812,7 @@ export async function registerServiceInstance(input: {
   };
   endpoints: {
     name: string;
-    protocol: string;
+    kind: string;
     port: number;
     path: string;
     enabled: boolean;
@@ -828,7 +828,7 @@ export async function registerServiceInstance(input: {
         ...registration,
         endpoints: registration.endpoints.map((endpoint) => ({
           ...endpoint,
-          protocol: endpoint.protocol.replace(/^PROTOCOL_/, "").toLowerCase(),
+          kind: publicEndpointKind(endpoint.kind),
         })),
       }),
     },
@@ -840,9 +840,26 @@ export async function registerServiceInstance(input: {
     endpoints: response.endpoints.map((endpoint) => ({
       ...endpoint,
       instanceId: response.instance.id,
-      protocol: `PROTOCOL_${endpoint.protocol.toUpperCase()}`,
+      kind: formEndpointKind(endpoint.kind),
     })),
   };
+}
+
+function publicEndpointKind(kind: string) {
+  return kind.replace(/^ENDPOINT_KIND_/, "").toUpperCase();
+}
+
+function formEndpointKind(kind: string) {
+  return kind.replace(/^ENDPOINT_KIND_/, "").toUpperCase();
+}
+
+function connectEndpointKind(kind: string) {
+  const value = formEndpointKind(kind);
+  return value ? `ENDPOINT_KIND_${value}` : value;
+}
+
+function normalizeEndpoint(endpoint: Endpoint): Endpoint {
+  return { ...endpoint, kind: formEndpointKind(endpoint.kind) };
 }
 
 export async function listEndpoints(instanceId?: string): Promise<Endpoint[]> {
@@ -853,13 +870,13 @@ export async function listEndpoints(instanceId?: string): Promise<Endpoint[]> {
       pagination: { pageSize: 100 },
     },
   );
-  return response.endpoints ?? [];
+  return (response.endpoints ?? []).map(normalizeEndpoint);
 }
 
 export async function createEndpoint(input: {
   instanceId: string;
   name: string;
-  protocol: string;
+  kind: string;
   port: number;
   path: string;
   enabled: boolean;
@@ -867,18 +884,18 @@ export async function createEndpoint(input: {
 }): Promise<Endpoint> {
   const response = await connectRequest<CreateEndpointResponse>(
     "/registry.v1.EndpointService/CreateEndpoint",
-    input,
+    { ...input, kind: connectEndpointKind(input.kind) },
   );
   if (!response.endpoint) {
     throw new Error("CreateEndpoint returned no endpoint");
   }
-  return response.endpoint;
+  return normalizeEndpoint(response.endpoint);
 }
 
 export async function updateEndpoint(input: {
   id: string;
   name: string;
-  protocol: string;
+  kind: string;
   port: number;
   path: string;
   enabled: boolean;
@@ -890,6 +907,7 @@ export async function updateEndpoint(input: {
     "/registry.v1.EndpointService/UpdateEndpoint",
     {
       ...input,
+      kind: connectEndpointKind(input.kind),
       tags: input.tags ?? {},
       metadata: input.metadata ?? {},
     },
@@ -897,7 +915,7 @@ export async function updateEndpoint(input: {
   if (!response.endpoint) {
     throw new Error("UpdateEndpoint returned no endpoint");
   }
-  return response.endpoint;
+  return normalizeEndpoint(response.endpoint);
 }
 
 export async function deleteEndpoint(id: string): Promise<void> {
@@ -1034,7 +1052,7 @@ export type HealthResultRecord = {
   instance: string;
   endpointId: string;
   endpoint: string;
-  protocol: number;
+  kind: number;
   port: number;
   address: string;
   checkId: string;

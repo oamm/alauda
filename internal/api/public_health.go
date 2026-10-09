@@ -107,21 +107,21 @@ func (a *publicContractAPI) healthResource(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		var endpointID string
-		var protocol int32
-		err = a.db.QueryRow(r.Context(), `SELECT id,protocol FROM endpoints WHERE instance_id=? AND name=? AND deleted_at IS NULL`, instanceID, input.Endpoint).Scan(&endpointID, &protocol)
+		var kind int32
+		err = a.db.QueryRow(r.Context(), `SELECT id,kind FROM endpoints WHERE instance_id=? AND name=? AND deleted_at IS NULL`, instanceID, input.Endpoint).Scan(&endpointID, &kind)
 		if err != nil {
 			publicLookupError(w, err, "endpoint_not_found", "Endpoint does not exist.")
 			return
 		}
 		if input.Type == "http" {
-			if protocol != int32(v1.Protocol_PROTOCOL_HTTP) && protocol != int32(v1.Protocol_PROTOCOL_HTTPS) {
+			if kind != int32(v1.EndpointKind_ENDPOINT_KIND_HTTP) && kind != int32(v1.EndpointKind_ENDPOINT_KIND_HTTPS) {
 				publicError(w, 400, "validation_failed", "HTTP checks require an HTTP or HTTPS Endpoint.", map[string][]string{"endpoint": {"Choose an HTTP or HTTPS Endpoint."}})
 				return
 			}
 			if input.Metadata == nil {
 				input.Metadata = map[string]string{}
 			}
-			input.Metadata["scheme"] = strings.ToLower(strings.TrimPrefix(v1.Protocol(protocol).String(), "PROTOCOL_"))
+			input.Metadata["scheme"] = strings.ToLower(strings.TrimPrefix(v1.EndpointKind(kind).String(), "ENDPOINT_KIND_"))
 		}
 		enabled := true
 		if input.Enabled != nil {

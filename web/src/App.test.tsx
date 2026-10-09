@@ -46,23 +46,23 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Health"),{target:{value:"healthy"}});
     expect(screen.getByText("No matching services")).toBeInTheDocument();
   });
-  it("uses protocol-aware fields in registration, standalone creation and endpoint editing", async () => {
+  it("uses endpoint-type-aware fields in registration, standalone creation and endpoint editing", async () => {
     window.history.replaceState({},"","/services/svc-1/instances");render(<App/>);
     await screen.findByRole("button",{name:"Add instance"});
     fireEvent.click(screen.getByRole("button",{name:"Add instance"}));
     let dialog = screen.getByRole("dialog",{name:"Add instance"});
-    fireEvent.change(within(dialog).getByRole("combobox",{name:/protocol/i}),{target:{value:"PROTOCOL_TCP"}});
+    fireEvent.change(within(dialog).getByRole("combobox",{name:/endpoint type/i}),{target:{value:"TCP"}});
     expect(within(dialog).queryByRole("textbox",{name:/path/i})).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button",{name:"Cancel"}));
     fireEvent.click(screen.getByRole("button",{name:"View details for checkout-a"}));
     fireEvent.click(screen.getByRole("button",{name:"Add endpoint"}));
     dialog = screen.getByRole("dialog",{name:"Add endpoint"});
-    fireEvent.change(within(dialog).getByLabelText("Protocol"),{target:{value:"PROTOCOL_GRPC"}});
+    fireEvent.change(within(dialog).getByLabelText("Endpoint type"),{target:{value:"GRPC"}});
     expect(within(dialog).queryByLabelText("Path")).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button",{name:"Cancel"}));
     fireEvent.click(screen.getByRole("button",{name:"Edit endpoint healthz"}));
     dialog = screen.getByRole("dialog",{name:"Edit endpoint"});
-    fireEvent.change(within(dialog).getByLabelText("Protocol"),{target:{value:"PROTOCOL_UDP"}});
+    fireEvent.change(within(dialog).getByLabelText("Endpoint type"),{target:{value:"UDP"}});
     expect(within(dialog).queryByLabelText("Path")).not.toBeInTheDocument();
   });
   beforeEach(() => {
@@ -385,7 +385,7 @@ describe("App", () => {
     expect(JSON.parse(call?.[1]?.body?.toString() ?? "{}").endpoints).toEqual([
       {
         name: "default",
-        protocol: "http",
+        kind: "HTTP",
         port: 8080,
         path: "/",
         enabled: true,
@@ -393,7 +393,7 @@ describe("App", () => {
       },
       {
         name: "metrics",
-        protocol: "http",
+        kind: "HTTP",
         port: 8080,
         path: "/",
         enabled: false,
@@ -741,7 +741,7 @@ describe("App", () => {
                   id: "end-1",
                   instanceId: "inst-1",
                   name: "default",
-                  protocol: "PROTOCOL_HTTP",
+                  kind: "HTTP",
                   port: 8080,
                   path: "/",
                   primary: true,
@@ -797,7 +797,7 @@ describe("App", () => {
                   id: "end-1",
                   instanceId: "inst-1",
                   name: "default",
-                  protocol: "PROTOCOL_HTTP",
+                  kind: "HTTP",
                   port: 8080,
                   path: "/",
                   enabled: true,
@@ -807,7 +807,7 @@ describe("App", () => {
                   id: "end-2",
                   instanceId: "inst-1",
                   name: "metrics",
-                  protocol: "PROTOCOL_HTTP",
+                  kind: "HTTP",
                   port: 8081,
                   path: "/metrics",
                   enabled: true,

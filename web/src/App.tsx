@@ -4,6 +4,7 @@ import "./App.css";
 import {
   newEndpoint,
   endpointPath,
+  getEndpointKindCapabilities,
   validateEndpoint,
   validateEndpointCollection,
   type EndpointFormValue,
@@ -251,7 +252,7 @@ function AuthenticatedApp({
   });
   const [endpointEditForm, setEndpointEditForm] = useState({
     name: "",
-    protocol: "PROTOCOL_HTTP",
+    kind: "HTTP",
     port: 8080,
     path: "/",
     enabled: true,
@@ -829,9 +830,9 @@ function AuthenticatedApp({
     setEditingEndpointId(endpoint.id);
     setEndpointEditForm({
       name: endpoint.name,
-      protocol: endpoint.protocol,
+      kind: endpoint.kind,
       port: endpoint.port,
-      path: endpointPath(endpoint.protocol, endpoint.path),
+      path: endpointPath(endpoint.kind, endpoint.path),
       enabled: endpoint.enabled,
       primary: endpoint.primary,
     });
@@ -945,7 +946,7 @@ function AuthenticatedApp({
         await createEndpoint({
           instanceId: addingEndpointInstanceId,
           name,
-          protocol: endpointEditForm.protocol,
+          kind: endpointEditForm.kind,
           port: endpointEditForm.port,
           path: endpointEditForm.path,
           enabled: endpointEditForm.enabled,
@@ -955,7 +956,7 @@ function AuthenticatedApp({
         await updateEndpoint({
           id: editingEndpointId,
           name,
-          protocol: endpointEditForm.protocol,
+          kind: endpointEditForm.kind,
           port: endpointEditForm.port,
           path: endpointEditForm.path,
           enabled: endpointEditForm.enabled,
@@ -1066,7 +1067,7 @@ function AuthenticatedApp({
         },
         endpoints: registrationForm.endpoints.map((endpoint) => ({
           name: endpoint.name.trim(),
-          protocol: endpoint.protocol,
+          kind: endpoint.kind,
           port: endpoint.port,
           path: endpoint.path,
           enabled: endpoint.enabled,
@@ -1427,7 +1428,7 @@ function AuthenticatedApp({
   void handleUpdateEndpoint;
   void handleDeleteEndpoint;
   void formatEndpointSummary;
-  void formatEndpointUrl;
+  void formatEndpointResolvedValue;
 
   const operationalProps = {
     loading,
@@ -2342,8 +2343,8 @@ function AuthenticatedApp({
   );
 }
 
-function formatProtocol(value: string) {
-  return value.replace("PROTOCOL_", "").toLowerCase();
+function formatKind(value: string) {
+  return getEndpointKindCapabilities(value)?.displayName ?? value;
 }
 
 function primaryEndpointForInstance(endpoints: Endpoint[], instanceId: string) {
@@ -2360,34 +2361,26 @@ function formatEndpointSummary(endpoint?: Endpoint) {
   if (!endpoint) {
     return "No endpoints";
   }
-  const protocol = formatProtocol(endpoint.protocol).toUpperCase();
+  const kind = formatKind(endpoint.kind);
   const path =
-    endpoint.path &&
-    (endpoint.protocol === "PROTOCOL_HTTP" ||
-      endpoint.protocol === "PROTOCOL_HTTPS")
+    endpoint.path && getEndpointKindCapabilities(endpoint.kind)?.supportsPath
       ? ` ${endpoint.path}`
       : "";
-  return `${endpoint.primary ? "Primary " : ""}${protocol} :${endpoint.port}${path}`;
+  return `${endpoint.primary ? "Primary " : ""}${kind} :${endpoint.port}${path}`;
 }
 
-function formatEndpointUrl(endpoint: Endpoint, instance?: ServiceInstance) {
+function formatEndpointResolvedValue(endpoint: Endpoint, instance?: ServiceInstance) {
   if (endpoint.address) return endpoint.address;
   const host = instance?.address || endpoint.instanceId;
   const port = endpoint.port || instance?.port || 0;
   const path = endpoint.path || "";
-  switch (endpoint.protocol) {
-    case "PROTOCOL_HTTP":
+  switch (endpoint.kind) {
+    case "HTTP":
       return `http://${host}:${port}${path || "/"}`;
-    case "PROTOCOL_HTTPS":
+    case "HTTPS":
       return `https://${host}:${port}${path || "/"}`;
-    case "PROTOCOL_GRPC":
-      return `grpc://${host}:${port}${path}`;
-    case "PROTOCOL_TCP":
-      return `tcp://${host}:${port}`;
-    case "PROTOCOL_UDP":
-      return `udp://${host}:${port}`;
     default:
-      return `${host}:${port}${path}`;
+      return `${host}:${port}`;
   }
 }
 

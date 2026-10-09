@@ -143,62 +143,72 @@ func (HealthCheckType) EnumDescriptor() ([]byte, []int) {
 	return file_api_registry_v1_common_proto_rawDescGZIP(), []int{1}
 }
 
-// Protocol enumeration
-type Protocol int32
+// Endpoint kind enumeration. Values describe endpoint semantics, not mandatory
+// URI schemes.
+type EndpointKind int32
 
 const (
-	Protocol_PROTOCOL_UNSPECIFIED Protocol = 0
-	Protocol_PROTOCOL_HTTP        Protocol = 1
-	Protocol_PROTOCOL_HTTPS       Protocol = 2
-	Protocol_PROTOCOL_GRPC        Protocol = 3
-	Protocol_PROTOCOL_TCP         Protocol = 4
-	Protocol_PROTOCOL_UDP         Protocol = 5
+	EndpointKind_ENDPOINT_KIND_UNSPECIFIED EndpointKind = 0
+	EndpointKind_ENDPOINT_KIND_HTTP        EndpointKind = 1
+	EndpointKind_ENDPOINT_KIND_HTTPS       EndpointKind = 2
+	EndpointKind_ENDPOINT_KIND_GRPC        EndpointKind = 3
+	EndpointKind_ENDPOINT_KIND_TCP         EndpointKind = 4
+	EndpointKind_ENDPOINT_KIND_UDP         EndpointKind = 5
+	EndpointKind_ENDPOINT_KIND_POSTGRES    EndpointKind = 6
+	EndpointKind_ENDPOINT_KIND_REDIS       EndpointKind = 7
+	EndpointKind_ENDPOINT_KIND_CUSTOM      EndpointKind = 8
 )
 
-// Enum value maps for Protocol.
+// Enum value maps for EndpointKind.
 var (
-	Protocol_name = map[int32]string{
-		0: "PROTOCOL_UNSPECIFIED",
-		1: "PROTOCOL_HTTP",
-		2: "PROTOCOL_HTTPS",
-		3: "PROTOCOL_GRPC",
-		4: "PROTOCOL_TCP",
-		5: "PROTOCOL_UDP",
+	EndpointKind_name = map[int32]string{
+		0: "ENDPOINT_KIND_UNSPECIFIED",
+		1: "ENDPOINT_KIND_HTTP",
+		2: "ENDPOINT_KIND_HTTPS",
+		3: "ENDPOINT_KIND_GRPC",
+		4: "ENDPOINT_KIND_TCP",
+		5: "ENDPOINT_KIND_UDP",
+		6: "ENDPOINT_KIND_POSTGRES",
+		7: "ENDPOINT_KIND_REDIS",
+		8: "ENDPOINT_KIND_CUSTOM",
 	}
-	Protocol_value = map[string]int32{
-		"PROTOCOL_UNSPECIFIED": 0,
-		"PROTOCOL_HTTP":        1,
-		"PROTOCOL_HTTPS":       2,
-		"PROTOCOL_GRPC":        3,
-		"PROTOCOL_TCP":         4,
-		"PROTOCOL_UDP":         5,
+	EndpointKind_value = map[string]int32{
+		"ENDPOINT_KIND_UNSPECIFIED": 0,
+		"ENDPOINT_KIND_HTTP":        1,
+		"ENDPOINT_KIND_HTTPS":       2,
+		"ENDPOINT_KIND_GRPC":        3,
+		"ENDPOINT_KIND_TCP":         4,
+		"ENDPOINT_KIND_UDP":         5,
+		"ENDPOINT_KIND_POSTGRES":    6,
+		"ENDPOINT_KIND_REDIS":       7,
+		"ENDPOINT_KIND_CUSTOM":      8,
 	}
 )
 
-func (x Protocol) Enum() *Protocol {
-	p := new(Protocol)
+func (x EndpointKind) Enum() *EndpointKind {
+	p := new(EndpointKind)
 	*p = x
 	return p
 }
 
-func (x Protocol) String() string {
+func (x EndpointKind) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (Protocol) Descriptor() protoreflect.EnumDescriptor {
+func (EndpointKind) Descriptor() protoreflect.EnumDescriptor {
 	return file_api_registry_v1_common_proto_enumTypes[2].Descriptor()
 }
 
-func (Protocol) Type() protoreflect.EnumType {
+func (EndpointKind) Type() protoreflect.EnumType {
 	return &file_api_registry_v1_common_proto_enumTypes[2]
 }
 
-func (x Protocol) Number() protoreflect.EnumNumber {
+func (x EndpointKind) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use Protocol.Descriptor instead.
-func (Protocol) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use EndpointKind.Descriptor instead.
+func (EndpointKind) EnumDescriptor() ([]byte, []int) {
 	return file_api_registry_v1_common_proto_rawDescGZIP(), []int{2}
 }
 
@@ -630,14 +640,17 @@ const file_api_registry_v1_common_proto_rawDesc = "" +
 	"\x16HEALTH_CHECK_TYPE_GRPC\x10\x03\x12\x19\n" +
 	"\x15HEALTH_CHECK_TYPE_TCP\x10\x04\x12\x19\n" +
 	"\x15HEALTH_CHECK_TYPE_UDP\x10\x05\x12\x1f\n" +
-	"\x1bHEALTH_CHECK_TYPE_HEARTBEAT\x10\x06*\x82\x01\n" +
-	"\bProtocol\x12\x18\n" +
-	"\x14PROTOCOL_UNSPECIFIED\x10\x00\x12\x11\n" +
-	"\rPROTOCOL_HTTP\x10\x01\x12\x12\n" +
-	"\x0ePROTOCOL_HTTPS\x10\x02\x12\x11\n" +
-	"\rPROTOCOL_GRPC\x10\x03\x12\x10\n" +
-	"\fPROTOCOL_TCP\x10\x04\x12\x10\n" +
-	"\fPROTOCOL_UDP\x10\x05*e\n" +
+	"\x1bHEALTH_CHECK_TYPE_HEARTBEAT\x10\x06*\xf3\x01\n" +
+	"\fEndpointKind\x12\x1d\n" +
+	"\x19ENDPOINT_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12ENDPOINT_KIND_HTTP\x10\x01\x12\x17\n" +
+	"\x13ENDPOINT_KIND_HTTPS\x10\x02\x12\x16\n" +
+	"\x12ENDPOINT_KIND_GRPC\x10\x03\x12\x15\n" +
+	"\x11ENDPOINT_KIND_TCP\x10\x04\x12\x15\n" +
+	"\x11ENDPOINT_KIND_UDP\x10\x05\x12\x1a\n" +
+	"\x16ENDPOINT_KIND_POSTGRES\x10\x06\x12\x17\n" +
+	"\x13ENDPOINT_KIND_REDIS\x10\a\x12\x18\n" +
+	"\x14ENDPOINT_KIND_CUSTOM\x10\b*e\n" +
 	"\rIncidentState\x12\x1e\n" +
 	"\x1aINCIDENT_STATE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13INCIDENT_STATE_OPEN\x10\x01\x12\x1b\n" +
@@ -667,7 +680,7 @@ var file_api_registry_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 6
 var file_api_registry_v1_common_proto_goTypes = []any{
 	(HealthState)(0),              // 0: registry.v1.HealthState
 	(HealthCheckType)(0),          // 1: registry.v1.HealthCheckType
-	(Protocol)(0),                 // 2: registry.v1.Protocol
+	(EndpointKind)(0),             // 2: registry.v1.EndpointKind
 	(IncidentState)(0),            // 3: registry.v1.IncidentState
 	(UserRole)(0),                 // 4: registry.v1.UserRole
 	(*Error)(nil),                 // 5: registry.v1.Error

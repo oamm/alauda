@@ -38,11 +38,11 @@ describe("shared endpoint semantics", () => {
       validateEndpoint(newEndpoint([], { name: "Default" }), ["default"]),
     ).toEqual({});
   });
-  it("shares required name, protocol, integer port and boolean validation", () => {
+  it("shares required name, kind, integer port and boolean validation", () => {
     expect(validateEndpoint(newEndpoint([], { name: " " })).name).toBeDefined();
     expect(
-      validateEndpoint(newEndpoint([], { protocol: "PROTOCOL_UNSPECIFIED" }))
-        .protocol,
+      validateEndpoint(newEndpoint([], { kind: "UNSPECIFIED" }))
+        .kind,
     ).toBeDefined();
     for (const port of [0, 65536, 12.5, NaN])
       expect(validateEndpoint(newEndpoint([], { port })).port).toBeDefined();
@@ -54,7 +54,7 @@ describe("shared endpoint semantics", () => {
     expect(
       validateEndpoint(
         newEndpoint([], {
-          protocol: "PROTOCOL_TCP",
+          kind: "TCP",
           path: "",
           enabled: false,
           primary: false,

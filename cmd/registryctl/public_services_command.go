@@ -44,13 +44,13 @@ func parsePublicPort(value string) (int32, error) {
 }
 
 func newPublicRegisterCommand() *cobra.Command {
-	var name, environment, instance, host, protocol, path, file, description, primary string
+	var name, environment, instance, host, kind, path, file, description, primary string
 	var port int64
 	var endpoints []string
 	var replace, enabled, endpointEnabled bool
 	var tags, metadata map[string]string
 	c := &cobra.Command{Use: "register", Short: "Register or update a service instance", Args: cobra.NoArgs,
-		Long:    "Service and Environment must already exist. Registration is an UPSERT by Service + Environment + Instance name. Omitted fields/endpoints are preserved; --replace-endpoints explicitly removes omitted endpoints. The shorthand uses the address as Instance name, endpoint default, protocol http and path /. A new singleton is Primary only when Primary is omitted. File fields use the same schema as REST; explicit flags override file values, then ALAUDA_ENVIRONMENT provides a missing Environment.",
+		Long:    "Service and Environment must already exist. Registration is an UPSERT by Service + Environment + Instance name. Omitted fields/endpoints are preserved; --replace-endpoints explicitly removes omitted endpoints. The shorthand uses the address as Instance name, endpoint default, kind http and path /. A new singleton is Primary only when Primary is omitted. File fields use the same schema as REST; explicit flags override file values, then ALAUDA_ENVIRONMENT provides a missing Environment.",
 		Example: "alauda services register --name Authentication.Grpc --environment stg --address lynx-authentication.lynx --port 81",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var input contract.Registration
@@ -110,7 +110,7 @@ func newPublicRegisterCommand() *cobra.Command {
 						continue
 					}
 					if len(parts) < 3 || len(parts) > 4 {
-						return fmt.Errorf("--endpoint must be name or name,protocol,port[,path]")
+						return fmt.Errorf("--endpoint must be name or name,kind,port[,path]")
 					}
 					p, err := parsePublicPort(parts[2])
 					if err != nil {
@@ -120,13 +120,13 @@ func newPublicRegisterCommand() *cobra.Command {
 					if len(parts) == 4 {
 						epPath = parts[3]
 					}
-					input.Endpoints = append(input.Endpoints, contract.EndpointPatch{Name: parts[0], Protocol: contract.Pointer(parts[1]), Port: contract.Pointer(p), Path: contract.Pointer(epPath)})
+					input.Endpoints = append(input.Endpoints, contract.EndpointPatch{Name: parts[0], Kind: contract.Pointer(parts[1]), Port: contract.Pointer(p), Path: contract.Pointer(epPath)})
 				}
 			}
 			if len(input.Endpoints) == 0 && cmd.Flags().Changed("port") {
-				input.Endpoints = []contract.EndpointPatch{{Name: "default", Protocol: contract.Pointer(protocol), Path: contract.Pointer(address.PublicPath(protocol, path))}}
+				input.Endpoints = []contract.EndpointPatch{{Name: "default", Kind: contract.Pointer(kind), Path: contract.Pointer(address.PublicPath(kind, path))}}
 			}
-			if len(input.Endpoints) > 1 && (cmd.Flags().Changed("port") || cmd.Flags().Changed("protocol") || cmd.Flags().Changed("path") || cmd.Flags().Changed("endpoint-enabled")) {
+			if len(input.Endpoints) > 1 && (cmd.Flags().Changed("port") || cmd.Flags().Changed("kind") || cmd.Flags().Changed("path") || cmd.Flags().Changed("endpoint-enabled")) {
 				return fmt.Errorf("endpoint override flags require exactly one endpoint")
 			}
 			if len(input.Endpoints) == 1 {
@@ -138,13 +138,14 @@ func newPublicRegisterCommand() *cobra.Command {
 					}
 					ep.Port = contract.Pointer(p)
 				}
-				if cmd.Flags().Changed("protocol") || ep.Protocol == nil && cmd.Flags().Changed("port") && (file == "" || len(endpoints) > 0) {
-					ep.Protocol = contract.Pointer(protocol)
+				if cmd.Flags().Changed("kind") || ep.Kind == nil && cmd.Flags().Changed("port") && (file == "" || len(endpoints) > 0) {
+					ep.Kind = contract.Pointer(kind)
 				}
 				if cmd.Flags().Changed("path") || ep.Path == nil && cmd.Flags().Changed("port") && (file == "" || len(endpoints) > 0) {
 					value := path
-					if !cmd.Flags().Changed("path") && ep.Protocol != nil {
-						value = address.PublicPath(*ep.Protocol, value)
+					endpointKind := ep.Kind
+					if !cmd.Flags().Changed("path") && endpointKind != nil {
+						value = address.PublicPath(*endpointKind, value)
 					}
 					ep.Path = contract.Pointer(value)
 				}
@@ -165,12 +166,13 @@ func newPublicRegisterCommand() *cobra.Command {
 				}
 			}
 			for _, ep := range input.Endpoints {
-				if ep.Protocol != nil {
+				endpointKind := ep.Kind
+				if endpointKind != nil {
 					endpointPath := ""
 					if ep.Path != nil {
 						endpointPath = *ep.Path
 					}
-					if err := address.ValidateEndpointPath(*ep.Protocol, endpointPath); err != nil {
+					if err := address.ValidateEndpointPath(*endpointKind, endpointPath); err != nil {
 						return fmt.Errorf("endpoint %q: %w", ep.Name, err)
 					}
 				}
@@ -205,11 +207,11 @@ func newPublicRegisterCommand() *cobra.Command {
 	c.Flags().StringVar(&environment, "environment", "", "Environment key (otherwise file or ALAUDA_ENVIRONMENT)")
 	c.Flags().StringVar(&instance, "instance", "", "Instance name (defaults to bare address)")
 	c.Flags().StringVar(&host, "address", "", "Bare DNS hostname or IP")
-	c.Flags().StringArrayVar(&endpoints, "endpoint", nil, "Repeat: name,protocol,port[,path], or name with --port")
+	c.Flags().StringArrayVar(&endpoints, "endpoint", nil, "Repeat: name,kind,port[,path], or name with --port")
 	c.Flags().StringArrayVar(&endpoints, "endpoints", nil, "Legacy alias for --endpoint")
 	_ = c.Flags().MarkDeprecated("endpoints", "use repeated --endpoint")
-	c.Flags().StringVar(&protocol, "protocol", "http", "Shorthand endpoint protocol")
-	c.Flags().StringVar(&path, "path", "/", "HTTP/HTTPS endpoint path; omitted for TCP/UDP/gRPC")
+	c.Flags().StringVar(&kind, "kind", "http", "Shorthand endpoint kind: http|https|grpc|postgres|redis|tcp|udp|custom")
+	c.Flags().StringVar(&path, "path", "/", "HTTP/HTTPS endpoint path; omitted for non-HTTP kinds")
 	c.Flags().Int64Var(&port, "port", 0, "Endpoint port 1..65535")
 	c.Flags().StringVar(&description, "description", "", "Instance description; empty explicitly clears")
 	c.Flags().StringVar(&file, "file", "", "Strict YAML or JSON registration file")
@@ -330,11 +332,11 @@ func newPublicResolveCommand() *cobra.Command {
 			return err
 		}
 		if cliConfig.Output == "value" {
-			address, ok := out["address"].(string)
-			if !ok || address == "" {
-				return publicCLIError{Status: 502, Code: "invalid_server_response", Detail: "Resolve response did not contain an address."}
+			value, err := publicResolvedValue(out)
+			if err != nil {
+				return err
 			}
-			fmt.Println(address)
+			fmt.Println(value)
 			return nil
 		}
 		printPublicOutput(out)
@@ -344,6 +346,28 @@ func newPublicResolveCommand() *cobra.Command {
 	c.Flags().StringVar(&endpoint, "endpoint", "", "Endpoint name")
 	c.Flags().StringVar(&health, "health", "usable", "Health policy: usable|healthy|all")
 	return c
+}
+
+func publicResolvedValue(out map[string]any) (string, error) {
+	if value, _ := out["resolvedValue"].(string); value != "" {
+		return value, nil
+	}
+	instance, _ := out["instance"].(map[string]any)
+	endpoint, _ := out["endpoint"].(map[string]any)
+	host, _ := instance["address"].(string)
+	if host == "" {
+		return "", publicCLIError{Status: 502, Code: "invalid_server_response", Detail: "Resolve response did not contain an address."}
+	}
+	kind, _ := endpoint["kind"].(string)
+	if kind == "" {
+		return "", publicCLIError{Status: 502, Code: "invalid_server_response", Detail: "Resolve response did not contain an endpoint kind."}
+	}
+	portNumber, ok := endpoint["port"].(float64)
+	if !ok {
+		return "", publicCLIError{Status: 502, Code: "invalid_server_response", Detail: "Resolve response did not contain a port."}
+	}
+	path, _ := endpoint["path"].(string)
+	return address.FormatValue(strings.ToLower(kind), host, int32(portNumber), path)
 }
 func mustJSON(value any) string { data, _ := json.Marshal(value); return string(data) }
 func printPublicOutput(value any) {
@@ -368,9 +392,9 @@ func printPublicTable(value any) {
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	defer w.Flush()
-	if item["address"] != nil {
-		fmt.Fprintln(w, "SERVICE\tENVIRONMENT\tINSTANCE\tENDPOINT\tADDRESS")
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", publicCell(item["service"]), publicCell(item["environment"]), publicCell(item["instance"]), publicCell(item["endpoint"]), publicCell(item["address"]))
+	if item["address"] != nil && item["port"] != nil {
+		fmt.Fprintln(w, "SERVICE\tENVIRONMENT\tINSTANCE\tENDPOINT\tKIND\tADDRESS\tPORT\tPATH")
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", publicCell(item["service"]), publicCell(item["environment"]), publicCell(item["instance"]), publicCell(item["endpoint"]), publicCell(item["kind"]), publicCell(item["address"]), publicCell(item["port"]), publicCell(item["path"]))
 		return
 	}
 	for _, key := range []string{"services", "instances", "endpoints", "environments", "checks", "results"} {
@@ -378,7 +402,7 @@ func printPublicTable(value any) {
 		if !ok {
 			continue
 		}
-		columns := map[string][]string{"services": {"name", "displayName", "healthStatus", "description"}, "instances": {"name", "address", "enabled", "healthState"}, "endpoints": {"name", "protocol", "port", "path", "primary", "enabled", "address"}, "environments": {"key", "name", "enabled"}, "checks": {"name", "endpoint", "type", "enabled", "intervalSeconds", "timeoutSeconds"}, "results": {"check", "instance", "endpoint", "timestamp", "success", "latencyMs", "statusCode"}}[key]
+		columns := map[string][]string{"services": {"name", "displayName", "healthStatus", "description"}, "instances": {"name", "address", "enabled", "healthState"}, "endpoints": {"name", "kind", "port", "path", "primary", "enabled", "address"}, "environments": {"key", "name", "enabled"}, "checks": {"name", "endpoint", "type", "enabled", "intervalSeconds", "timeoutSeconds"}, "results": {"check", "instance", "endpoint", "timestamp", "success", "latencyMs", "statusCode"}}[key]
 		headings := make([]string, len(columns))
 		for i, column := range columns {
 			headings[i] = strings.ToUpper(column)
