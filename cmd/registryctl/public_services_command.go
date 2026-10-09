@@ -50,7 +50,7 @@ func newPublicRegisterCommand() *cobra.Command {
 	var replace, enabled, endpointEnabled bool
 	var tags, metadata map[string]string
 	c := &cobra.Command{Use: "register", Short: "Register or update a service instance", Args: cobra.NoArgs,
-		Long:    "Service and Environment must already exist. Registration is an UPSERT by Service + Environment + Instance name. Omitted fields/endpoints are preserved; --replace-endpoints explicitly removes omitted endpoints. The shorthand uses the address as Instance name, endpoint default, kind http and path /. A new singleton is Primary only when Primary is omitted. File fields use the same schema as REST; explicit flags override file values, then ALAUDA_ENVIRONMENT provides a missing Environment.",
+		Long:    "Service and Environment must already exist. Registration is an UPSERT by Service + Environment + Instance name. Omitted fields/endpoints are preserved; --replace-endpoints explicitly removes omitted endpoints. The shorthand uses the address as Instance name, endpoint default, kind http and an empty path. A new singleton is Primary only when Primary is omitted. File fields use the same schema as REST; explicit flags override file values, then ALAUDA_ENVIRONMENT provides a missing Environment.",
 		Example: "alauda services register --name Authentication.Grpc --environment stg --address lynx-authentication.lynx --port 81",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var input contract.Registration
@@ -211,7 +211,7 @@ func newPublicRegisterCommand() *cobra.Command {
 	c.Flags().StringArrayVar(&endpoints, "endpoints", nil, "Legacy alias for --endpoint")
 	_ = c.Flags().MarkDeprecated("endpoints", "use repeated --endpoint")
 	c.Flags().StringVar(&kind, "kind", "http", "Shorthand endpoint kind: http|https|grpc|postgres|redis|tcp|udp|custom")
-	c.Flags().StringVar(&path, "path", "/", "HTTP/HTTPS endpoint path; omitted for non-HTTP kinds")
+	c.Flags().StringVar(&path, "path", "", "HTTP/HTTPS endpoint path; omitted for non-HTTP kinds")
 	c.Flags().Int64Var(&port, "port", 0, "Endpoint port 1..65535")
 	c.Flags().StringVar(&description, "description", "", "Instance description; empty explicitly clears")
 	c.Flags().StringVar(&file, "file", "", "Strict YAML or JSON registration file")

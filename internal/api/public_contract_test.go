@@ -166,3 +166,65 @@ func TestPublicPostgresDiscoveryIsStructured(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicCustomDiscoveryReturnsHostPortValue(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.NewDatabase(ctx, fixtureDatabasePath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.RunMigrations(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewEnvironmentRepository(db).Create(ctx, &registryv1.CreateEnvironmentRequest{Key: "stg", Name: "Staging"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewServiceRepository(db).Create(ctx, &registryv1.CreateServiceRequest{Name: "kafka", DisplayName: "Kafka"}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, db)
+	body := []byte(`{"environment":"stg","instance":{"name":"broker","address":"pkc-lgk0v.us-west1.gcp.confluent.cloud"},"endpoints":[{"name":"default","kind":"custom","port":9092,"primary":true}]}`)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/api/v1/services/kafka/instances", bytes.NewReader(body)))
+	if res.Code != http.StatusOK {
+		t.Fatalf("register status=%d body=%s", res.Code, res.Body.String())
+	}
+	res = httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/v1/discovery/kafka/resolve?environment=stg", nil))
+	if res.Code != http.StatusOK || !bytes.Contains(res.Body.Bytes(), []byte(`"resolvedValue":"pkc-lgk0v.us-west1.gcp.confluent.cloud:9092"`)) || bytes.Contains(res.Body.Bytes(), []byte(`custom://`)) {
+		t.Fatalf("resolve status=%d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestPublicHTTPDiscoveryDoesNotInventSlashForEmptyPath(t *testing.T) {
+	ctx := context.Background()
+	db, err := storage.NewDatabase(ctx, fixtureDatabasePath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := storage.RunMigrations(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewEnvironmentRepository(db).Create(ctx, &registryv1.CreateEnvironmentRequest{Key: "stg", Name: "Staging"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := storage.NewServiceRepository(db).Create(ctx, &registryv1.CreateServiceRequest{Name: "api", DisplayName: "API"}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, db)
+	body := []byte(`{"environment":"stg","instance":{"name":"api-01","address":"api.internal"},"endpoints":[{"name":"default","kind":"http","port":8080,"primary":true}]}`)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/api/v1/services/api/instances", bytes.NewReader(body)))
+	if res.Code != http.StatusOK {
+		t.Fatalf("register status=%d body=%s", res.Code, res.Body.String())
+	}
+	res = httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/v1/discovery/api/resolve?environment=stg", nil))
+	if res.Code != http.StatusOK || !bytes.Contains(res.Body.Bytes(), []byte(`"resolvedValue":"http://api.internal:8080"`)) || bytes.Contains(res.Body.Bytes(), []byte(`http://api.internal:8080/`)) {
+		t.Fatalf("resolve status=%d body=%s", res.Code, res.Body.String())
+	}
+}

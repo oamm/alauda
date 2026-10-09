@@ -2376,9 +2376,9 @@ function formatEndpointResolvedValue(endpoint: Endpoint, instance?: ServiceInsta
   const path = endpoint.path || "";
   switch (endpoint.kind) {
     case "HTTP":
-      return `http://${host}:${port}${path || "/"}`;
+      return `http://${host}:${port}${path}`;
     case "HTTPS":
-      return `https://${host}:${port}${path || "/"}`;
+      return `https://${host}:${port}${path}`;
     default:
       return `${host}:${port}`;
   }

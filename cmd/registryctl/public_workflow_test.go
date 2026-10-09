@@ -90,7 +90,7 @@ func TestAuthenticatedPublicCLIWorkflow(t *testing.T) {
 		t.Fatal("rerun identity not stable")
 	}
 	value := require("services", "resolve", "Authentication.Grpc", "--output", "value", "--quiet")
-	if value != "http://lynx-authentication.lynx:81/\n" {
+	if value != "http://lynx-authentication.lynx:81\n" {
 		t.Fatalf("value=%q", value)
 	}
 	for _, format := range []string{"json", "yaml", "table"} {

@@ -9,6 +9,7 @@ describe("shared endpoint semantics", () => {
   it("suggests deterministic instance-local names with editable defaults", () => {
     expect(newEndpoint()).toMatchObject({
       name: "default",
+      path: "",
       primary: true,
       enabled: true,
     });

@@ -50,6 +50,12 @@ func TestPublicRegistrationKindPaths(t *testing.T) {
 	if *received.Endpoints[0].Path != "/health" {
 		t.Fatal("HTTP path lost")
 	}
+	if err := run("--kind", "http"); err != nil {
+		t.Fatal(err)
+	}
+	if received.Endpoints[0].Path != nil && *received.Endpoints[0].Path != "" {
+		t.Fatalf("HTTP default path = %q, want empty", *received.Endpoints[0].Path)
+	}
 	if err := run("--endpoint", "default,tcp,5432"); err != nil {
 		t.Fatal(err)
 	}
@@ -64,5 +70,8 @@ func TestPublicRegistrationKindPaths(t *testing.T) {
 	}
 	if got, err := publicResolvedValue(map[string]any{"instance": map[string]any{"address": "api.internal"}, "endpoint": map[string]any{"kind": "HTTP", "port": float64(8080), "path": "/"}}); err != nil || got != "http://api.internal:8080/" {
 		t.Fatalf("http value = %q, %v", got, err)
+	}
+	if got, err := publicResolvedValue(map[string]any{"instance": map[string]any{"address": "api.internal"}, "endpoint": map[string]any{"kind": "HTTP", "port": float64(8080)}}); err != nil || got != "http://api.internal:8080" {
+		t.Fatalf("http empty path value = %q, %v", got, err)
 	}
 }

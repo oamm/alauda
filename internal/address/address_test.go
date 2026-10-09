@@ -15,6 +15,7 @@ func TestCanonicalAddresses(t *testing.T) {
 		{"grpc", "auth-host", "/ignored", "auth-host:81", 81},
 		{"postgres", "10.0.0.1", "", "10.0.0.1:5432", 5432},
 		{"redis", "redis.internal", "", "redis.internal:6379", 6379},
+		{"custom", "pkc-lgk0v.us-west1.gcp.confluent.cloud", "", "pkc-lgk0v.us-west1.gcp.confluent.cloud:9092", 9092},
 		{"tcp", "10.0.0.1", "", "10.0.0.1:81", 81},
 		{"udp", "::1", "", "[::1]:81", 81},
 	} {

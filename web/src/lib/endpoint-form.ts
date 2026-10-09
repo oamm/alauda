@@ -124,7 +124,7 @@ export function newEndpoint(
     name,
     kind: "HTTP",
     port: 8080,
-    path: "/",
+    path: "",
     primary: existingNames.length === 0,
     enabled: true,
     ...overrides,

@@ -20,7 +20,7 @@ alauda services register --name Authentication.Grpc --environment stg --address 
 alauda services resolve Authentication.Grpc --environment stg --output value
 ```
 
-The shorthand uses the bare address as Instance name, Endpoint name `default`, kind `http`, path `/`. IPv6 and addresses that cannot form a resource key require explicit `--instance`. Repeating registration is an atomic UPSERT; IDs stay stable. Omitted mutable fields and endpoints are preserved. Only a new singleton with Primary omitted defaults to Primary. Promotion is explicit with `--primary-endpoint`; file `primary: false` is respected. See [PUBLIC_API.md](PUBLIC_API.md) for canonical reconciliation and lifecycle semantics.
+The shorthand uses the bare address as Instance name, Endpoint name `default`, kind `http`, and an empty path. Use `--path /` only when the root path should be part of the resolved URI. IPv6 and addresses that cannot form a resource key require explicit `--instance`. Repeating registration is an atomic UPSERT; IDs stay stable. Omitted mutable fields and endpoints are preserved. Only a new singleton with Primary omitted defaults to Primary. Promotion is explicit with `--primary-endpoint`; file `primary: false` is respected. See [PUBLIC_API.md](PUBLIC_API.md) for canonical reconciliation and lifecycle semantics.
 
 ## Endpoint semantics
 
