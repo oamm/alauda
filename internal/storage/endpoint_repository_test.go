@@ -117,6 +117,31 @@ func TestCreateEndpointRejectsActiveDuplicateWithoutChangingPrimary(t *testing.T
 	}
 }
 
+func TestListEndpointsHandlesNullPath(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDatabase(t)
+	defer db.Close()
+	instance := createEndpointTestInstance(t, ctx, db)
+	repo := NewEndpointRepository(db)
+	endpoint, err := repo.Create(ctx, &registryv1.CreateEndpointRequest{
+		InstanceId: instance.GetId(), Name: "grpc", Kind: registryv1.EndpointKind_ENDPOINT_KIND_GRPC,
+		Port: 81, Enabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE endpoints SET path = NULL WHERE id = ?`, endpoint.GetId()); err != nil {
+		t.Fatal(err)
+	}
+	items, _, err := repo.List(ctx, instance.GetId(), 10, "")
+	if err != nil {
+		t.Fatalf("list endpoints with null path: %v", err)
+	}
+	if len(items) != 1 || items[0].GetPath() != "" {
+		t.Fatalf("endpoints = %+v, want one endpoint with empty path", items)
+	}
+}
+
 func TestCreateEndpointDeletedNameIsScopedToInstance(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDatabase(t)

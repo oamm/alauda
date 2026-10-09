@@ -268,7 +268,7 @@ func scanEndpoint(scanner interface{ Scan(...interface{}) error }) (*registryv1.
 		name         string
 		kind         int32
 		port         int32
-		path         string
+		path         sql.NullString
 		enabled      bool
 		tagsJSON     string
 		metadataJSON string
@@ -289,7 +289,7 @@ func scanEndpoint(scanner interface{ Scan(...interface{}) error }) (*registryv1.
 		Name:       name,
 		Kind:       registryv1.EndpointKind(kind),
 		Port:       port,
-		Path:       path,
+		Path:       path.String,
 		Enabled:    enabled,
 		Tags:       make(map[string]string),
 		Metadata:   make(map[string]string),
