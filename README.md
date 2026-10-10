@@ -18,6 +18,14 @@ docker pull oamm/alauda:latest
 - PostgreSQL and SQLite-backed persistence
 - Runtime registration and service discovery workflows
 
+## Web Console
+
+![Alauda dashboard overview](docs/assets/screenshots/alauda-dashboard.png)
+
+![Service inventory and endpoint detail](docs/assets/screenshots/alauda-service-inventory.png)
+
+![Health check execution history](docs/assets/screenshots/alauda-health-results.png)
+
 ## Choose a Storage Provider
 
 Alauda supports SQLite for a simple single-node installation and PostgreSQL for shared or production deployments. Set both `ALAUDA_STORAGE_PROVIDER` and `ALAUDA_DATABASE_URL` explicitly in production.
