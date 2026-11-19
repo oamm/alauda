@@ -19,6 +19,7 @@ BEGIN
           AND column_name = 'kind'
     ) THEN
         ALTER TABLE endpoints RENAME COLUMN protocol TO kind;
+        ALTER TABLE endpoints ALTER COLUMN kind TYPE INTEGER USING kind::integer;
     END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_endpoints_kind ON endpoints(kind) WHERE deleted_at IS NULL;

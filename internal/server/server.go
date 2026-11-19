@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"github.com/company/service-registry/internal/alerts"
 	"github.com/company/service-registry/internal/api"
 	"github.com/company/service-registry/internal/auth"
+	"github.com/company/service-registry/internal/buildinfo"
 	"github.com/company/service-registry/internal/config"
 	"github.com/company/service-registry/internal/health"
 	"github.com/company/service-registry/internal/storage"
@@ -154,7 +156,7 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 func (s *Server) version(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"version":"0.1.0","commit":"dev"}`)
+	_ = json.NewEncoder(w).Encode(map[string]string{"version": buildinfo.Version, "commit": buildinfo.Commit})
 }
 
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {

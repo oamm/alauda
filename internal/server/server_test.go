@@ -12,6 +12,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/company/service-registry/internal/buildinfo"
 	"github.com/company/service-registry/internal/config"
 	"github.com/company/service-registry/internal/storage"
 )
@@ -27,7 +28,7 @@ func TestHealthzVersionAndMetricsHandlers(t *testing.T) {
 		body        string
 	}{
 		{name: "healthz", handler: s.healthz, contentType: "application/json", body: `"status":"ok"`},
-		{name: "version", handler: s.version, contentType: "application/json", body: `"version":"0.1.0"`},
+		{name: "version", handler: s.version, contentType: "application/json", body: `"version":"` + buildinfo.Version + `"`},
 		{name: "metrics", handler: s.metrics, contentType: "text/plain; version=0.0.4", body: "registry_database_up 1"},
 	}
 	for _, tc := range tests {

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	v1 "github.com/company/service-registry/gen/go/api/registry/v1"
+	"github.com/company/service-registry/gen/go/api/registry/v1/registryv1connect"
 	"github.com/company/service-registry/internal/auth"
 	"github.com/company/service-registry/internal/config"
 	"github.com/company/service-registry/internal/storage"
@@ -24,6 +25,44 @@ type publicFixture struct {
 	db                              *storage.Database
 	mux                             *http.ServeMux
 	token, serviceID, environmentID string
+}
+
+func TestPublicServiceNameReuseAfterDelete(t *testing.T) {
+	f := newPublicFixture(t)
+	const path = "/api/v1/services"
+	const body = `{"name":"payments"}`
+	create := func() string {
+		t.Helper()
+		w := f.request(http.MethodPost, path, body)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("create service: got %d, want 201: %s", w.Code, w.Body.String())
+		}
+		var service struct{ ID, Name string }
+		if err := json.Unmarshal(w.Body.Bytes(), &service); err != nil {
+			t.Fatal(err)
+		}
+		if service.ID == "" || service.Name != "payments" {
+			t.Fatalf("unexpected created service: %+v", service)
+		}
+		return service.ID
+	}
+
+	oldID := create()
+	w := f.request(http.MethodPost, registryv1connect.CatalogServiceDeleteServiceProcedure, `{"id":"`+oldID+`"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete service: got %d, want 200: %s", w.Code, w.Body.String())
+	}
+	if newID := create(); newID == oldID {
+		t.Fatalf("recreated service reused deleted ID %q", oldID)
+	}
+	w = f.request(http.MethodPost, registryv1connect.CatalogServiceGetServiceProcedure, `{"id":"`+oldID+`"}`)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("get deleted service: got %d, want 404: %s", w.Code, w.Body.String())
+	}
+	w = f.request(http.MethodPost, path, body)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), `"resource_conflict"`) {
+		t.Fatalf("create active duplicate: got %d, want 409 resource_conflict: %s", w.Code, w.Body.String())
+	}
 }
 
 func TestPublicKeyManagementAndBootstrap(t *testing.T) {

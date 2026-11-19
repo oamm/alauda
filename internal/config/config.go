@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/company/service-registry/internal/buildinfo"
 	"gopkg.in/yaml.v3"
 )
 
@@ -393,7 +394,7 @@ func defaultConfig() *Config {
 			Enabled:        true,
 			OTLPEndpoint:   "http://localhost:4317",
 			ServiceName:    "registry",
-			ServiceVersion: "0.1.0",
+			ServiceVersion: buildinfo.Version,
 		},
 		Alerts: AlertsConfig{
 			Enabled:    true,

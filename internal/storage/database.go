@@ -3,7 +3,9 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -149,23 +151,78 @@ func RunMigrations(ctx context.Context, d *Database) error {
 			continue
 		}
 		up := strings.TrimSpace(strings.SplitN(parts[1], "-- Down", 2)[0])
-		tx, err := d.BeginTx(ctx)
-		if err != nil {
-			return err
-		}
-		if _, err = tx.ExecContext(ctx, up); err == nil {
-			_, err = tx.ExecContext(ctx, "INSERT INTO migrations (name, applied_at) VALUES (?, ?)", entry.Name(), time.Now().UTC().Format(time.RFC3339Nano))
-		}
-		if err != nil {
-			_ = tx.Rollback()
+		rebuild := d.provider == "sqlite" && strings.Contains(parts[0], "-- SQLite: rebuild table")
+		if err := d.applyMigration(ctx, entry.Name(), up, rebuild); err != nil {
 			return fmt.Errorf("apply migration %s: %w", entry.Name(), err)
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit migration %s: %w", entry.Name(), err)
 		}
 		slog.Info("Migration completed", slog.String("name", entry.Name()), slog.String("provider", d.provider))
 	}
 	return nil
+}
+
+func (d *Database) applyMigration(ctx context.Context, name, up string, rebuild bool) (err error) {
+	begin := d.db.BeginTx
+	if rebuild {
+		// SQLite requires changing foreign key enforcement outside the rebuild transaction.
+		conn, connErr := d.db.Conn(ctx)
+		if connErr != nil {
+			return connErr
+		}
+		defer conn.Close()
+		defer func() {
+			if _, restoreErr := conn.ExecContext(context.WithoutCancel(ctx), "PRAGMA foreign_keys = ON"); restoreErr != nil {
+				_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+				err = errors.Join(err, fmt.Errorf("restore SQLite foreign key enforcement: %w", restoreErr))
+			}
+		}()
+		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+			return err
+		}
+		begin = conn.BeginTx
+	}
+
+	sqlTx, err := begin(ctx, nil)
+	if err != nil {
+		return err
+	}
+	tx := &Tx{tx: sqlTx, provider: d.provider}
+	defer tx.Rollback()
+	if d.provider == "sqlite" && name == "025_endpoint_kind.sql" {
+		if err := migrateSQLiteEndpointKind(ctx, tx); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, up); err != nil {
+		return err
+	}
+	if rebuild {
+		var invalid bool
+		if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM pragma_foreign_key_check)").Scan(&invalid); err != nil {
+			return err
+		}
+		if invalid {
+			return errors.New("SQLite foreign key check failed after table rebuild")
+		}
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO migrations (name, applied_at) VALUES (?, ?)", name, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func migrateSQLiteEndpointKind(ctx context.Context, tx *Tx) error {
+	var legacy bool
+	if err := tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM pragma_table_info('endpoints') WHERE name = 'protocol')").Scan(&legacy); err != nil || !legacy {
+		return err
+	}
+	// Older SQLite versions of Alauda stored protocol numbers in a TEXT column.
+	_, err := tx.ExecContext(ctx, `
+		DROP INDEX IF EXISTS idx_endpoints_protocol;
+		ALTER TABLE endpoints ADD COLUMN kind INTEGER NOT NULL DEFAULT 0;
+		UPDATE endpoints SET kind = CAST(protocol AS INTEGER);
+		ALTER TABLE endpoints DROP COLUMN protocol;
+	`)
+	return err
 }
 
 func (d *Database) QueryRow(ctx context.Context, q string, args ...any) *sql.Row {

@@ -22,7 +22,7 @@ telemetry:
   enabled: true
   otlpEndpoint: "http://localhost:4317"
   serviceName: "registry"
-  serviceVersion: "0.1.0"
+  serviceVersion: "0.2.0"
 
 alerts:
   enabled: true

@@ -11,18 +11,13 @@ import (
 	"time"
 
 	"github.com/company/service-registry/internal/auth"
+	"github.com/company/service-registry/internal/buildinfo"
 	"github.com/company/service-registry/internal/config"
 	"github.com/company/service-registry/internal/server"
 	"github.com/company/service-registry/internal/storage"
 	"github.com/company/service-registry/internal/telemetry"
 	"github.com/company/service-registry/internal/webstatic"
 	"github.com/spf13/cobra"
-)
-
-var (
-	version = "0.1.0"
-	commit  = "dev"
-	date    = time.Now().Format("2006-01-02")
 )
 
 func main() {
@@ -51,7 +46,7 @@ func main() {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("registry version %s (commit: %s, date: %s)\n", version, commit, date)
+			fmt.Printf("registry version %s (commit: %s, date: %s)\n", buildinfo.Version, buildinfo.Commit, buildinfo.Date)
 		},
 	}
 	rootCmd.AddCommand(versionCmd)

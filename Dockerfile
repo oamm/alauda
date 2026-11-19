@@ -33,8 +33,9 @@ COPY gen ./gen
 COPY --from=frontend-builder /app/web/dist ./internal/webstatic/dist
 
 # Build the server and public CLI binaries
+ARG BUILD_COMMIT=dev
 RUN CGO_ENABLED=1 GOOS=linux go build \
-    -ldflags="-w -s" \
+    -ldflags="-w -s -X github.com/company/service-registry/internal/buildinfo.Commit=${BUILD_COMMIT} -X github.com/company/service-registry/internal/buildinfo.Date=$(date -u +%Y-%m-%d)" \
     -o registry ./cmd/registry
 RUN CGO_ENABLED=1 GOOS=linux go build \
     -ldflags="-w -s" \
